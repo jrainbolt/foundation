@@ -46,3 +46,7 @@ separate pickup and drop commits. They retain held material under backpressure,
 and same-endpoint contention is won by the lowest inserter entity ID.
 
 See `docs/inserter-system.md` for timing, ownership, and interaction rules.
+
+Internally, item movement uses entity-and-slot logistics endpoints so source
+inspection, destination acceptance, and atomic ownership commits share one
+implementation. This refactor does not change the public API or gameplay.

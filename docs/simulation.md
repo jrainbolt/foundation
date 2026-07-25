@@ -34,3 +34,8 @@ Inserter drop processing precedes pickup processing, so an item acquired during
 step 8 remains visibly held until a later tick. Both phases validate current
 endpoint state, resolve contention by lowest inserter entity ID, and only then
 commit ownership.
+
+Producer, belt, splitter, and inserter planners now record private logistics
+endpoints. Endpoint inspection is read-only; commit revalidates the expected
+source item and destination acceptance before either ownership field changes.
+This changes internal dispatch only, not the fixed update order.

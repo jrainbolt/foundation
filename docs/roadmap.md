@@ -9,6 +9,8 @@
 - [x] Machine interaction
 - [x] Belt pickup and belt drop
 - [x] Cardinal placement orientation
+- [x] Internal entity-and-slot logistics endpoints
+- [x] Shared atomic ownership transfer operations
 - [ ] Inserter variants, filters, and longer arms
 
 The next milestone can build richer factory-control systems on the deterministic

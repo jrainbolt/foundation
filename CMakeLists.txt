@@ -53,6 +53,7 @@ add_library(factory_engine
     src/extractor.c
     src/item.c
     src/inserter.c
+    src/logistics_endpoint.c
     src/recipe.c
     src/refinery.c
     src/simulation.c
@@ -134,6 +135,25 @@ if(BUILD_TESTING)
     add_executable(factory_inserter_tests tests/test_inserter.c)
     target_link_libraries(factory_inserter_tests PRIVATE factory_engine)
     add_test(NAME factory_inserter_tests COMMAND factory_inserter_tests)
+
+    add_executable(
+        factory_logistics_endpoint_tests
+        tests/test_logistics_endpoint.c
+    )
+    target_include_directories(
+        factory_logistics_endpoint_tests
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(
+        factory_logistics_endpoint_tests
+        PRIVATE
+            factory_engine
+    )
+    add_test(
+        NAME factory_logistics_endpoint_tests
+        COMMAND factory_logistics_endpoint_tests
+    )
 
     add_executable(factory_simulation_tests tests/test_simulation.c)
     target_link_libraries(factory_simulation_tests PRIVATE factory_engine)

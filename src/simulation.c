@@ -6,54 +6,20 @@
 #include "belt_internal.h"
 #include "extractor_internal.h"
 #include "inserter_internal.h"
+#include "logistics_endpoint_internal.h"
 #include "refinery_internal.h"
 #include "splitter_internal.h"
 #include "storage_internal.h"
+#include "simulation_internal.h"
 #include "world_internal.h"
 
-typedef enum {
-    TRANSFER_TO_BELT = 0,
-    TRANSFER_TO_STORAGE,
-    TRANSFER_TO_REFINERY,
-    TRANSFER_TO_ASSEMBLER_IRON,
-    TRANSFER_TO_ASSEMBLER_COPPER,
-    TRANSFER_TO_SPLITTER
-} TransferKind;
-
-typedef enum {
-    SOURCE_BELT = 0,
-    SOURCE_EXTRACTOR,
-    SOURCE_REFINERY,
-    SOURCE_ASSEMBLER,
-    SOURCE_SPLITTER
-} TransferSourceKind;
-
 typedef struct {
-    FactoryEntityId source_id;
-    FactoryEntityId destination_id;
+    FactoryLogisticsEndpoint source;
+    FactoryLogisticsEndpoint destination;
     FactoryItemType item;
-    TransferKind kind;
-    TransferSourceKind source_kind;
     FactorySplitterOutput splitter_output;
     bool wins;
 } TransferIntent;
-
-struct FactorySimulation {
-    uint64_t tick;
-    FactoryWorld *world;
-    FactoryEntityManager *entities;
-    FactoryExtractorStore extractors;
-    FactoryRefineryStore refineries;
-    FactoryAssemblerStore assemblers;
-    FactorySplitterStore splitters;
-    FactoryInserterStore inserters;
-    FactoryBeltStore belts;
-    FactoryStorageStore storages;
-    FactoryCommand commands[FACTORY_COMMAND_QUEUE_CAPACITY];
-    size_t command_count;
-    FactoryCommandResult results[FACTORY_COMMAND_QUEUE_CAPACITY];
-    size_t result_count;
-};
 
 static void adjacent_coordinate(
     int32_t x,
@@ -686,7 +652,6 @@ static void add_producer_intent(
     TransferIntent *intents,
     size_t *count,
     FactoryEntityId source_id,
-    TransferSourceKind source_kind,
     int32_t x,
     int32_t y,
     FactoryDirection direction,
@@ -704,14 +669,21 @@ static void add_producer_intent(
         return;
     }
     belt = factory_belt_store_find(&simulation->belts, tile->occupying_entity);
-    if (belt == NULL || belt->item != FACTORY_ITEM_NONE) {
+    if (belt == NULL) {
         return;
     }
-    intents[*count].source_id = source_id;
-    intents[*count].destination_id = belt->entity_id;
+    intents[*count].source = (FactoryLogisticsEndpoint){
+        source_id, FACTORY_LOGISTICS_SLOT_OUTPUT
+    };
+    intents[*count].destination = (FactoryLogisticsEndpoint){
+        belt->entity_id, FACTORY_LOGISTICS_SLOT_MAIN
+    };
+    if (factory_logistics_endpoint_can_accept(
+            simulation, intents[*count].destination, item)
+        != FACTORY_LOGISTICS_RESULT_OK) {
+        return;
+    }
     intents[*count].item = item;
-    intents[*count].kind = TRANSFER_TO_BELT;
-    intents[*count].source_kind = source_kind;
     intents[*count].wins = true;
     ++*count;
 }
@@ -737,7 +709,14 @@ static bool splitter_output_is_available(
         return false;
     }
     belt = factory_belt_store_find(&simulation->belts, tile->occupying_entity);
-    if (belt == NULL || belt->item != FACTORY_ITEM_NONE) {
+    if (belt == NULL
+        || factory_logistics_endpoint_can_accept(
+            simulation,
+            (FactoryLogisticsEndpoint){
+                belt->entity_id, FACTORY_LOGISTICS_SLOT_MAIN
+            },
+            splitter->item
+        ) != FACTORY_LOGISTICS_RESULT_OK) {
         return false;
     }
     *out_belt_id = belt->entity_id;
@@ -764,11 +743,16 @@ static void add_splitter_intent(
             return;
         }
     }
-    intents[*count].source_id = splitter->entity_id;
-    intents[*count].destination_id = belt_id;
+    intents[*count].source = (FactoryLogisticsEndpoint){
+        splitter->entity_id,
+        selected == FACTORY_SPLITTER_OUTPUT_LEFT
+            ? FACTORY_LOGISTICS_SLOT_SPLITTER_LEFT_OUTPUT
+            : FACTORY_LOGISTICS_SLOT_SPLITTER_RIGHT_OUTPUT
+    };
+    intents[*count].destination = (FactoryLogisticsEndpoint){
+        belt_id, FACTORY_LOGISTICS_SLOT_MAIN
+    };
     intents[*count].item = splitter->item;
-    intents[*count].kind = TRANSFER_TO_BELT;
-    intents[*count].source_kind = SOURCE_SPLITTER;
     intents[*count].splitter_output = selected;
     intents[*count].wins = true;
     ++*count;
@@ -781,10 +765,11 @@ static void resolve_transfers(TransferIntent *intents, size_t count)
 
     for (first = 0U; first < count; ++first) {
         for (second = first + 1U; second < count; ++second) {
-            if (intents[first].destination_id
-                    == intents[second].destination_id
-                && intents[first].kind == intents[second].kind) {
-                if (intents[first].source_id < intents[second].source_id) {
+            if (factory_logistics_endpoint_equal(
+                    intents[first].destination,
+                    intents[second].destination)) {
+                if (intents[first].source.entity_id
+                    < intents[second].source.entity_id) {
                     intents[second].wins = false;
                 } else {
                     intents[first].wins = false;
@@ -817,7 +802,7 @@ static void update_producer_transfers(FactorySimulation *simulation)
         if (source->output_item != FACTORY_ITEM_NONE) {
             add_producer_intent(
                 simulation, intents, &count, source->entity_id,
-                SOURCE_EXTRACTOR, source->x, source->y,
+                source->x, source->y,
                 source->output_direction, source->output_item
             );
         }
@@ -828,7 +813,7 @@ static void update_producer_transfers(FactorySimulation *simulation)
         if (source->output_item != FACTORY_ITEM_NONE) {
             add_producer_intent(
                 simulation, intents, &count, source->entity_id,
-                SOURCE_REFINERY, source->x, source->y,
+                source->x, source->y,
                 source->output_direction, source->output_item
             );
         }
@@ -839,7 +824,7 @@ static void update_producer_transfers(FactorySimulation *simulation)
         if (source->output_item != FACTORY_ITEM_NONE) {
             add_producer_intent(
                 simulation, intents, &count, source->entity_id,
-                SOURCE_ASSEMBLER, source->x, source->y,
+                source->x, source->y,
                 source->output_direction, source->output_item
             );
         }
@@ -853,39 +838,23 @@ static void update_producer_transfers(FactorySimulation *simulation)
     }
     resolve_transfers(intents, count);
     for (index = 0U; index < count; ++index) {
-        FactoryBelt *destination;
-
         if (!intents[index].wins) {
             continue;
         }
-        destination = factory_belt_store_find_mutable(
-            &simulation->belts, intents[index].destination_id
-        );
-        destination->item = intents[index].item;
-        destination->movement_progress = 0U;
-        if (intents[index].source_kind == SOURCE_EXTRACTOR) {
-            FactoryExtractor *source = factory_extractor_store_find_mutable(
-                &simulation->extractors, intents[index].source_id
-            );
-            source->output_item = FACTORY_ITEM_NONE;
-            source->output_amount = 0U;
-        } else if (intents[index].source_kind == SOURCE_REFINERY) {
-            FactoryRefinery *source = factory_refinery_store_find_mutable(
-                &simulation->refineries, intents[index].source_id
-            );
-            source->output_item = FACTORY_ITEM_NONE;
-            source->output_amount = 0U;
-        } else if (intents[index].source_kind == SOURCE_ASSEMBLER) {
-            FactoryAssembler *source = factory_assembler_store_find_mutable(
-                &simulation->assemblers, intents[index].source_id
-            );
-            source->output_item = FACTORY_ITEM_NONE;
-            source->output_amount = 0U;
-        } else {
+        if (factory_logistics_endpoint_transfer(
+                simulation,
+                intents[index].source,
+                intents[index].destination,
+                intents[index].item) != FACTORY_LOGISTICS_RESULT_OK) {
+            continue;
+        }
+        if (intents[index].source.slot
+            == FACTORY_LOGISTICS_SLOT_SPLITTER_LEFT_OUTPUT
+            || intents[index].source.slot
+                == FACTORY_LOGISTICS_SLOT_SPLITTER_RIGHT_OUTPUT) {
             FactorySplitter *source = factory_splitter_store_find_mutable(
-                &simulation->splitters, intents[index].source_id
+                &simulation->splitters, intents[index].source.entity_id
             );
-            source->item = FACTORY_ITEM_NONE;
             source->next_output =
                 intents[index].splitter_output
                     == FACTORY_SPLITTER_OUTPUT_LEFT
@@ -908,11 +877,11 @@ static size_t plan_belt_transfers(
         const FactoryBelt *source = &simulation->belts.items[belt_index];
         const FactoryTile *tile;
         const FactoryBelt *destination_belt;
-        const FactoryStorage *destination_storage;
         const FactoryRefinery *destination_refinery;
         const FactoryAssembler *destination_assembler;
         const FactorySplitter *destination_splitter;
-        const FactoryRecipe *destination_recipe;
+        const FactoryStorage *destination_storage;
+        FactoryLogisticsEndpoint destination = {0};
         int32_t target_x;
         int32_t target_y;
         int32_t input_x;
@@ -938,31 +907,22 @@ static size_t plan_belt_transfers(
         destination_refinery = factory_refinery_store_find(
             &simulation->refineries, tile->occupying_entity
         );
-        destination_recipe = destination_refinery == NULL
-            ? NULL
-            : factory_recipe_get(destination_refinery->recipe_id);
         destination_assembler = factory_assembler_store_find(
             &simulation->assemblers, tile->occupying_entity
         );
         destination_splitter = factory_splitter_store_find(
             &simulation->splitters, tile->occupying_entity
         );
-        if (destination_belt != NULL
-            && destination_belt->item == FACTORY_ITEM_NONE) {
-            intents[intent_count].kind = TRANSFER_TO_BELT;
-        } else if (destination_storage != NULL
-            && (source->item == FACTORY_ITEM_IRON_ORE
-                || source->item == FACTORY_ITEM_IRON_PLATE
-                || source->item == FACTORY_ITEM_COPPER_ORE
-                || source->item == FACTORY_ITEM_COPPER_PLATE
-                || source->item == FACTORY_ITEM_ELECTRONIC_COMPONENT)
-            && factory_storage_get_total_amount(destination_storage)
-                < destination_storage->total_capacity) {
-            intents[intent_count].kind = TRANSFER_TO_STORAGE;
-        } else if (destination_refinery != NULL
-            && destination_recipe != NULL
-            && source->item == destination_recipe->input_item
-            && destination_refinery->input_item == FACTORY_ITEM_NONE) {
+        if (destination_belt != NULL) {
+            destination = (FactoryLogisticsEndpoint){
+                destination_belt->entity_id, FACTORY_LOGISTICS_SLOT_MAIN
+            };
+        } else if (destination_storage != NULL) {
+            destination = (FactoryLogisticsEndpoint){
+                destination_storage->entity_id,
+                FACTORY_LOGISTICS_SLOT_STORAGE_INPUT
+            };
+        } else if (destination_refinery != NULL) {
             adjacent_coordinate(
                 destination_refinery->x,
                 destination_refinery->y,
@@ -973,17 +933,25 @@ static size_t plan_belt_transfers(
             if (input_x != source->x || input_y != source->y) {
                 continue;
             }
-            intents[intent_count].kind = TRANSFER_TO_REFINERY;
-        } else if (destination_assembler != NULL
-            && source->item == FACTORY_ITEM_IRON_PLATE
-            && destination_assembler->iron_plate_amount == 0U) {
-            intents[intent_count].kind = TRANSFER_TO_ASSEMBLER_IRON;
-        } else if (destination_assembler != NULL
-            && source->item == FACTORY_ITEM_COPPER_PLATE
-            && destination_assembler->copper_plate_amount == 0U) {
-            intents[intent_count].kind = TRANSFER_TO_ASSEMBLER_COPPER;
-        } else if (destination_splitter != NULL
-            && destination_splitter->item == FACTORY_ITEM_NONE) {
+            destination = (FactoryLogisticsEndpoint){
+                destination_refinery->entity_id,
+                FACTORY_LOGISTICS_SLOT_INPUT
+            };
+        } else if (destination_assembler != NULL) {
+            if (source->item == FACTORY_ITEM_IRON_PLATE) {
+                destination = (FactoryLogisticsEndpoint){
+                    destination_assembler->entity_id,
+                    FACTORY_LOGISTICS_SLOT_IRON_INPUT
+                };
+            } else if (source->item == FACTORY_ITEM_COPPER_PLATE) {
+                destination = (FactoryLogisticsEndpoint){
+                    destination_assembler->entity_id,
+                    FACTORY_LOGISTICS_SLOT_COPPER_INPUT
+                };
+            } else {
+                continue;
+            }
+        } else if (destination_splitter != NULL) {
             adjacent_coordinate(
                 destination_splitter->x,
                 destination_splitter->y,
@@ -994,14 +962,23 @@ static size_t plan_belt_transfers(
             if (input_x != source->x || input_y != source->y) {
                 continue;
             }
-            intents[intent_count].kind = TRANSFER_TO_SPLITTER;
+            destination = (FactoryLogisticsEndpoint){
+                destination_splitter->entity_id,
+                FACTORY_LOGISTICS_SLOT_SPLITTER_INPUT
+            };
         } else {
             continue;
         }
-        intents[intent_count].source_id = source->entity_id;
-        intents[intent_count].destination_id = tile->occupying_entity;
+        if (factory_logistics_endpoint_can_accept(
+                simulation, destination, source->item)
+            != FACTORY_LOGISTICS_RESULT_OK) {
+            continue;
+        }
+        intents[intent_count].source = (FactoryLogisticsEndpoint){
+            source->entity_id, FACTORY_LOGISTICS_SLOT_MAIN
+        };
+        intents[intent_count].destination = destination;
         intents[intent_count].item = source->item;
-        intents[intent_count].source_kind = SOURCE_BELT;
         intents[intent_count].wins = true;
         ++intent_count;
     }
@@ -1017,62 +994,15 @@ static void commit_belt_transfers(
     size_t index;
 
     for (index = 0U; index < count; ++index) {
-        FactoryBelt *source;
-
         if (!intents[index].wins) {
             continue;
         }
-        source = factory_belt_store_find_mutable(
-            &simulation->belts, intents[index].source_id
+        (void)factory_logistics_endpoint_transfer(
+            simulation,
+            intents[index].source,
+            intents[index].destination,
+            intents[index].item
         );
-        if (intents[index].kind == TRANSFER_TO_BELT) {
-            FactoryBelt *destination = factory_belt_store_find_mutable(
-                &simulation->belts, intents[index].destination_id
-            );
-            destination->item = intents[index].item;
-            destination->movement_progress = 0U;
-        } else if (intents[index].kind == TRANSFER_TO_STORAGE) {
-            FactoryStorage *destination = factory_storage_store_find_mutable(
-                &simulation->storages, intents[index].destination_id
-            );
-            if (intents[index].item == FACTORY_ITEM_IRON_ORE) {
-                ++destination->iron_ore_amount;
-            } else if (intents[index].item == FACTORY_ITEM_IRON_PLATE) {
-                ++destination->iron_plate_amount;
-            } else if (intents[index].item == FACTORY_ITEM_COPPER_ORE) {
-                ++destination->copper_ore_amount;
-            } else if (intents[index].item == FACTORY_ITEM_COPPER_PLATE) {
-                ++destination->copper_plate_amount;
-            } else {
-                ++destination->electronic_component_amount;
-            }
-        } else if (intents[index].kind == TRANSFER_TO_REFINERY) {
-            FactoryRefinery *destination =
-                factory_refinery_store_find_mutable(
-                    &simulation->refineries, intents[index].destination_id
-                );
-            destination->input_item = intents[index].item;
-            destination->input_amount = 1U;
-        } else if (intents[index].kind == TRANSFER_TO_ASSEMBLER_IRON
-            || intents[index].kind == TRANSFER_TO_ASSEMBLER_COPPER) {
-            FactoryAssembler *destination =
-                factory_assembler_store_find_mutable(
-                    &simulation->assemblers, intents[index].destination_id
-                );
-            if (intents[index].kind == TRANSFER_TO_ASSEMBLER_IRON) {
-                destination->iron_plate_amount = 1U;
-            } else {
-                destination->copper_plate_amount = 1U;
-            }
-        } else {
-            FactorySplitter *destination =
-                factory_splitter_store_find_mutable(
-                    &simulation->splitters, intents[index].destination_id
-                );
-            destination->item = intents[index].item;
-        }
-        source->item = FACTORY_ITEM_NONE;
-        source->movement_progress = 0U;
     }
 }
 
@@ -1094,19 +1024,10 @@ static void update_belt_transfers(FactorySimulation *simulation)
     free(intents);
 }
 
-typedef enum {
-    INSERTER_ENDPOINT_BELT = 0,
-    INSERTER_ENDPOINT_SPLITTER,
-    INSERTER_ENDPOINT_REFINERY,
-    INSERTER_ENDPOINT_ASSEMBLER,
-    INSERTER_ENDPOINT_STORAGE
-} InserterEndpointKind;
-
 typedef struct {
     FactoryEntityId inserter_id;
-    FactoryEntityId endpoint_id;
+    FactoryLogisticsEndpoint endpoint;
     FactoryItemType item;
-    InserterEndpointKind kind;
     bool wins;
 } InserterIntent;
 
@@ -1153,9 +1074,8 @@ static bool splitter_can_output_to_inserter(
 static bool inspect_inserter_source(
     FactorySimulation *simulation,
     const FactoryInserter *inserter,
-    FactoryEntityId *out_id,
-    FactoryItemType *out_item,
-    InserterEndpointKind *out_kind
+    FactoryLogisticsEndpoint *out_endpoint,
+    FactoryItemType *out_item
 )
 {
     const FactoryTile *tile = factory_world_get_tile(
@@ -1170,29 +1090,41 @@ static bool inspect_inserter_source(
         return false;
     }
     belt = factory_belt_store_find(&simulation->belts, tile->occupying_entity);
-    if (belt != NULL && belt->item != FACTORY_ITEM_NONE) {
-        *out_id = belt->entity_id;
-        *out_item = belt->item;
-        *out_kind = INSERTER_ENDPOINT_BELT;
-        return true;
+    if (belt != NULL) {
+        *out_endpoint = (FactoryLogisticsEndpoint){
+            belt->entity_id, FACTORY_LOGISTICS_SLOT_MAIN
+        };
+        return factory_logistics_endpoint_peek(
+            simulation, *out_endpoint, out_item
+        ) == FACTORY_LOGISTICS_RESULT_OK;
     }
     splitter = factory_splitter_store_find(
         &simulation->splitters, tile->occupying_entity
     );
     if (splitter != NULL
-        && splitter->item != FACTORY_ITEM_NONE
         && splitter_can_output_to_inserter(splitter, inserter)) {
-        *out_id = splitter->entity_id;
-        *out_item = splitter->item;
-        *out_kind = INSERTER_ENDPOINT_SPLITTER;
-        return true;
+        *out_endpoint = (FactoryLogisticsEndpoint){
+            splitter->entity_id,
+            coordinate_matches_direction(
+                splitter->x,
+                splitter->y,
+                splitter_output_direction(
+                    splitter->facing, FACTORY_SPLITTER_OUTPUT_LEFT
+                ),
+                inserter->x,
+                inserter->y
+            )
+                ? FACTORY_LOGISTICS_SLOT_SPLITTER_LEFT_OUTPUT
+                : FACTORY_LOGISTICS_SLOT_SPLITTER_RIGHT_OUTPUT
+        };
+        return factory_logistics_endpoint_peek(
+            simulation, *out_endpoint, out_item
+        ) == FACTORY_LOGISTICS_RESULT_OK;
     }
     refinery = factory_refinery_store_find(
         &simulation->refineries, tile->occupying_entity
     );
     if (refinery != NULL
-        && refinery->output_item != FACTORY_ITEM_NONE
-        && refinery->output_amount == 1U
         && coordinate_matches_direction(
             refinery->x,
             refinery->y,
@@ -1200,17 +1132,17 @@ static bool inspect_inserter_source(
             inserter->x,
             inserter->y
         )) {
-        *out_id = refinery->entity_id;
-        *out_item = refinery->output_item;
-        *out_kind = INSERTER_ENDPOINT_REFINERY;
-        return true;
+        *out_endpoint = (FactoryLogisticsEndpoint){
+            refinery->entity_id, FACTORY_LOGISTICS_SLOT_OUTPUT
+        };
+        return factory_logistics_endpoint_peek(
+            simulation, *out_endpoint, out_item
+        ) == FACTORY_LOGISTICS_RESULT_OK;
     }
     assembler = factory_assembler_store_find(
         &simulation->assemblers, tile->occupying_entity
     );
     if (assembler != NULL
-        && assembler->output_item != FACTORY_ITEM_NONE
-        && assembler->output_amount == 1U
         && coordinate_matches_direction(
             assembler->x,
             assembler->y,
@@ -1218,10 +1150,12 @@ static bool inspect_inserter_source(
             inserter->x,
             inserter->y
         )) {
-        *out_id = assembler->entity_id;
-        *out_item = assembler->output_item;
-        *out_kind = INSERTER_ENDPOINT_ASSEMBLER;
-        return true;
+        *out_endpoint = (FactoryLogisticsEndpoint){
+            assembler->entity_id, FACTORY_LOGISTICS_SLOT_OUTPUT
+        };
+        return factory_logistics_endpoint_peek(
+            simulation, *out_endpoint, out_item
+        ) == FACTORY_LOGISTICS_RESULT_OK;
     }
     return false;
 }
@@ -1236,7 +1170,8 @@ static void resolve_inserter_intents(
 
     for (first = 0U; first < count; ++first) {
         for (second = first + 1U; second < count; ++second) {
-            if (intents[first].endpoint_id == intents[second].endpoint_id) {
+            if (factory_logistics_endpoint_equal(
+                    intents[first].endpoint, intents[second].endpoint)) {
                 if (intents[first].inserter_id
                     < intents[second].inserter_id) {
                     intents[second].wins = false;
@@ -1245,41 +1180,6 @@ static void resolve_inserter_intents(
                 }
             }
         }
-    }
-}
-
-static void clear_inserter_source(
-    FactorySimulation *simulation,
-    const InserterIntent *intent
-)
-{
-    if (intent->kind == INSERTER_ENDPOINT_BELT) {
-        FactoryBelt *belt = factory_belt_store_find_mutable(
-            &simulation->belts, intent->endpoint_id
-        );
-
-        belt->item = FACTORY_ITEM_NONE;
-        belt->movement_progress = 0U;
-    } else if (intent->kind == INSERTER_ENDPOINT_SPLITTER) {
-        FactorySplitter *splitter = factory_splitter_store_find_mutable(
-            &simulation->splitters, intent->endpoint_id
-        );
-
-        splitter->item = FACTORY_ITEM_NONE;
-    } else if (intent->kind == INSERTER_ENDPOINT_REFINERY) {
-        FactoryRefinery *refinery = factory_refinery_store_find_mutable(
-            &simulation->refineries, intent->endpoint_id
-        );
-
-        refinery->output_item = FACTORY_ITEM_NONE;
-        refinery->output_amount = 0U;
-    } else {
-        FactoryAssembler *assembler = factory_assembler_store_find_mutable(
-            &simulation->assemblers, intent->endpoint_id
-        );
-
-        assembler->output_item = FACTORY_ITEM_NONE;
-        assembler->output_amount = 0U;
     }
 }
 
@@ -1300,12 +1200,11 @@ static void update_inserter_pickups(FactorySimulation *simulation)
         FactoryInserter *inserter = &simulation->inserters.items[index];
 
         if (inserter->state == FACTORY_INSERTER_STATE_IDLE) {
-            FactoryEntityId endpoint_id;
+            FactoryLogisticsEndpoint endpoint;
             FactoryItemType item;
-            InserterEndpointKind kind;
 
             if (inspect_inserter_source(
-                    simulation, inserter, &endpoint_id, &item, &kind)) {
+                    simulation, inserter, &endpoint, &item)) {
                 inserter->state = FACTORY_INSERTER_STATE_PICKING_UP;
                 inserter->progress = 0U;
             }
@@ -1318,9 +1217,8 @@ static void update_inserter_pickups(FactorySimulation *simulation)
                 if (!inspect_inserter_source(
                         simulation,
                         inserter,
-                        &intent->endpoint_id,
-                        &intent->item,
-                        &intent->kind)) {
+                        &intent->endpoint,
+                        &intent->item)) {
                     inserter->state = FACTORY_INSERTER_STATE_IDLE;
                     inserter->progress = 0U;
                     continue;
@@ -1342,29 +1240,28 @@ static void update_inserter_pickups(FactorySimulation *simulation)
             inserter->progress = 0U;
             continue;
         }
-        clear_inserter_source(simulation, &intents[index]);
-        inserter->held_item = intents[index].item;
-        inserter->held_amount = 1U;
+        if (factory_logistics_endpoint_transfer(
+                simulation,
+                intents[index].endpoint,
+                (FactoryLogisticsEndpoint){
+                    inserter->entity_id,
+                    FACTORY_LOGISTICS_SLOT_INSERTER_HELD
+                },
+                intents[index].item) != FACTORY_LOGISTICS_RESULT_OK) {
+            inserter->state = FACTORY_INSERTER_STATE_IDLE;
+            inserter->progress = 0U;
+            continue;
+        }
         inserter->state = FACTORY_INSERTER_STATE_HOLDING;
         inserter->progress = 0U;
     }
     free(intents);
 }
 
-static bool storage_accepts_item(
-    const FactoryStorage *storage,
-    FactoryItemType item
-)
-{
-    return item != FACTORY_ITEM_NONE
-        && factory_storage_get_total_amount(storage) < storage->total_capacity;
-}
-
 static bool inspect_inserter_destination(
     FactorySimulation *simulation,
     const FactoryInserter *inserter,
-    FactoryEntityId *out_id,
-    InserterEndpointKind *out_kind
+    FactoryLogisticsEndpoint *out_endpoint
 )
 {
     const FactoryTile *tile = factory_world_get_tile(
@@ -1377,22 +1274,24 @@ static bool inspect_inserter_destination(
     const FactoryStorage *storage;
     const FactoryRefinery *refinery;
     const FactoryAssembler *assembler;
-    const FactoryRecipe *recipe;
+
+    *out_endpoint = (FactoryLogisticsEndpoint){
+        0U, FACTORY_LOGISTICS_SLOT_NONE
+    };
 
     if (tile == NULL || tile->occupying_entity == 0U) {
         return false;
     }
     belt = factory_belt_store_find(&simulation->belts, tile->occupying_entity);
-    if (belt != NULL && belt->item == FACTORY_ITEM_NONE) {
-        *out_id = belt->entity_id;
-        *out_kind = INSERTER_ENDPOINT_BELT;
-        return true;
+    if (belt != NULL) {
+        *out_endpoint = (FactoryLogisticsEndpoint){
+            belt->entity_id, FACTORY_LOGISTICS_SLOT_MAIN
+        };
     }
     splitter = factory_splitter_store_find(
         &simulation->splitters, tile->occupying_entity
     );
     if (splitter != NULL
-        && splitter->item == FACTORY_ITEM_NONE
         && coordinate_matches_direction(
             splitter->x,
             splitter->y,
@@ -1400,29 +1299,23 @@ static bool inspect_inserter_destination(
             inserter->x,
             inserter->y
         )) {
-        *out_id = splitter->entity_id;
-        *out_kind = INSERTER_ENDPOINT_SPLITTER;
-        return true;
-    }
-    storage = factory_storage_store_find(
-        &simulation->storages, tile->occupying_entity
-    );
-    if (storage != NULL && storage_accepts_item(
-            storage, inserter->held_item)) {
-        *out_id = storage->entity_id;
-        *out_kind = INSERTER_ENDPOINT_STORAGE;
-        return true;
+        *out_endpoint = (FactoryLogisticsEndpoint){
+            splitter->entity_id, FACTORY_LOGISTICS_SLOT_SPLITTER_INPUT
+        };
+    } else {
+        storage = factory_storage_store_find(
+            &simulation->storages, tile->occupying_entity
+        );
+        if (storage != NULL) {
+            *out_endpoint = (FactoryLogisticsEndpoint){
+                storage->entity_id, FACTORY_LOGISTICS_SLOT_STORAGE_INPUT
+            };
+        }
     }
     refinery = factory_refinery_store_find(
         &simulation->refineries, tile->occupying_entity
     );
-    recipe = refinery == NULL
-        ? NULL
-        : factory_recipe_get(refinery->recipe_id);
     if (refinery != NULL
-        && recipe != NULL
-        && inserter->held_item == recipe->input_item
-        && refinery->input_item == FACTORY_ITEM_NONE
         && coordinate_matches_direction(
             refinery->x,
             refinery->y,
@@ -1430,85 +1323,25 @@ static bool inspect_inserter_destination(
             inserter->x,
             inserter->y
         )) {
-        *out_id = refinery->entity_id;
-        *out_kind = INSERTER_ENDPOINT_REFINERY;
-        return true;
+        *out_endpoint = (FactoryLogisticsEndpoint){
+            refinery->entity_id, FACTORY_LOGISTICS_SLOT_INPUT
+        };
     }
     assembler = factory_assembler_store_find(
         &simulation->assemblers, tile->occupying_entity
     );
-    if (assembler != NULL
-        && ((inserter->held_item == FACTORY_ITEM_IRON_PLATE
-                && assembler->iron_plate_amount == 0U)
-            || (inserter->held_item == FACTORY_ITEM_COPPER_PLATE
-                && assembler->copper_plate_amount == 0U))) {
-        *out_id = assembler->entity_id;
-        *out_kind = INSERTER_ENDPOINT_ASSEMBLER;
-        return true;
+    if (assembler != NULL) {
+        *out_endpoint = (FactoryLogisticsEndpoint){
+            assembler->entity_id,
+            inserter->held_item == FACTORY_ITEM_IRON_PLATE
+                ? FACTORY_LOGISTICS_SLOT_IRON_INPUT
+                : FACTORY_LOGISTICS_SLOT_COPPER_INPUT
+        };
     }
-    return false;
-}
-
-static void add_item_to_storage(
-    FactoryStorage *storage,
-    FactoryItemType item
-)
-{
-    if (item == FACTORY_ITEM_IRON_ORE) {
-        ++storage->iron_ore_amount;
-    } else if (item == FACTORY_ITEM_IRON_PLATE) {
-        ++storage->iron_plate_amount;
-    } else if (item == FACTORY_ITEM_COPPER_ORE) {
-        ++storage->copper_ore_amount;
-    } else if (item == FACTORY_ITEM_COPPER_PLATE) {
-        ++storage->copper_plate_amount;
-    } else {
-        ++storage->electronic_component_amount;
-    }
-}
-
-static void commit_inserter_drop(
-    FactorySimulation *simulation,
-    const InserterIntent *intent
-)
-{
-    if (intent->kind == INSERTER_ENDPOINT_BELT) {
-        FactoryBelt *belt = factory_belt_store_find_mutable(
-            &simulation->belts, intent->endpoint_id
-        );
-
-        belt->item = intent->item;
-        belt->movement_progress = 0U;
-    } else if (intent->kind == INSERTER_ENDPOINT_SPLITTER) {
-        FactorySplitter *splitter = factory_splitter_store_find_mutable(
-            &simulation->splitters, intent->endpoint_id
-        );
-
-        splitter->item = intent->item;
-    } else if (intent->kind == INSERTER_ENDPOINT_STORAGE) {
-        FactoryStorage *storage = factory_storage_store_find_mutable(
-            &simulation->storages, intent->endpoint_id
-        );
-
-        add_item_to_storage(storage, intent->item);
-    } else if (intent->kind == INSERTER_ENDPOINT_REFINERY) {
-        FactoryRefinery *refinery = factory_refinery_store_find_mutable(
-            &simulation->refineries, intent->endpoint_id
-        );
-
-        refinery->input_item = intent->item;
-        refinery->input_amount = 1U;
-    } else {
-        FactoryAssembler *assembler = factory_assembler_store_find_mutable(
-            &simulation->assemblers, intent->endpoint_id
-        );
-
-        if (intent->item == FACTORY_ITEM_IRON_PLATE) {
-            assembler->iron_plate_amount = 1U;
-        } else {
-            assembler->copper_plate_amount = 1U;
-        }
-    }
+    return out_endpoint->entity_id != 0U
+        && factory_logistics_endpoint_can_accept(
+            simulation, *out_endpoint, inserter->held_item
+        ) == FACTORY_LOGISTICS_RESULT_OK;
 }
 
 static void update_inserter_drops(FactorySimulation *simulation)
@@ -1543,8 +1376,7 @@ static void update_inserter_drops(FactorySimulation *simulation)
             if (!inspect_inserter_destination(
                     simulation,
                     inserter,
-                    &intent->endpoint_id,
-                    &intent->kind)) {
+                    &intent->endpoint)) {
                 continue;
             }
             intent->inserter_id = inserter->entity_id;
@@ -1560,12 +1392,19 @@ static void update_inserter_drops(FactorySimulation *simulation)
         if (!intents[index].wins) {
             continue;
         }
-        commit_inserter_drop(simulation, &intents[index]);
         inserter = factory_inserter_store_find_mutable(
             &simulation->inserters, intents[index].inserter_id
         );
-        inserter->held_item = FACTORY_ITEM_NONE;
-        inserter->held_amount = 0U;
+        if (factory_logistics_endpoint_transfer(
+                simulation,
+                (FactoryLogisticsEndpoint){
+                    inserter->entity_id,
+                    FACTORY_LOGISTICS_SLOT_INSERTER_HELD
+                },
+                intents[index].endpoint,
+                intents[index].item) != FACTORY_LOGISTICS_RESULT_OK) {
+            continue;
+        }
         inserter->state = FACTORY_INSERTER_STATE_IDLE;
         inserter->progress = 0U;
     }

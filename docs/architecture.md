@@ -42,3 +42,8 @@ pathfinding.
 
 Inserters add an active state machine above the same ownership model. Pickup
 and drop have independent plan, contention-resolution, and commit phases.
+
+Shared logistics operations flow from simulation planning into a private
+endpoint layer and then into entity-specific stores. An endpoint combines an
+entity ID with a logical slot, avoiding duplicated type dispatch while keeping
+routing, geometry, scheduling, and processing in their owning systems.

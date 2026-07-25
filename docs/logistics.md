@@ -50,3 +50,9 @@ facing. Supported sources are belts, splitter outputs, and refinery/assembler
 outputs. Supported destinations are belts, splitter inputs, storage, and
 compatible refinery/assembler inputs. Storage is drop-only. Pickup and drop
 commit on separate ticks; blocked delivery remains owned by the inserter.
+
+Internally, planners identify both the entity and logical slot for every source
+and destination. Read-only peek/acceptance precedes conflict resolution.
+Winning transfers revalidate and atomically move exactly one item through the
+shared endpoint layer. Complete endpoint identity makes assembler iron and
+copper inputs independent while preserving same-slot conflicts.
