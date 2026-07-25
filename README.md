@@ -50,3 +50,8 @@ See `docs/inserter-system.md` for timing, ownership, and interaction rules.
 Internally, item movement uses entity-and-slot logistics endpoints so source
 inspection, destination acceptance, and atomic ownership commits share one
 implementation. This refactor does not change the public API or gameplay.
+
+Placement spends simulation-owned construction units, while successful
+empty-only demolition refunds the full fixed cost. Construction units remain
+separate from iron, copper, and production logistics. See
+`docs/construction-inventory.md` and `docs/construction-costs.md`.

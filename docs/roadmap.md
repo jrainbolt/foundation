@@ -11,7 +11,9 @@
 - [x] Cardinal placement orientation
 - [x] Internal entity-and-slot logistics endpoints
 - [x] Shared atomic ownership transfer operations
+- [x] Simulation-owned construction inventory
+- [x] Fixed placement costs and full demolition refunds
 - [ ] Inserter variants, filters, and longer arms
 
-The next milestone can build richer factory-control systems on the deterministic
-logistics core.
+The next production milestone is assembler recipe selection with multiple
+recipes, recipe-dependent inputs, and safe switching.

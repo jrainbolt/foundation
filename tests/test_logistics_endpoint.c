@@ -36,7 +36,7 @@ static Fixture create_fixture(void)
     CHECK(factory_world_add_resource(
         fixture.world, 0, 0, FACTORY_RESOURCE_IRON, 10U
     ) == FACTORY_RESULT_OK);
-    fixture.simulation = factory_simulation_create(fixture.world);
+    fixture.simulation = factory_simulation_create_with_construction_units(fixture.world, UINT32_MAX);
     submit(fixture.simulation, (FactoryCommand){
         FACTORY_COMMAND_PLACE_EXTRACTOR,
         {.place_extractor = {0, 0, FACTORY_DIRECTION_SOUTH}}

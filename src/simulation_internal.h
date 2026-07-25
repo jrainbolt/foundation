@@ -10,6 +10,7 @@
 #include "refinery_internal.h"
 #include "splitter_internal.h"
 #include "storage_internal.h"
+#include "construction_inventory_internal.h"
 
 struct FactorySimulation {
     uint64_t tick;
@@ -22,6 +23,7 @@ struct FactorySimulation {
     FactoryInserterStore inserters;
     FactoryBeltStore belts;
     FactoryStorageStore storages;
+    FactoryConstructionInventory construction_inventory;
     FactoryCommand commands[FACTORY_COMMAND_QUEUE_CAPACITY];
     size_t command_count;
     FactoryCommandResult results[FACTORY_COMMAND_QUEUE_CAPACITY];

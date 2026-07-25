@@ -41,6 +41,8 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
         case FACTORY_COMMAND_PLACE_INSERTER:
             direction = command->data.place_inserter.facing;
             break;
+        case FACTORY_COMMAND_GRANT_CONSTRUCTION_UNITS:
+            return true;
         default:
             return false;
     }

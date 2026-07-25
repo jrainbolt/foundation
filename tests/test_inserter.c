@@ -171,7 +171,7 @@ static uint32_t accounted_element(
 static void test_placement_orientation_and_invalid_sources(void)
 {
     FactoryWorld *world = factory_world_create(4U, 3U);
-    FactorySimulation *simulation = factory_simulation_create(world);
+    FactorySimulation *simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     FactoryInserter state;
     FactoryCommand invalid = inserter(0, 0, (FactoryDirection)99);
 
@@ -232,7 +232,7 @@ static void test_belt_pickup_storage_drop_timing_and_backpressure(void)
     CHECK(factory_world_add_resource(
         world, 0, 0, FACTORY_RESOURCE_IRON, 3U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_PLACE_EXTRACTOR,
         {.place_extractor = {0, 0, FACTORY_DIRECTION_EAST}}
@@ -300,7 +300,7 @@ static void test_belt_pickup_storage_drop_timing_and_backpressure(void)
     CHECK(factory_world_add_resource(
         world, 0, 0, FACTORY_RESOURCE_IRON, 3U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_PLACE_EXTRACTOR,
         {.place_extractor = {0, 0, FACTORY_DIRECTION_EAST}}
@@ -359,7 +359,7 @@ static void test_drop_contention_lowest_id_wins(void)
     CHECK(factory_world_add_resource(
         world, 4, 0, FACTORY_RESOURCE_IRON, 1U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_PLACE_EXTRACTOR,
         {.place_extractor = {0, 0, FACTORY_DIRECTION_SOUTH}}
@@ -432,7 +432,7 @@ static void test_pickup_contention_and_determinism(void)
         CHECK(factory_world_add_resource(
             world[run], 2, 0, FACTORY_RESOURCE_IRON, 1U
         ) == FACTORY_RESULT_OK);
-        simulation[run] = factory_simulation_create(world[run]);
+        simulation[run] = factory_simulation_create_with_construction_units(world[run], UINT32_MAX);
         submit(simulation[run], (FactoryCommand){
             FACTORY_COMMAND_PLACE_EXTRACTOR,
             {.place_extractor = {2, 0, FACTORY_DIRECTION_SOUTH}}
@@ -509,7 +509,7 @@ static void test_splitter_input_and_output(void)
     CHECK(factory_world_add_resource(
         world, 0, 1, FACTORY_RESOURCE_IRON, 2U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_PLACE_EXTRACTOR,
         {.place_extractor = {0, 1, FACTORY_DIRECTION_EAST}}
@@ -565,7 +565,7 @@ static void test_machine_pipeline_and_elemental_conservation(void)
     CHECK(factory_world_add_resource(
         world, 0, 4, FACTORY_RESOURCE_COPPER, 2U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
 
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_PLACE_EXTRACTOR,

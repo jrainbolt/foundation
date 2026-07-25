@@ -8,37 +8,33 @@ static void submit(FactorySimulation *simulation, FactoryCommand command)
     (void)factory_simulation_submit_command(simulation, &command);
 }
 
-static const char *state_name(FactoryInserterState state)
+static const char *result_name(FactoryResult result)
 {
-    switch (state) {
-        case FACTORY_INSERTER_STATE_IDLE:
-            return "idle";
-        case FACTORY_INSERTER_STATE_PICKING_UP:
-            return "picking up";
-        case FACTORY_INSERTER_STATE_HOLDING:
-            return "holding";
-        case FACTORY_INSERTER_STATE_DROPPING:
-            return "dropping";
+    if (result == FACTORY_RESULT_OK) {
+        return "success";
     }
-    return "invalid";
+    if (result == FACTORY_RESULT_INSUFFICIENT_CONSTRUCTION_UNITS) {
+        return "insufficient construction units";
+    }
+    return "failed";
+}
+
+static uint32_t cost(FactoryEntityType type)
+{
+    uint32_t value = 0U;
+
+    (void)factory_entity_construction_cost(type, &value);
+    return value;
 }
 
 int main(void)
 {
-    FactoryWorld *world = factory_world_create(6U, 5U);
+    FactoryWorld *world = factory_world_create(3U, 1U);
     FactorySimulation *simulation;
-    FactoryInserter previous = {0};
-    bool previous_processing = false;
-    uint32_t previous_stored = 0U;
+    const FactoryCommandResult *result;
+    bool succeeded;
 
-    if (world == NULL
-        || factory_world_add_resource(
-            world, 0, 0, FACTORY_RESOURCE_IRON, 1U
-        ) != FACTORY_RESULT_OK
-        || factory_world_add_resource(
-            world, 0, 4, FACTORY_RESOURCE_COPPER, 1U
-        ) != FACTORY_RESULT_OK) {
-        factory_world_destroy(world);
+    if (world == NULL) {
         return 1;
     }
     simulation = factory_simulation_create(world);
@@ -47,86 +43,82 @@ int main(void)
         return 1;
     }
 
-    submit(simulation, (FactoryCommand){FACTORY_COMMAND_PLACE_EXTRACTOR,
-        {.place_extractor = {0, 0, FACTORY_DIRECTION_EAST}}});
-    submit(simulation, (FactoryCommand){FACTORY_COMMAND_PLACE_BELT,
-        {.place_belt = {1, 0, FACTORY_DIRECTION_EAST}}});
-    submit(simulation, (FactoryCommand){FACTORY_COMMAND_PLACE_INSERTER,
-        {.place_inserter = {2, 0, FACTORY_DIRECTION_EAST}}});
-    submit(simulation, (FactoryCommand){FACTORY_COMMAND_PLACE_REFINERY,
-        {.place_refinery = {
-            3, 0, FACTORY_DIRECTION_WEST, FACTORY_DIRECTION_SOUTH
-        }}});
-    submit(simulation, (FactoryCommand){FACTORY_COMMAND_PLACE_EXTRACTOR,
-        {.place_extractor = {0, 4, FACTORY_DIRECTION_EAST}}});
-    submit(simulation, (FactoryCommand){FACTORY_COMMAND_PLACE_BELT,
-        {.place_belt = {1, 4, FACTORY_DIRECTION_EAST}}});
-    submit(simulation, (FactoryCommand){FACTORY_COMMAND_PLACE_INSERTER,
-        {.place_inserter = {2, 4, FACTORY_DIRECTION_EAST}}});
-    submit(simulation, (FactoryCommand){FACTORY_COMMAND_PLACE_REFINERY,
-        {.place_refinery = {
-            3, 4, FACTORY_DIRECTION_WEST, FACTORY_DIRECTION_NORTH
-        }}});
-    submit(simulation, (FactoryCommand){FACTORY_COMMAND_PLACE_INSERTER,
-        {.place_inserter = {3, 1, FACTORY_DIRECTION_SOUTH}}});
-    submit(simulation, (FactoryCommand){FACTORY_COMMAND_PLACE_INSERTER,
-        {.place_inserter = {3, 3, FACTORY_DIRECTION_NORTH}}});
-    submit(simulation, (FactoryCommand){FACTORY_COMMAND_PLACE_ASSEMBLER,
-        {.place_assembler = {3, 2, FACTORY_DIRECTION_EAST}}});
-    submit(simulation, (FactoryCommand){FACTORY_COMMAND_PLACE_INSERTER,
-        {.place_inserter = {4, 2, FACTORY_DIRECTION_EAST}}});
-    submit(simulation, (FactoryCommand){FACTORY_COMMAND_PLACE_STORAGE,
-        {.place_storage = {5, 2}}});
-    factory_simulation_tick(simulation);
-    submit(simulation, (FactoryCommand){FACTORY_COMMAND_SET_REFINERY_RECIPE,
-        {.set_refinery_recipe = {4U, FACTORY_RECIPE_IRON_PLATE}}});
-    submit(simulation, (FactoryCommand){FACTORY_COMMAND_SET_REFINERY_RECIPE,
-        {.set_refinery_recipe = {8U, FACTORY_RECIPE_COPPER_PLATE}}});
-    factory_simulation_tick(simulation);
-
     (void)printf(
-        "Deposits -> belts -> inserters -> refineries -> inserters\n"
-        "         -> assembler -> inserter -> storage\n"
+        "Initial construction units: %" PRIu32 "\n",
+        factory_simulation_construction_units(simulation)
     );
-    for (uint32_t update = 0U; update < 140U; ++update) {
-        FactoryInserter output;
-        FactoryAssembler assembler;
-        FactoryStorage storage;
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_GRANT_CONSTRUCTION_UNITS,
+        {.grant_construction_units = {20U}}
+    });
+    factory_simulation_tick(simulation);
+    (void)printf(
+        "Grant 20: %" PRIu32 "\n",
+        factory_simulation_construction_units(simulation)
+    );
 
-        factory_simulation_tick(simulation);
-        (void)factory_simulation_get_inserter(simulation, 12U, &output);
-        (void)factory_simulation_get_assembler(simulation, 11U, &assembler);
-        (void)factory_simulation_get_storage(simulation, 13U, &storage);
-        if (output.state != previous.state
-            || output.held_item != previous.held_item) {
-            (void)printf(
-                "Tick %" PRIu64 ": output inserter %-10s (%s)\n",
-                factory_simulation_get_tick(simulation),
-                state_name(output.state),
-                factory_item_name(output.held_item)
-            );
-            previous = output;
-        }
-        if (assembler.processing != previous_processing) {
-            (void)printf(
-                "Tick %" PRIu64 ": assembler %s\n",
-                factory_simulation_get_tick(simulation),
-                assembler.processing ? "processing" : "output ready"
-            );
-            previous_processing = assembler.processing;
-        }
-        if (storage.electronic_component_amount != previous_stored) {
-            (void)printf(
-                "Tick %" PRIu64 ": component arrived in storage (%" PRIu32
-                " total)\n",
-                factory_simulation_get_tick(simulation),
-                storage.electronic_component_amount
-            );
-            previous_stored = storage.electronic_component_amount;
-        }
-    }
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_BELT,
+        {.place_belt = {0, 0, FACTORY_DIRECTION_EAST}}
+    });
+    factory_simulation_tick(simulation);
+    (void)printf(
+        "Place belt (cost %" PRIu32 "): %" PRIu32 " remaining\n",
+        cost(FACTORY_ENTITY_TYPE_BELT),
+        factory_simulation_construction_units(simulation)
+    );
 
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_INSERTER,
+        {.place_inserter = {1, 0, FACTORY_DIRECTION_EAST}}
+    });
+    factory_simulation_tick(simulation);
+    (void)printf(
+        "Place inserter (cost %" PRIu32 "): %" PRIu32 " remaining\n",
+        cost(FACTORY_ENTITY_TYPE_INSERTER),
+        factory_simulation_construction_units(simulation)
+    );
+
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_ASSEMBLER,
+        {.place_assembler = {2, 0, FACTORY_DIRECTION_EAST}}
+    });
+    factory_simulation_tick(simulation);
+    result = factory_simulation_get_command_result(simulation, 0U);
+    (void)printf(
+        "Attempt assembler (cost %" PRIu32 "): %s, %" PRIu32
+        " remaining\n",
+        cost(FACTORY_ENTITY_TYPE_ASSEMBLER),
+        result_name(result->result),
+        factory_simulation_construction_units(simulation)
+    );
+
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_DEMOLISH_ENTITY, {.demolish_entity = {2U}}
+    });
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_DEMOLISH_ENTITY, {.demolish_entity = {1U}}
+    });
+    factory_simulation_tick(simulation);
+    (void)printf(
+        "Refund inserter + belt: %" PRIu32 " remaining\n",
+        factory_simulation_construction_units(simulation)
+    );
+
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_ASSEMBLER,
+        {.place_assembler = {0, 0, FACTORY_DIRECTION_EAST}}
+    });
+    factory_simulation_tick(simulation);
+    result = factory_simulation_get_command_result(simulation, 0U);
+    (void)printf(
+        "Place assembler: %s, %" PRIu32 " remaining\n",
+        result_name(result->result),
+        factory_simulation_construction_units(simulation)
+    );
+
+    succeeded = result->result == FACTORY_RESULT_OK;
     factory_simulation_destroy(simulation);
     factory_world_destroy(world);
-    return previous_stored == 1U ? 0 : 1;
+    return succeeded ? 0 : 1;
 }

@@ -69,7 +69,7 @@ static void test_empty_lifecycle_and_fifo(void)
     CHECK(factory_world_add_resource(
         world, 0, 0, FACTORY_RESOURCE_IRON, 10U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     for (size_t index = 0U; index < 8U; ++index) {
         submit(simulation, placements[index]);
     }
@@ -157,7 +157,7 @@ static void test_material_blocks_demolition(void)
     CHECK(factory_world_add_resource(
         world, 0, 0, FACTORY_RESOURCE_IRON, 2U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_PLACE_EXTRACTOR,
         {.place_extractor = {0, 0, FACTORY_DIRECTION_EAST}}
@@ -187,8 +187,8 @@ static void test_lifecycle_determinism(void)
 {
     FactoryWorld *world_a = factory_world_create(2U, 1U);
     FactoryWorld *world_b = factory_world_create(2U, 1U);
-    FactorySimulation *a = factory_simulation_create(world_a);
-    FactorySimulation *b = factory_simulation_create(world_b);
+    FactorySimulation *a = factory_simulation_create_with_construction_units(world_a, UINT32_MAX);
+    FactorySimulation *b = factory_simulation_create_with_construction_units(world_b, UINT32_MAX);
 
     submit(a, belt(0, 0));
     submit(b, belt(0, 0));

@@ -64,6 +64,14 @@ static FactoryDirection splitter_output_direction(
 
 FactorySimulation *factory_simulation_create(FactoryWorld *world)
 {
+    return factory_simulation_create_with_construction_units(world, 0U);
+}
+
+FactorySimulation *factory_simulation_create_with_construction_units(
+    FactoryWorld *world,
+    FactoryConstructionMaterial construction_units
+)
+{
     FactorySimulation *simulation;
 
     if (world == NULL) {
@@ -79,6 +87,7 @@ FactorySimulation *factory_simulation_create(FactoryWorld *world)
         return NULL;
     }
     simulation->world = world;
+    simulation->construction_inventory.units = construction_units;
     return simulation;
 }
 
@@ -557,12 +566,20 @@ static FactoryResult demolish_entity(
 )
 {
     FactoryEntityId id = command->data.demolish_entity.entity_id;
+    FactoryConstructionMaterial refund;
     FactoryResult result = validate_demolition(
         simulation, id, out_type, out_x, out_y
     );
 
     if (result != FACTORY_RESULT_OK) {
         return result;
+    }
+    if (!factory_entity_construction_cost(*out_type, &refund)) {
+        return FACTORY_RESULT_UNSUPPORTED_ENTITY;
+    }
+    if (!factory_construction_inventory_can_credit(
+            &simulation->construction_inventory, refund)) {
+        return FACTORY_RESULT_CONSTRUCTION_INVENTORY_OVERFLOW;
     }
     result = factory_world_clear_occupying_entity(
         simulation->world, *out_x, *out_y, id
@@ -574,6 +591,56 @@ static FactoryResult demolish_entity(
         return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
     }
     factory_entity_destroy(simulation->entities, id);
+    factory_construction_inventory_credit_validated(
+        &simulation->construction_inventory, refund
+    );
+    return FACTORY_RESULT_OK;
+}
+
+static bool placement_type(
+    FactoryCommandType command_type,
+    FactoryEntityType *out_type
+)
+{
+    switch (command_type) {
+        case FACTORY_COMMAND_PLACE_EXTRACTOR:
+            *out_type = FACTORY_ENTITY_TYPE_EXTRACTOR;
+            return true;
+        case FACTORY_COMMAND_PLACE_BELT:
+            *out_type = FACTORY_ENTITY_TYPE_BELT;
+            return true;
+        case FACTORY_COMMAND_PLACE_STORAGE:
+            *out_type = FACTORY_ENTITY_TYPE_STORAGE;
+            return true;
+        case FACTORY_COMMAND_PLACE_REFINERY:
+            *out_type = FACTORY_ENTITY_TYPE_REFINERY;
+            return true;
+        case FACTORY_COMMAND_PLACE_ASSEMBLER:
+            *out_type = FACTORY_ENTITY_TYPE_ASSEMBLER;
+            return true;
+        case FACTORY_COMMAND_PLACE_SPLITTER:
+            *out_type = FACTORY_ENTITY_TYPE_SPLITTER;
+            return true;
+        case FACTORY_COMMAND_PLACE_INSERTER:
+            *out_type = FACTORY_ENTITY_TYPE_INSERTER;
+            return true;
+        default:
+            return false;
+    }
+}
+
+static FactoryResult grant_construction_units(
+    FactorySimulation *simulation,
+    FactoryConstructionMaterial amount
+)
+{
+    if (!factory_construction_inventory_can_credit(
+            &simulation->construction_inventory, amount)) {
+        return FACTORY_RESULT_CONSTRUCTION_INVENTORY_OVERFLOW;
+    }
+    factory_construction_inventory_credit_validated(
+        &simulation->construction_inventory, amount
+    );
     return FACTORY_RESULT_OK;
 }
 
@@ -590,6 +657,25 @@ static void apply_commands(FactorySimulation *simulation)
         result->entity_type = FACTORY_ENTITY_TYPE_NONE;
         result->x = 0;
         result->y = 0;
+        result->construction_units_changed = 0U;
+        result->construction_units_remaining =
+            simulation->construction_inventory.units;
+        if (placement_type(
+                result->command.type, &result->entity_type)) {
+            FactoryConstructionMaterial cost;
+
+            if (!factory_entity_construction_cost(
+                    result->entity_type, &cost)) {
+                result->result = FACTORY_RESULT_UNSUPPORTED_ENTITY;
+                continue;
+            }
+            if (!factory_construction_inventory_can_spend(
+                    &simulation->construction_inventory, cost)) {
+                result->result =
+                    FACTORY_RESULT_INSUFFICIENT_CONSTRUCTION_UNITS;
+                continue;
+            }
+        }
         switch (result->command.type) {
             case FACTORY_COMMAND_PLACE_EXTRACTOR:
                 result->result = place_extractor(
@@ -642,9 +728,48 @@ static void apply_commands(FactorySimulation *simulation)
                     &result->y
                 );
                 break;
+            case FACTORY_COMMAND_GRANT_CONSTRUCTION_UNITS:
+                result->result = grant_construction_units(
+                    simulation,
+                    result->command.data.grant_construction_units.amount
+                );
+                break;
         }
+        if (result->result == FACTORY_RESULT_OK) {
+            FactoryConstructionMaterial amount;
+
+            if (placement_type(
+                    result->command.type, &result->entity_type)
+                && factory_entity_construction_cost(
+                    result->entity_type, &amount)) {
+                factory_construction_inventory_spend_validated(
+                    &simulation->construction_inventory, amount
+                );
+                result->construction_units_changed = amount;
+            } else if (result->command.type
+                == FACTORY_COMMAND_GRANT_CONSTRUCTION_UNITS) {
+                result->construction_units_changed =
+                    result->command.data.grant_construction_units.amount;
+            } else if (result->command.type
+                == FACTORY_COMMAND_DEMOLISH_ENTITY
+                && factory_entity_construction_cost(
+                    result->entity_type, &amount)) {
+                result->construction_units_changed = amount;
+            }
+        }
+        result->construction_units_remaining =
+            simulation->construction_inventory.units;
     }
     simulation->command_count = 0U;
+}
+
+FactoryConstructionMaterial factory_simulation_construction_units(
+    const FactorySimulation *simulation
+)
+{
+    return simulation == NULL
+        ? 0U
+        : simulation->construction_inventory.units;
 }
 
 static void add_producer_intent(

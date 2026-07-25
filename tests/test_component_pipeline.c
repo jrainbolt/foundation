@@ -54,7 +54,7 @@ static Pipeline create_pipeline(void)
     CHECK(factory_world_add_resource(
         p.world, 0, 0, FACTORY_RESOURCE_COPPER, 10U
     ) == FACTORY_RESULT_OK);
-    p.simulation = factory_simulation_create(p.world);
+    p.simulation = factory_simulation_create_with_construction_units(p.world, UINT32_MAX);
 
     submit(p.simulation, extractor(0, 1, FACTORY_DIRECTION_EAST)); /* 1 */
     submit(p.simulation, belt(1, 1, FACTORY_DIRECTION_EAST));      /* 2 */

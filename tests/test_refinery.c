@@ -24,7 +24,7 @@ static FactoryCommand refinery(
 int main(void)
 {
     FactoryWorld *world = factory_world_create(3U, 2U);
-    FactorySimulation *simulation = factory_simulation_create(world);
+    FactorySimulation *simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     FactoryCommand valid = refinery(
         1, 0, FACTORY_DIRECTION_WEST, FACTORY_DIRECTION_EAST
     );

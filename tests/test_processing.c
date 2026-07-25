@@ -90,7 +90,7 @@ static void test_processing_boundaries_and_blocking(void)
     CHECK(factory_world_add_resource(
         world, 0, 0, FACTORY_RESOURCE_IRON, 3U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     submit(simulation, extractor(0, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, belt(1, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, refinery(
@@ -165,7 +165,7 @@ static void test_complete_pipeline_and_storage_items(void)
     CHECK(factory_world_add_resource(
         world, 0, 0, FACTORY_RESOURCE_IRON, 5U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     submit(simulation, extractor(0, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, belt(1, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, refinery(
@@ -227,7 +227,7 @@ static void setup_pipeline(
     CHECK(factory_world_add_resource(
         *out_world, 0, 0, FACTORY_RESOURCE_IRON, 8U
     ) == FACTORY_RESULT_OK);
-    *out_simulation = factory_simulation_create(*out_world);
+    *out_simulation = factory_simulation_create_with_construction_units(*out_world, UINT32_MAX);
     submit(*out_simulation, extractor(0, 0, FACTORY_DIRECTION_EAST));
     submit(*out_simulation, belt(1, 0, FACTORY_DIRECTION_EAST));
     submit(*out_simulation, refinery(

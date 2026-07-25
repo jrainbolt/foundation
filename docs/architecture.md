@@ -47,3 +47,7 @@ Shared logistics operations flow from simulation planning into a private
 endpoint layer and then into entity-specific stores. An endpoint combines an
 entity ID with a logical slot, avoiding duplicated type dispatch while keeping
 routing, geometry, scheduling, and processing in their owning systems.
+
+The simulation directly owns a small construction inventory. Commands are its
+only runtime mutation path: grants credit it, successful placement spends it,
+and successful demolition refunds it. Fixed costs use one immutable lookup.

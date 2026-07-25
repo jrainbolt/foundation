@@ -41,7 +41,7 @@ static Network create_network(bool left_output, bool right_output)
     CHECK(factory_world_add_resource(
         network.world, 0, 1, FACTORY_RESOURCE_IRON, 6U
     ) == FACTORY_RESULT_OK);
-    network.simulation = factory_simulation_create(network.world);
+    network.simulation = factory_simulation_create_with_construction_units(network.world, UINT32_MAX);
     submit(network.simulation, (FactoryCommand){
         FACTORY_COMMAND_PLACE_EXTRACTOR,
         {.place_extractor = {0, 1, FACTORY_DIRECTION_EAST}}
@@ -193,7 +193,7 @@ static void test_blocking_and_demolition(void)
 
     {
         FactoryWorld *world = factory_world_create(1U, 1U);
-        FactorySimulation *simulation = factory_simulation_create(world);
+        FactorySimulation *simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
 
         submit(simulation, splitter(0, 0, FACTORY_DIRECTION_NORTH));
         factory_simulation_tick(simulation);
@@ -214,7 +214,7 @@ static void test_blocking_and_demolition(void)
 static void test_invalid_placement_and_determinism(void)
 {
     FactoryWorld *world = factory_world_create(2U, 1U);
-    FactorySimulation *simulation = factory_simulation_create(world);
+    FactorySimulation *simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     FactoryCommand invalid = splitter(0, 0, (FactoryDirection)99);
     FactoryCommand outside = splitter(2, 0, FACTORY_DIRECTION_EAST);
 

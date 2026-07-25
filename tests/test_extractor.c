@@ -42,7 +42,7 @@ static void test_placement_and_production(void)
     CHECK(factory_world_add_resource(
         world, 1, 0, FACTORY_RESOURCE_IRON, 100U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     CHECK(factory_simulation_submit_command(
         simulation, &command
     ) == FACTORY_RESULT_OK);
@@ -100,7 +100,7 @@ static void test_failed_placements_and_fifo(void)
     CHECK(factory_world_add_resource(
         world, 2, 0, FACTORY_RESOURCE_IRON, 5U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     commands[0] = place(-1, 0, FACTORY_DIRECTION_NORTH);
     commands[1] = place(0, 0, FACTORY_DIRECTION_NORTH);
     commands[2] = place(1, 0, FACTORY_DIRECTION_NORTH);
@@ -153,7 +153,7 @@ static void test_depleted_and_multiple(void)
     CHECK(factory_world_add_resource(
         world, 1, 0, FACTORY_RESOURCE_IRON, 1U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     CHECK(factory_simulation_submit_command(simulation, &first)
         == FACTORY_RESULT_OK);
     CHECK(factory_simulation_submit_command(simulation, &second)

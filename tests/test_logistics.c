@@ -88,7 +88,7 @@ static void test_full_pipeline(void)
     CHECK(factory_world_add_resource(
         world, 0, 0, FACTORY_RESOURCE_IRON, 10U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     submit(simulation, extractor(0, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, belt(1, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, belt(2, 0, FACTORY_DIRECTION_EAST));
@@ -148,7 +148,7 @@ static void test_blocked_and_conflict(void)
     CHECK(factory_world_add_resource(
         world, 1, 0, FACTORY_RESOURCE_IRON, 2U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     submit(simulation, extractor(0, 1, FACTORY_DIRECTION_EAST));
     submit(simulation, belt(1, 1, FACTORY_DIRECTION_EAST));
     submit(simulation, extractor(1, 0, FACTORY_DIRECTION_EAST));
@@ -212,7 +212,7 @@ static void test_cardinal_directions(void)
             FACTORY_RESOURCE_IRON,
             1U
         ) == FACTORY_RESULT_OK);
-        simulation = factory_simulation_create(world);
+        simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
         submit(simulation, extractor(
             cases[index].extractor_x,
             cases[index].extractor_y,
@@ -249,7 +249,7 @@ static void test_full_storage_stalls(void)
         world, 0, 0, FACTORY_RESOURCE_IRON,
         FACTORY_STORAGE_IRON_ORE_CAPACITY + 1U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     submit(simulation, extractor(0, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, belt(1, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, storage(2, 0));
@@ -304,7 +304,7 @@ static ObservableState deterministic_pipeline_run(void)
     CHECK(factory_world_add_resource(
         world, 0, 0, FACTORY_RESOURCE_IRON, 10U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     submit(simulation, extractor(0, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, belt(1, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, belt(2, 0, FACTORY_DIRECTION_EAST));
@@ -361,7 +361,7 @@ static void test_blocking_targets(void)
     CHECK(factory_world_add_resource(
         world, 2, 1, FACTORY_RESOURCE_IRON, 1U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     submit(simulation, extractor(0, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, belt(1, 0, FACTORY_DIRECTION_NORTH));
     submit(simulation, extractor(2, 1, FACTORY_DIRECTION_NORTH));

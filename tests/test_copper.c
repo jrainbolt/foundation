@@ -63,7 +63,7 @@ static Mixed mixed_create(void)
     CHECK(factory_world_add_resource(
         mixed.world, 0, 1, FACTORY_RESOURCE_COPPER, 20U
     ) == FACTORY_RESULT_OK);
-    mixed.simulation = factory_simulation_create(mixed.world);
+    mixed.simulation = factory_simulation_create_with_construction_units(mixed.world, UINT32_MAX);
     for (int32_t y = 0; y < 2; ++y) {
         submit(mixed.simulation, extractor(0, y));
         submit(mixed.simulation, belt(1, y));
@@ -236,7 +236,7 @@ static void test_copper_ore_storage_and_recipe_mismatch(void)
     CHECK(factory_world_add_resource(
         world, 1, 0, (FactoryResourceType)99, 1U
     ) == FACTORY_RESULT_INVALID_ARGUMENT);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     submit(simulation, extractor(0, 0));
     submit(simulation, belt(1, 0));
     submit(simulation, storage(2, 0));

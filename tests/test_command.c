@@ -29,7 +29,7 @@ int main(void)
             world, (int32_t)index, 0, FACTORY_RESOURCE_IRON, 1U
         ) == FACTORY_RESULT_OK);
     }
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     CHECK(simulation != NULL);
     command = place(0, 0);
     CHECK(factory_simulation_submit_command(NULL, &command)

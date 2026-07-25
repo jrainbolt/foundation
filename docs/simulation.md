@@ -26,6 +26,10 @@ Recipe selection therefore takes effect before input transfer and processing
 on its tick. A placement result's entity ID must be inspected before submitting
 a dependent selection command on a later tick.
 
+Construction grants, placement spending, and demolition refunds occur during
+step 1 in FIFO order. Later commands in a tick observe earlier balance changes.
+Production and logistics updates never modify construction units.
+
 Demolition is also applied in step 1. Successfully removed entities cannot
 produce, advance, receive, or transfer later in that tick. Rejected demolition
 leaves the entity active.

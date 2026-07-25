@@ -27,7 +27,7 @@ int main(void)
         FACTORY_ASSEMBLER_RECIPE_ELECTRONIC_COMPONENT
     );
     FactoryWorld *world = factory_world_create(3U, 2U);
-    FactorySimulation *simulation = factory_simulation_create(world);
+    FactorySimulation *simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     FactoryCommand valid = assembler(1, 0, FACTORY_DIRECTION_EAST);
     FactoryCommand occupied = assembler(1, 0, FACTORY_DIRECTION_WEST);
     FactoryCommand outside = assembler(3, 0, FACTORY_DIRECTION_NORTH);

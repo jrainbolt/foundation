@@ -14,6 +14,7 @@
 #include "foundation/storage.h"
 #include "foundation/splitter.h"
 #include "foundation/inserter.h"
+#include "foundation/construction.h"
 
 typedef struct FactorySimulation FactorySimulation;
 
@@ -22,7 +23,14 @@ typedef struct FactorySimulation FactorySimulation;
  * factory_simulation_destroy is called.
  */
 FactorySimulation *factory_simulation_create(FactoryWorld *world);
+FactorySimulation *factory_simulation_create_with_construction_units(
+    FactoryWorld *world,
+    FactoryConstructionMaterial construction_units
+);
 void factory_simulation_destroy(FactorySimulation *simulation);
+FactoryConstructionMaterial factory_simulation_construction_units(
+    const FactorySimulation *simulation
+);
 
 /*
  * Queues a copy of command. OK means queued, not that the gameplay action

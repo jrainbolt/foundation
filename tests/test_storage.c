@@ -19,7 +19,7 @@ static FactoryCommand storage_command(int32_t x, int32_t y)
 int main(void)
 {
     FactoryWorld *world = factory_world_create(2U, 1U);
-    FactorySimulation *simulation = factory_simulation_create(world);
+    FactorySimulation *simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     FactoryCommand first = storage_command(0, 0);
     FactoryCommand occupied = storage_command(0, 0);
     FactoryCommand outside = storage_command(-1, 0);

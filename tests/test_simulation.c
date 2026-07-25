@@ -31,7 +31,7 @@ static RunState run_scenario(void)
     CHECK(factory_world_add_resource(
         world, 1, 1, FACTORY_RESOURCE_IRON, 10U
     ) == FACTORY_RESULT_OK);
-    simulation = factory_simulation_create(world);
+    simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     CHECK(simulation != NULL);
     CHECK(factory_simulation_submit_command(
         simulation, &command
@@ -58,11 +58,11 @@ static RunState run_scenario(void)
 int main(void)
 {
     FactoryWorld *world = factory_world_create(1U, 1U);
-    FactorySimulation *simulation = factory_simulation_create(world);
+    FactorySimulation *simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     RunState first;
     RunState second;
 
-    CHECK(factory_simulation_create(NULL) == NULL);
+    CHECK(factory_simulation_create_with_construction_units(NULL, UINT32_MAX) == NULL);
     CHECK(simulation != NULL);
     CHECK(factory_simulation_get_tick(simulation) == 0U);
     factory_simulation_tick(simulation);

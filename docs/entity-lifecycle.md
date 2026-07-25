@@ -1,7 +1,15 @@
 # Entity Lifecycle
 
+Placement requires the entity's full fixed construction cost. Insufficient
+funds fail before ID allocation; every other placement failure also leaves the
+balance unchanged. Successful placement deducts only after the entity,
+subsystem record, and tile occupancy have been established.
+
 Entity IDs are monotonic and never reused. A replacement placed after
 demolition always receives a newer ID, while unrelated IDs remain unchanged.
+
+Successful demolition refunds the immutable cost. Demolish-then-replace can
+therefore reuse both a tile and its refund in one FIFO command-processing tick.
 
 Private subsystem arrays use swap-remove. Simulation outcomes do not depend on
 their order: transfer contention uses source entity IDs, and inspection finds

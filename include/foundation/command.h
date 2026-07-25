@@ -26,7 +26,8 @@ typedef enum {
     FACTORY_COMMAND_PLACE_ASSEMBLER,
     FACTORY_COMMAND_DEMOLISH_ENTITY,
     FACTORY_COMMAND_PLACE_SPLITTER,
-    FACTORY_COMMAND_PLACE_INSERTER
+    FACTORY_COMMAND_PLACE_INSERTER,
+    FACTORY_COMMAND_GRANT_CONSTRUCTION_UNITS
 } FactoryCommandType;
 
 typedef struct {
@@ -74,6 +75,9 @@ typedef struct {
             int32_t y;
             FactoryDirection facing;
         } place_inserter;
+        struct {
+            uint32_t amount;
+        } grant_construction_units;
     } data;
 } FactoryCommand;
 
@@ -84,6 +88,8 @@ typedef struct {
     FactoryEntityType entity_type;
     int32_t x;
     int32_t y;
+    uint32_t construction_units_changed;
+    uint32_t construction_units_remaining;
 } FactoryCommandResult;
 
 /* Returns whether a command's enum fields are recognized. */
