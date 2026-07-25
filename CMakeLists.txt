@@ -122,6 +122,21 @@ if(BUILD_TESTING)
     target_link_libraries(factory_assembler_tests PRIVATE factory_engine)
     add_test(NAME factory_assembler_tests COMMAND factory_assembler_tests)
 
+    add_executable(
+        factory_assembler_recipe_tests
+        tests/test_assembler_recipes.c
+    )
+    target_include_directories(
+        factory_assembler_recipe_tests
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(factory_assembler_recipe_tests PRIVATE factory_engine)
+    add_test(
+        NAME factory_assembler_recipe_tests
+        COMMAND factory_assembler_recipe_tests
+    )
+
     add_executable(factory_component_pipeline_tests tests/test_component_pipeline.c)
     target_link_libraries(factory_component_pipeline_tests PRIVATE factory_engine)
     add_test(NAME factory_component_pipeline_tests COMMAND factory_component_pipeline_tests)

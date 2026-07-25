@@ -23,8 +23,9 @@ Refinery output planning precedes processing, so output completed during step
 the same rule. Belt destination items receive progress zero.
 
 Recipe selection therefore takes effect before input transfer and processing
-on its tick. A placement result's entity ID must be inspected before submitting
-a dependent selection command on a later tick.
+on its tick. Commands are FIFO, so placement followed by selection for its
+deterministically allocated ID can succeed in one tick; selection before that
+placement fails and does not prevent the later placement.
 
 Construction grants, placement spending, and demolition refunds occur during
 step 1 in FIFO order. Later commands in a tick observe earlier balance changes.

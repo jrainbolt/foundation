@@ -19,3 +19,7 @@ After successful demolition, entity and type-specific lookup fail and the tile
 contains occupying entity ID zero. Any previously obtained internal record
 pointer is invalid after removal or later store growth; public inspection APIs
 copy records to caller-owned values.
+
+Changing or clearing an assembler recipe leaves its entity ID, orientation,
+tile occupancy, and construction accounting unchanged. It is permitted only
+when empty and idle, preventing existing material from being reinterpreted.

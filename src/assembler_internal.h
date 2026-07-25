@@ -34,5 +34,9 @@ bool factory_assembler_store_remove(
     FactoryEntityId entity_id
 );
 void factory_assembler_store_update(FactoryAssemblerStore *store);
+bool factory_assembler_configure_recipe(
+    FactoryAssembler *assembler,
+    FactoryAssemblerRecipeId recipe_id
+);
 
 #endif

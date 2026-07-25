@@ -1,4 +1,5 @@
 #include "assembler_internal.h"
+#include "assembler_recipe_internal.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -53,14 +54,64 @@ void factory_assembler_store_add(
     assembler->x = x;
     assembler->y = y;
     assembler->output_direction = output_direction;
-    assembler->recipe_id =
-        FACTORY_ASSEMBLER_RECIPE_ELECTRONIC_COMPONENT;
-    assembler->iron_plate_amount = 0U;
-    assembler->copper_plate_amount = 0U;
+    assembler->recipe_id = FACTORY_ASSEMBLER_RECIPE_NONE;
+    for (size_t index = 0U;
+        index < FACTORY_ASSEMBLER_MAX_INPUT_TYPES;
+        ++index) {
+        assembler->input_slots[index].item = FACTORY_ITEM_NONE;
+        assembler->input_slots[index].count = 0U;
+        assembler->input_slots[index].capacity = 0U;
+    }
     assembler->output_item = FACTORY_ITEM_NONE;
     assembler->output_amount = 0U;
     assembler->processing_progress = 0U;
+    assembler->processing_duration = 0U;
     assembler->processing = false;
+}
+
+bool factory_assembler_configure_recipe(
+    FactoryAssembler *assembler,
+    FactoryAssemblerRecipeId recipe_id
+)
+{
+    const FactoryAssemblerRecipe *recipe;
+    size_t index;
+
+    if (assembler == NULL) {
+        return false;
+    }
+    if (recipe_id == FACTORY_ASSEMBLER_RECIPE_NONE) {
+        assembler->recipe_id = recipe_id;
+        assembler->processing_duration = 0U;
+        for (index = 0U;
+            index < FACTORY_ASSEMBLER_MAX_INPUT_TYPES;
+            ++index) {
+            assembler->input_slots[index].item = FACTORY_ITEM_NONE;
+            assembler->input_slots[index].count = 0U;
+            assembler->input_slots[index].capacity = 0U;
+        }
+        return true;
+    }
+    recipe = factory_assembler_recipe_find(recipe_id);
+    if (recipe == NULL) {
+        return false;
+    }
+    assembler->recipe_id = recipe_id;
+    assembler->processing_duration = recipe->processing_ticks;
+    for (index = 0U;
+        index < FACTORY_ASSEMBLER_MAX_INPUT_TYPES;
+        ++index) {
+        assembler->input_slots[index].item =
+            index < recipe->input_count
+            ? recipe->input_items[index]
+            : FACTORY_ITEM_NONE;
+        assembler->input_slots[index].count = 0U;
+        assembler->input_slots[index].capacity =
+            index < recipe->input_count
+            ? recipe->input_amounts[index]
+            : 0U;
+    }
+    return true;
 }
 
 const FactoryAssembler *factory_assembler_store_find(
@@ -116,14 +167,30 @@ void factory_assembler_store_update(FactoryAssemblerStore *store)
     for (index = 0U; index < store->count; ++index) {
         FactoryAssembler *assembler = &store->items[index];
         const FactoryAssemblerRecipe *recipe =
-            factory_assembler_recipe_get(assembler->recipe_id);
+            factory_assembler_recipe_find(assembler->recipe_id);
+        bool inputs_ready = recipe != NULL;
+        size_t slot;
 
+        for (slot = 0U;
+            slot < FACTORY_ASSEMBLER_MAX_INPUT_TYPES;
+            ++slot) {
+            uint32_t required = recipe != NULL
+                && slot < recipe->input_count
+                ? recipe->input_amounts[slot]
+                : 0U;
+
+            if (assembler->input_slots[slot].count != required) {
+                inputs_ready = false;
+            }
+        }
         if (!assembler->processing
             && assembler->output_item == FACTORY_ITEM_NONE
-            && assembler->iron_plate_amount == recipe->input_amounts[0]
-            && assembler->copper_plate_amount == recipe->input_amounts[1]) {
-            assembler->iron_plate_amount = 0U;
-            assembler->copper_plate_amount = 0U;
+            && inputs_ready) {
+            for (slot = 0U;
+                slot < FACTORY_ASSEMBLER_MAX_INPUT_TYPES;
+                ++slot) {
+                assembler->input_slots[slot].count = 0U;
+            }
             assembler->processing = true;
             assembler->processing_progress = 0U;
         }

@@ -55,3 +55,8 @@ Placement spends simulation-owned construction units, while successful
 empty-only demolition refunds the full fixed cost. Construction units remain
 separate from iron, copper, and production logistics. See
 `docs/construction-inventory.md` and `docs/construction-costs.md`.
+
+Assemblers now default to no recipe and can select fixed electronic-component,
+iron-gear, or copper-wire recipes through the FIFO command queue. Inputs and
+outputs are bounded counted buffers, including the two-wire output. See
+`docs/assembler-recipes.md` and `docs/conservation.md`.

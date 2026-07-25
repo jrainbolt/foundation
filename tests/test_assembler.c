@@ -23,9 +23,7 @@ static FactoryCommand assembler(
 
 int main(void)
 {
-    const FactoryAssemblerRecipe *recipe = factory_assembler_recipe_get(
-        FACTORY_ASSEMBLER_RECIPE_ELECTRONIC_COMPONENT
-    );
+    FactoryAssemblerRecipe recipe;
     FactoryWorld *world = factory_world_create(3U, 2U);
     FactorySimulation *simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     FactoryCommand valid = assembler(1, 0, FACTORY_DIRECTION_EAST);
@@ -38,18 +36,24 @@ int main(void)
     FactoryStorage storage = {0};
     uint32_t amount = 99U;
 
-    CHECK(recipe != NULL);
-    CHECK(recipe->input_count == 2U);
-    CHECK(recipe->input_items[0] == FACTORY_ITEM_IRON_PLATE);
-    CHECK(recipe->input_amounts[0] == 1U);
-    CHECK(recipe->input_items[1] == FACTORY_ITEM_COPPER_PLATE);
-    CHECK(recipe->input_amounts[1] == 1U);
-    CHECK(recipe->output_item == FACTORY_ITEM_ELECTRONIC_COMPONENT);
-    CHECK(recipe->output_amount == 1U);
-    CHECK(recipe->processing_ticks
+    CHECK(factory_assembler_recipe_get(
+        FACTORY_ASSEMBLER_RECIPE_ELECTRONIC_COMPONENT, &recipe
+    ));
+    CHECK(recipe.input_count == 2U);
+    CHECK(recipe.input_items[0] == FACTORY_ITEM_IRON_PLATE);
+    CHECK(recipe.input_amounts[0] == 1U);
+    CHECK(recipe.input_items[1] == FACTORY_ITEM_COPPER_PLATE);
+    CHECK(recipe.input_amounts[1] == 1U);
+    CHECK(recipe.output_item == FACTORY_ITEM_ELECTRONIC_COMPONENT);
+    CHECK(recipe.output_amount == 1U);
+    CHECK(recipe.processing_ticks
         == FACTORY_ASSEMBLER_ELECTRONIC_COMPONENT_TICKS);
-    CHECK(factory_assembler_recipe_get(FACTORY_ASSEMBLER_RECIPE_NONE) == NULL);
-    CHECK(factory_assembler_recipe_get((FactoryAssemblerRecipeId)99) == NULL);
+    CHECK(!factory_assembler_recipe_get(
+        FACTORY_ASSEMBLER_RECIPE_NONE, &recipe
+    ));
+    CHECK(!factory_assembler_recipe_get(
+        (FactoryAssemblerRecipeId)99, &recipe
+    ));
     CHECK(strcmp(factory_item_name(
         FACTORY_ITEM_ELECTRONIC_COMPONENT
     ), "electronic component") == 0);
@@ -71,10 +75,9 @@ int main(void)
     CHECK(factory_simulation_get_assembler(simulation, id, &state));
     CHECK(state.x == 1 && state.y == 0);
     CHECK(state.output_direction == FACTORY_DIRECTION_EAST);
-    CHECK(state.recipe_id
-        == FACTORY_ASSEMBLER_RECIPE_ELECTRONIC_COMPONENT);
-    CHECK(state.iron_plate_amount == 0U);
-    CHECK(state.copper_plate_amount == 0U);
+    CHECK(state.recipe_id == FACTORY_ASSEMBLER_RECIPE_NONE);
+    CHECK(state.input_slots[0].count == 0U);
+    CHECK(state.input_slots[1].count == 0U);
     CHECK(state.output_item == FACTORY_ITEM_NONE);
     CHECK(state.output_amount == 0U);
     CHECK(!state.processing);

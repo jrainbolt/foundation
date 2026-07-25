@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "foundation/entity.h"
+#include "foundation/assembler_recipe.h"
 #include <foundation/world.h>
 #include "foundation/recipe.h"
 
@@ -27,7 +28,8 @@ typedef enum {
     FACTORY_COMMAND_DEMOLISH_ENTITY,
     FACTORY_COMMAND_PLACE_SPLITTER,
     FACTORY_COMMAND_PLACE_INSERTER,
-    FACTORY_COMMAND_GRANT_CONSTRUCTION_UNITS
+    FACTORY_COMMAND_GRANT_CONSTRUCTION_UNITS,
+    FACTORY_COMMAND_SET_ASSEMBLER_RECIPE
 } FactoryCommandType;
 
 typedef struct {
@@ -78,6 +80,10 @@ typedef struct {
         struct {
             uint32_t amount;
         } grant_construction_units;
+        struct {
+            FactoryEntityId assembler_entity;
+            FactoryAssemblerRecipeId recipe_id;
+        } set_assembler_recipe;
     } data;
 } FactoryCommand;
 
@@ -90,6 +96,8 @@ typedef struct {
     int32_t y;
     uint32_t construction_units_changed;
     uint32_t construction_units_remaining;
+    FactoryAssemblerRecipeId previous_assembler_recipe;
+    FactoryAssemblerRecipeId new_assembler_recipe;
 } FactoryCommandResult;
 
 /* Returns whether a command's enum fields are recognized. */

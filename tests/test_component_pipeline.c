@@ -86,6 +86,11 @@ static Pipeline create_pipeline(void)
     command = (FactoryCommand){FACTORY_COMMAND_SET_REFINERY_RECIPE,
         {.set_refinery_recipe = {p.ids[6], FACTORY_RECIPE_COPPER_PLATE}}};
     submit(p.simulation, command);
+    command = (FactoryCommand){FACTORY_COMMAND_SET_ASSEMBLER_RECIPE,
+        {.set_assembler_recipe = {
+            p.ids[9], FACTORY_ASSEMBLER_RECIPE_ELECTRONIC_COMPONENT
+        }}};
+    submit(p.simulation, command);
     factory_simulation_tick(p.simulation);
     return p;
 }
@@ -129,8 +134,8 @@ static uint32_t total(const Pipeline *p, bool copper)
         } else if (factory_simulation_get_assembler(
                 p->simulation, p->ids[index], &assembler_state)) {
             value += copper
-                ? assembler_state.copper_plate_amount
-                : assembler_state.iron_plate_amount;
+                ? assembler_state.input_slots[1].count
+                : assembler_state.input_slots[0].count;
             value += assembler_state.processing ? 1U : 0U;
             value += assembler_state.output_item
                 == FACTORY_ITEM_ELECTRONIC_COMPONENT
@@ -170,8 +175,8 @@ static void test_pipeline_boundaries(void)
     CHECK(factory_simulation_get_assembler(
         p.simulation, p.ids[9], &assembler_state
     ));
-    CHECK(assembler_state.iron_plate_amount == 1U);
-    CHECK(assembler_state.copper_plate_amount == 0U);
+    CHECK(assembler_state.input_slots[0].count == 1U);
+    CHECK(assembler_state.input_slots[1].count == 0U);
     CHECK(!assembler_state.processing);
 
     while (factory_simulation_get_tick(p.simulation) < 43U) {
@@ -180,8 +185,8 @@ static void test_pipeline_boundaries(void)
     CHECK(factory_simulation_get_assembler(
         p.simulation, p.ids[9], &assembler_state
     ));
-    CHECK(assembler_state.iron_plate_amount == 0U);
-    CHECK(assembler_state.copper_plate_amount == 0U);
+    CHECK(assembler_state.input_slots[0].count == 0U);
+    CHECK(assembler_state.input_slots[1].count == 0U);
     CHECK(assembler_state.processing);
     CHECK(assembler_state.processing_progress == 1U);
     CHECK(total(&p, false) == 10U);
@@ -250,8 +255,8 @@ static void test_pipeline_determinism(void)
             a.simulation, a.ids[9], &aa));
         CHECK(factory_simulation_get_assembler(
             b.simulation, b.ids[9], &ab));
-        CHECK(aa.iron_plate_amount == ab.iron_plate_amount);
-        CHECK(aa.copper_plate_amount == ab.copper_plate_amount);
+        CHECK(aa.input_slots[0].count == ab.input_slots[0].count);
+        CHECK(aa.input_slots[1].count == ab.input_slots[1].count);
         CHECK(aa.processing == ab.processing);
         CHECK(aa.processing_progress == ab.processing_progress);
         CHECK(aa.output_item == ab.output_item);

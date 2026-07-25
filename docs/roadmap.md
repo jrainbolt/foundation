@@ -13,7 +13,8 @@
 - [x] Shared atomic ownership transfer operations
 - [x] Simulation-owned construction inventory
 - [x] Fixed placement costs and full demolition refunds
+- [x] Fixed assembler recipes and safe FIFO recipe selection
+- [x] Counted generic assembler inputs and multi-item output
 - [ ] Inserter variants, filters, and longer arms
 
-The next production milestone is assembler recipe selection with multiple
-recipes, recipe-dependent inputs, and safe switching.
+The next production milestone is storage output.

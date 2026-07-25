@@ -56,6 +56,8 @@ void factory_storage_store_add(
     storage->copper_ore_amount = 0U;
     storage->copper_plate_amount = 0U;
     storage->electronic_component_amount = 0U;
+    storage->iron_gear_amount = 0U;
+    storage->copper_wire_amount = 0U;
     storage->total_capacity = FACTORY_STORAGE_CAPACITY;
 }
 
@@ -134,6 +136,14 @@ bool factory_storage_get_item_amount(
         *out_amount = storage->electronic_component_amount;
         return true;
     }
+    if (item == FACTORY_ITEM_IRON_GEAR) {
+        *out_amount = storage->iron_gear_amount;
+        return true;
+    }
+    if (item == FACTORY_ITEM_COPPER_WIRE) {
+        *out_amount = storage->copper_wire_amount;
+        return true;
+    }
     return false;
 }
 
@@ -145,5 +155,7 @@ uint32_t factory_storage_get_total_amount(const FactoryStorage *storage)
             + storage->iron_plate_amount
             + storage->copper_ore_amount
             + storage->copper_plate_amount
-            + storage->electronic_component_amount;
+            + storage->electronic_component_amount
+            + storage->iron_gear_amount
+            + storage->copper_wire_amount;
 }

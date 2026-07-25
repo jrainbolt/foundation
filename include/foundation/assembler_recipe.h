@@ -1,6 +1,7 @@
 #ifndef FOUNDATION_ASSEMBLER_RECIPE_H
 #define FOUNDATION_ASSEMBLER_RECIPE_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "foundation/item.h"
@@ -10,10 +11,14 @@
 
 typedef enum {
     FACTORY_ASSEMBLER_RECIPE_NONE = 0,
-    FACTORY_ASSEMBLER_RECIPE_ELECTRONIC_COMPONENT
+    FACTORY_ASSEMBLER_RECIPE_ELECTRONIC_COMPONENT,
+    FACTORY_ASSEMBLER_RECIPE_IRON_GEAR,
+    FACTORY_ASSEMBLER_RECIPE_COPPER_WIRE,
+    FACTORY_ASSEMBLER_RECIPE_COUNT
 } FactoryAssemblerRecipeId;
 
 typedef struct {
+    FactoryAssemblerRecipeId recipe_id;
     FactoryItemType input_items[FACTORY_ASSEMBLER_MAX_INPUT_TYPES];
     uint32_t input_amounts[FACTORY_ASSEMBLER_MAX_INPUT_TYPES];
     uint32_t input_count;
@@ -22,8 +27,9 @@ typedef struct {
     uint32_t processing_ticks;
 } FactoryAssemblerRecipe;
 
-const FactoryAssemblerRecipe *factory_assembler_recipe_get(
-    FactoryAssemblerRecipeId recipe_id
+bool factory_assembler_recipe_get(
+    FactoryAssemblerRecipeId recipe_id,
+    FactoryAssemblerRecipe *out_recipe
 );
 
 #endif

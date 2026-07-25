@@ -485,8 +485,8 @@ static FactoryResult validate_demolition(
         if (assembler->processing || assembler->processing_progress != 0U) {
             return FACTORY_RESULT_ENTITY_BUSY;
         }
-        if (assembler->iron_plate_amount != 0U
-            || assembler->copper_plate_amount != 0U
+        if (assembler->input_slots[0].count != 0U
+            || assembler->input_slots[1].count != 0U
             || assembler->output_item != FACTORY_ITEM_NONE
             || assembler->output_amount != 0U) {
             return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
@@ -644,6 +644,54 @@ static FactoryResult grant_construction_units(
     return FACTORY_RESULT_OK;
 }
 
+static FactoryResult set_assembler_recipe(
+    FactorySimulation *simulation,
+    const FactoryCommand *command,
+    FactoryEntityId *out_id,
+    FactoryAssemblerRecipeId *out_previous,
+    FactoryAssemblerRecipeId *out_new
+)
+{
+    FactoryEntityId id =
+        command->data.set_assembler_recipe.assembler_entity;
+    FactoryAssemblerRecipeId recipe_id =
+        command->data.set_assembler_recipe.recipe_id;
+    FactoryAssembler *assembler;
+
+    if (recipe_id < FACTORY_ASSEMBLER_RECIPE_NONE
+        || recipe_id >= FACTORY_ASSEMBLER_RECIPE_COUNT
+        || (recipe_id != FACTORY_ASSEMBLER_RECIPE_NONE
+            && !factory_assembler_recipe_get(recipe_id,
+                &(FactoryAssemblerRecipe){0}))) {
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    }
+    if (!factory_entity_is_valid(simulation->entities, id)) {
+        return FACTORY_RESULT_ENTITY_NOT_FOUND;
+    }
+    assembler = factory_assembler_store_find_mutable(
+        &simulation->assemblers, id
+    );
+    if (assembler == NULL) {
+        return FACTORY_RESULT_UNSUPPORTED_ENTITY;
+    }
+    *out_previous = assembler->recipe_id;
+    *out_new = recipe_id;
+    *out_id = id;
+    if (assembler->processing
+        || assembler->processing_progress != 0U
+        || assembler->input_slots[0].count != 0U
+        || assembler->input_slots[1].count != 0U
+        || assembler->output_item != FACTORY_ITEM_NONE
+        || assembler->output_amount != 0U) {
+        return FACTORY_RESULT_ASSEMBLER_NOT_EMPTY;
+    }
+    if (assembler->recipe_id == recipe_id) {
+        return FACTORY_RESULT_OK;
+    }
+    return factory_assembler_configure_recipe(assembler, recipe_id)
+        ? FACTORY_RESULT_OK : FACTORY_RESULT_INVALID_ARGUMENT;
+}
+
 static void apply_commands(FactorySimulation *simulation)
 {
     size_t index;
@@ -660,6 +708,8 @@ static void apply_commands(FactorySimulation *simulation)
         result->construction_units_changed = 0U;
         result->construction_units_remaining =
             simulation->construction_inventory.units;
+        result->previous_assembler_recipe = FACTORY_ASSEMBLER_RECIPE_NONE;
+        result->new_assembler_recipe = FACTORY_ASSEMBLER_RECIPE_NONE;
         if (placement_type(
                 result->command.type, &result->entity_type)) {
             FactoryConstructionMaterial cost;
@@ -732,6 +782,15 @@ static void apply_commands(FactorySimulation *simulation)
                 result->result = grant_construction_units(
                     simulation,
                     result->command.data.grant_construction_units.amount
+                );
+                break;
+            case FACTORY_COMMAND_SET_ASSEMBLER_RECIPE:
+                result->result = set_assembler_recipe(
+                    simulation,
+                    &result->command,
+                    &result->entity_id,
+                    &result->previous_assembler_recipe,
+                    &result->new_assembler_recipe
                 );
                 break;
         }
@@ -1063,17 +1122,24 @@ static size_t plan_belt_transfers(
                 FACTORY_LOGISTICS_SLOT_INPUT
             };
         } else if (destination_assembler != NULL) {
-            if (source->item == FACTORY_ITEM_IRON_PLATE) {
-                destination = (FactoryLogisticsEndpoint){
+            for (size_t slot = 0U;
+                slot < FACTORY_ASSEMBLER_MAX_INPUT_TYPES;
+                ++slot) {
+                FactoryLogisticsEndpoint candidate = {
                     destination_assembler->entity_id,
-                    FACTORY_LOGISTICS_SLOT_IRON_INPUT
+                    slot == 0U
+                        ? FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_0
+                        : FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_1
                 };
-            } else if (source->item == FACTORY_ITEM_COPPER_PLATE) {
-                destination = (FactoryLogisticsEndpoint){
-                    destination_assembler->entity_id,
-                    FACTORY_LOGISTICS_SLOT_COPPER_INPUT
-                };
-            } else {
+
+                if (factory_logistics_endpoint_can_accept(
+                        simulation, candidate, source->item)
+                    == FACTORY_LOGISTICS_RESULT_OK) {
+                    destination = candidate;
+                    break;
+                }
+            }
+            if (destination.entity_id == 0U) {
                 continue;
             }
         } else if (destination_splitter != NULL) {
@@ -1456,12 +1522,23 @@ static bool inspect_inserter_destination(
         &simulation->assemblers, tile->occupying_entity
     );
     if (assembler != NULL) {
-        *out_endpoint = (FactoryLogisticsEndpoint){
-            assembler->entity_id,
-            inserter->held_item == FACTORY_ITEM_IRON_PLATE
-                ? FACTORY_LOGISTICS_SLOT_IRON_INPUT
-                : FACTORY_LOGISTICS_SLOT_COPPER_INPUT
-        };
+        for (size_t slot = 0U;
+            slot < FACTORY_ASSEMBLER_MAX_INPUT_TYPES;
+            ++slot) {
+            FactoryLogisticsEndpoint candidate = {
+                assembler->entity_id,
+                slot == 0U
+                    ? FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_0
+                    : FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_1
+            };
+
+            if (factory_logistics_endpoint_can_accept(
+                    simulation, candidate, inserter->held_item)
+                == FACTORY_LOGISTICS_RESULT_OK) {
+                *out_endpoint = candidate;
+                break;
+            }
+        }
     }
     return out_endpoint->entity_id != 0U
         && factory_logistics_endpoint_can_accept(

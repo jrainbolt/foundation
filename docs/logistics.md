@@ -54,5 +54,7 @@ commit on separate ticks; blocked delivery remains owned by the inserter.
 Internally, planners identify both the entity and logical slot for every source
 and destination. Read-only peek/acceptance precedes conflict resolution.
 Winning transfers revalidate and atomically move exactly one item through the
-shared endpoint layer. Complete endpoint identity makes assembler iron and
-copper inputs independent while preserving same-slot conflicts.
+shared endpoint layer. Assembler inputs are generic slots 0 and 1; the selected
+recipe supplies their item types and capacities. The lowest compatible slot is
+chosen, different slots remain independent, and same-slot conflicts remain.
+Counted assembler output still transfers one item per successful commit.

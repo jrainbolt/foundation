@@ -43,6 +43,11 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
             break;
         case FACTORY_COMMAND_GRANT_CONSTRUCTION_UNITS:
             return true;
+        case FACTORY_COMMAND_SET_ASSEMBLER_RECIPE:
+            return command->data.set_assembler_recipe.recipe_id
+                >= FACTORY_ASSEMBLER_RECIPE_NONE
+                && command->data.set_assembler_recipe.recipe_id
+                    < FACTORY_ASSEMBLER_RECIPE_COUNT;
         default:
             return false;
     }

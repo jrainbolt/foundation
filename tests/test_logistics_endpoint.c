@@ -70,6 +70,10 @@ static Fixture create_fixture(void)
     factory_simulation_tick(fixture.simulation);
     fixture.simulation->refineries.items[0].recipe_id =
         FACTORY_RECIPE_IRON_PLATE;
+    CHECK(factory_assembler_configure_recipe(
+        &fixture.simulation->assemblers.items[0],
+        FACTORY_ASSEMBLER_RECIPE_ELECTRONIC_COMPONENT
+    ));
     return fixture;
 }
 
@@ -92,8 +96,8 @@ static void clear_items(Fixture *fixture)
     simulation->refineries.items[0].input_amount = 0U;
     simulation->refineries.items[0].output_item = FACTORY_ITEM_NONE;
     simulation->refineries.items[0].output_amount = 0U;
-    simulation->assemblers.items[0].iron_plate_amount = 0U;
-    simulation->assemblers.items[0].copper_plate_amount = 0U;
+    simulation->assemblers.items[0].input_slots[0].count = 0U;
+    simulation->assemblers.items[0].input_slots[1].count = 0U;
     simulation->assemblers.items[0].output_item = FACTORY_ITEM_NONE;
     simulation->assemblers.items[0].output_amount = 0U;
     simulation->inserters.items[0].held_item = FACTORY_ITEM_NONE;
@@ -180,12 +184,12 @@ static void test_validation_and_read_only_queries(void)
 
     CHECK(factory_logistics_endpoint_can_accept(
         simulation,
-        endpoint(5U, FACTORY_LOGISTICS_SLOT_IRON_INPUT),
+        endpoint(5U, FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_0),
         FACTORY_ITEM_IRON_PLATE
     ) == FACTORY_LOGISTICS_RESULT_OK);
     CHECK(factory_logistics_endpoint_can_accept(
         simulation,
-        endpoint(5U, FACTORY_LOGISTICS_SLOT_COPPER_INPUT),
+        endpoint(5U, FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_1),
         FACTORY_ITEM_COPPER_PLATE
     ) == FACTORY_LOGISTICS_RESULT_OK);
     CHECK(factory_logistics_endpoint_peek(
@@ -193,7 +197,7 @@ static void test_validation_and_read_only_queries(void)
     ) == FACTORY_LOGISTICS_RESULT_EMPTY);
     CHECK(factory_logistics_endpoint_can_accept(
         simulation,
-        endpoint(5U, FACTORY_LOGISTICS_SLOT_IRON_INPUT),
+        endpoint(5U, FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_0),
         FACTORY_ITEM_COPPER_PLATE
     ) == FACTORY_LOGISTICS_RESULT_INCOMPATIBLE_ITEM);
 
@@ -309,16 +313,16 @@ static void test_remove_insert_and_failure_atomicity(void)
 
     CHECK(factory_logistics_endpoint_insert(
         simulation,
-        endpoint(5U, FACTORY_LOGISTICS_SLOT_IRON_INPUT),
+        endpoint(5U, FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_0),
         FACTORY_ITEM_IRON_PLATE
     ) == FACTORY_LOGISTICS_RESULT_OK);
     CHECK(factory_logistics_endpoint_insert(
         simulation,
-        endpoint(5U, FACTORY_LOGISTICS_SLOT_COPPER_INPUT),
+        endpoint(5U, FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_1),
         FACTORY_ITEM_COPPER_PLATE
     ) == FACTORY_LOGISTICS_RESULT_OK);
-    CHECK(simulation->assemblers.items[0].iron_plate_amount == 1U);
-    CHECK(simulation->assemblers.items[0].copper_plate_amount == 1U);
+    CHECK(simulation->assemblers.items[0].input_slots[0].count == 1U);
+    CHECK(simulation->assemblers.items[0].input_slots[1].count == 1U);
     simulation->assemblers.items[0].output_item =
         FACTORY_ITEM_ELECTRONIC_COMPONENT;
     simulation->assemblers.items[0].output_amount = 1U;
@@ -358,33 +362,33 @@ static void test_remove_insert_and_failure_atomicity(void)
 
     clear_items(&fixture);
     simulation->belts.items[0].item = FACTORY_ITEM_IRON_PLATE;
-    simulation->assemblers.items[0].iron_plate_amount = 1U;
+    simulation->assemblers.items[0].input_slots[0].count = 1U;
     CHECK(factory_logistics_endpoint_transfer(
         simulation,
         endpoint(2U, FACTORY_LOGISTICS_SLOT_MAIN),
-        endpoint(5U, FACTORY_LOGISTICS_SLOT_IRON_INPUT),
+        endpoint(5U, FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_0),
         FACTORY_ITEM_IRON_PLATE
     ) == FACTORY_LOGISTICS_RESULT_BLOCKED);
     CHECK(simulation->belts.items[0].item == FACTORY_ITEM_IRON_PLATE);
-    CHECK(simulation->assemblers.items[0].iron_plate_amount == 1U);
+    CHECK(simulation->assemblers.items[0].input_slots[0].count == 1U);
 
-    simulation->assemblers.items[0].iron_plate_amount = 0U;
+    simulation->assemblers.items[0].input_slots[0].count = 0U;
     CHECK(factory_logistics_endpoint_transfer(
         simulation,
         endpoint(2U, FACTORY_LOGISTICS_SLOT_MAIN),
-        endpoint(5U, FACTORY_LOGISTICS_SLOT_IRON_INPUT),
+        endpoint(5U, FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_0),
         FACTORY_ITEM_COPPER_PLATE
     ) == FACTORY_LOGISTICS_RESULT_STATE_MISMATCH);
     CHECK(simulation->belts.items[0].item == FACTORY_ITEM_IRON_PLATE);
-    CHECK(simulation->assemblers.items[0].iron_plate_amount == 0U);
+    CHECK(simulation->assemblers.items[0].input_slots[0].count == 0U);
     CHECK(factory_logistics_endpoint_transfer(
         simulation,
         endpoint(2U, FACTORY_LOGISTICS_SLOT_MAIN),
-        endpoint(5U, FACTORY_LOGISTICS_SLOT_IRON_INPUT),
+        endpoint(5U, FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_0),
         FACTORY_ITEM_IRON_PLATE
     ) == FACTORY_LOGISTICS_RESULT_OK);
     CHECK(simulation->belts.items[0].item == FACTORY_ITEM_NONE);
-    CHECK(simulation->assemblers.items[0].iron_plate_amount == 1U);
+    CHECK(simulation->assemblers.items[0].input_slots[0].count == 1U);
 
     destroy_fixture(&fixture);
 }
@@ -392,10 +396,10 @@ static void test_remove_insert_and_failure_atomicity(void)
 static void test_endpoint_conflict_identity(void)
 {
     FactoryLogisticsEndpoint iron = endpoint(
-        5U, FACTORY_LOGISTICS_SLOT_IRON_INPUT
+        5U, FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_0
     );
     FactoryLogisticsEndpoint copper = endpoint(
-        5U, FACTORY_LOGISTICS_SLOT_COPPER_INPUT
+        5U, FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_1
     );
 
     CHECK(factory_logistics_endpoint_equal(iron, iron));

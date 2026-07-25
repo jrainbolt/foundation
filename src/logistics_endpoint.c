@@ -1,11 +1,12 @@
 #include "logistics_endpoint_internal.h"
 
 #include "simulation_internal.h"
+#include "assembler_recipe_internal.h"
 
 static bool item_is_valid(FactoryItemType item)
 {
     return item > FACTORY_ITEM_NONE
-        && item <= FACTORY_ITEM_ELECTRONIC_COMPONENT;
+        && item <= FACTORY_ITEM_COPPER_WIRE;
 }
 
 bool factory_logistics_endpoint_equal(
@@ -196,23 +197,30 @@ FactoryLogisticsResult factory_logistics_endpoint_can_accept(
         &simulation->assemblers, endpoint.entity_id
     );
     if (assembler != NULL) {
-        if (endpoint.slot == FACTORY_LOGISTICS_SLOT_IRON_INPUT) {
-            if (item != FACTORY_ITEM_IRON_PLATE) {
-                return FACTORY_LOGISTICS_RESULT_INCOMPATIBLE_ITEM;
-            }
-            return assembler->iron_plate_amount == 0U
-                ? FACTORY_LOGISTICS_RESULT_OK
-                : FACTORY_LOGISTICS_RESULT_BLOCKED;
+        size_t slot;
+        const FactoryAssemblerRecipe *assembler_recipe =
+            factory_assembler_recipe_find(assembler->recipe_id);
+
+        if (endpoint.slot == FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_0) {
+            slot = 0U;
+        } else if (endpoint.slot
+            == FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_1) {
+            slot = 1U;
+        } else {
+            return FACTORY_LOGISTICS_RESULT_INVALID_SLOT;
         }
-        if (endpoint.slot == FACTORY_LOGISTICS_SLOT_COPPER_INPUT) {
-            if (item != FACTORY_ITEM_COPPER_PLATE) {
-                return FACTORY_LOGISTICS_RESULT_INCOMPATIBLE_ITEM;
-            }
-            return assembler->copper_plate_amount == 0U
-                ? FACTORY_LOGISTICS_RESULT_OK
-                : FACTORY_LOGISTICS_RESULT_BLOCKED;
+        if (assembler_recipe == NULL
+            || slot >= assembler_recipe->input_count
+            || assembler->input_slots[slot].capacity == 0U) {
+            return FACTORY_LOGISTICS_RESULT_INCOMPATIBLE_ITEM;
         }
-        return FACTORY_LOGISTICS_RESULT_INVALID_SLOT;
+        if (assembler_recipe->input_items[slot] != item) {
+            return FACTORY_LOGISTICS_RESULT_INCOMPATIBLE_ITEM;
+        }
+        return assembler->input_slots[slot].count
+                < assembler->input_slots[slot].capacity
+            ? FACTORY_LOGISTICS_RESULT_OK
+            : FACTORY_LOGISTICS_RESULT_BLOCKED;
     }
     inserter = factory_inserter_store_find(
         &simulation->inserters, endpoint.entity_id
@@ -310,8 +318,10 @@ static void remove_unchecked(
         refinery->output_item = FACTORY_ITEM_NONE;
         refinery->output_amount = 0U;
     } else if (assembler != NULL) {
-        assembler->output_item = FACTORY_ITEM_NONE;
-        assembler->output_amount = 0U;
+        --assembler->output_amount;
+        if (assembler->output_amount == 0U) {
+            assembler->output_item = FACTORY_ITEM_NONE;
+        }
     } else {
         inserter->held_item = FACTORY_ITEM_NONE;
         inserter->held_amount = 0U;
@@ -368,11 +378,11 @@ static void insert_unchecked(
         refinery->input_item = item;
         refinery->input_amount = 1U;
     } else if (assembler != NULL) {
-        if (endpoint.slot == FACTORY_LOGISTICS_SLOT_IRON_INPUT) {
-            assembler->iron_plate_amount = 1U;
-        } else {
-            assembler->copper_plate_amount = 1U;
-        }
+        size_t slot = endpoint.slot
+                == FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_0
+            ? 0U : 1U;
+
+        ++assembler->input_slots[slot].count;
     } else if (inserter != NULL) {
         inserter->held_item = item;
         inserter->held_amount = 1U;
@@ -384,8 +394,12 @@ static void insert_unchecked(
         ++storage->copper_ore_amount;
     } else if (item == FACTORY_ITEM_COPPER_PLATE) {
         ++storage->copper_plate_amount;
-    } else {
+    } else if (item == FACTORY_ITEM_ELECTRONIC_COMPONENT) {
         ++storage->electronic_component_amount;
+    } else if (item == FACTORY_ITEM_IRON_GEAR) {
+        ++storage->iron_gear_amount;
+    } else {
+        ++storage->copper_wire_amount;
     }
 }
 

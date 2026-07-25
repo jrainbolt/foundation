@@ -73,7 +73,7 @@ static uint32_t accounted_iron(
             total += refinery_state.output_amount;
         } else if (factory_simulation_get_assembler(
                 simulation, id, &assembler_state)) {
-            total += assembler_state.iron_plate_amount;
+            total += assembler_state.input_slots[0].count;
             total += assembler_state.processing ? 1U : 0U;
             total += assembler_state.output_amount;
         } else if (factory_simulation_get_storage(
@@ -149,8 +149,8 @@ static uint32_t accounted_element(
         } else if (factory_simulation_get_assembler(
                 simulation, id, &assembler)) {
             total += copper
-                ? assembler.copper_plate_amount
-                : assembler.iron_plate_amount;
+                ? assembler.input_slots[1].count
+                : assembler.input_slots[0].count;
             if (assembler.processing) {
                 ++total;
             }
@@ -615,6 +615,12 @@ static void test_machine_pipeline_and_elemental_conservation(void)
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_SET_REFINERY_RECIPE,
         {.set_refinery_recipe = {8U, FACTORY_RECIPE_COPPER_PLATE}}
+    });
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_SET_ASSEMBLER_RECIPE,
+        {.set_assembler_recipe = {
+            11U, FACTORY_ASSEMBLER_RECIPE_ELECTRONIC_COMPONENT
+        }}
     });
     factory_simulation_tick(simulation);
 

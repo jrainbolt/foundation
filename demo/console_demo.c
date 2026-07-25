@@ -27,11 +27,29 @@ static uint32_t cost(FactoryEntityType type)
     return value;
 }
 
+static const char *assembler_recipe_name(FactoryAssemblerRecipeId recipe_id)
+{
+    switch (recipe_id) {
+        case FACTORY_ASSEMBLER_RECIPE_NONE:
+            return "none";
+        case FACTORY_ASSEMBLER_RECIPE_ELECTRONIC_COMPONENT:
+            return "electronic component";
+        case FACTORY_ASSEMBLER_RECIPE_IRON_GEAR:
+            return "iron gear";
+        case FACTORY_ASSEMBLER_RECIPE_COPPER_WIRE:
+            return "copper wire";
+        default:
+            return "invalid";
+    }
+}
+
 int main(void)
 {
     FactoryWorld *world = factory_world_create(3U, 1U);
     FactorySimulation *simulation;
     const FactoryCommandResult *result;
+    FactoryAssembler assembler;
+    FactoryEntityId assembler_id = 0U;
     bool succeeded;
 
     if (world == NULL) {
@@ -111,6 +129,7 @@ int main(void)
     });
     factory_simulation_tick(simulation);
     result = factory_simulation_get_command_result(simulation, 0U);
+    assembler_id = result->entity_id;
     (void)printf(
         "Place assembler: %s, %" PRIu32 " remaining\n",
         result_name(result->result),
@@ -118,6 +137,48 @@ int main(void)
     );
 
     succeeded = result->result == FACTORY_RESULT_OK;
+    if (succeeded) {
+        (void)factory_simulation_get_assembler(
+            simulation, assembler_id, &assembler
+        );
+        (void)printf(
+            "\nAssembler %" PRIu32 " default recipe: %s\n",
+            assembler_id,
+            assembler_recipe_name(assembler.recipe_id)
+        );
+        for (FactoryAssemblerRecipeId recipe_id =
+                FACTORY_ASSEMBLER_RECIPE_ELECTRONIC_COMPONENT;
+            recipe_id < FACTORY_ASSEMBLER_RECIPE_COUNT;
+            recipe_id = (FactoryAssemblerRecipeId)(recipe_id + 1)) {
+            FactoryAssemblerRecipe recipe;
+
+            if (factory_assembler_recipe_get(recipe_id, &recipe)) {
+                (void)printf(
+                    "Recipe %-20s: %" PRIu32 " input slot(s), %" PRIu32
+                    " x %s output, %" PRIu32 " ticks\n",
+                    assembler_recipe_name(recipe_id),
+                    recipe.input_count,
+                    recipe.output_amount,
+                    factory_item_name(recipe.output_item),
+                    recipe.processing_ticks
+                );
+            }
+            submit(simulation, (FactoryCommand){
+                FACTORY_COMMAND_SET_ASSEMBLER_RECIPE,
+                {.set_assembler_recipe = {assembler_id, recipe_id}}
+            });
+        }
+        factory_simulation_tick(simulation);
+        (void)factory_simulation_get_assembler(
+            simulation, assembler_id, &assembler
+        );
+        (void)printf(
+            "FIFO selections end on: %s; input 0 is %s 0/%" PRIu32 "\n",
+            assembler_recipe_name(assembler.recipe_id),
+            factory_item_name(assembler.input_slots[0].item),
+            assembler.input_slots[0].capacity
+        );
+    }
     factory_simulation_destroy(simulation);
     factory_world_destroy(world);
     return succeeded ? 0 : 1;
