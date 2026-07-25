@@ -56,3 +56,7 @@ Assembler processing and logistics share one private immutable recipe table.
 Public queries copy recipe definitions; internal consumers use stable table
 entries without exposing mutable pointers. Assembler input endpoints are
 generic logical slots whose item and capacity derive from the selected recipe.
+
+Storage keeps inventory ownership separate from its one-item output buffer.
+The storage subsystem performs the inventory-to-buffer transition; the endpoint
+layer exposes only that buffer to inserters.

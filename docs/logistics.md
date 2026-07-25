@@ -58,3 +58,7 @@ shared endpoint layer. Assembler inputs are generic slots 0 and 1; the selected
 recipe supplies their item types and capacities. The lowest compatible slot is
 chosen, different slots remain independent, and same-slot conflicts remain.
 Counted assembler output still transfers one item per successful commit.
+
+Storage inventory is not a logistics source. Its subsystem moves one configured
+item into a bounded output endpoint, after which inserters use the ordinary
+transactional transfer and contention rules. Belts cannot extract from storage.

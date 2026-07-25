@@ -44,3 +44,8 @@ Producer, belt, splitter, and inserter planners now record private logistics
 endpoints. Endpoint inspection is read-only; commit revalidates the expected
 source item and destination acceptance before either ownership field changes.
 This changes internal dispatch only, not the fixed update order.
+
+Storage output generation occurs after assembler processing and before inserter
+updates. A newly filled buffer may make an idle inserter enter `PICKING_UP`, but
+ownership transfers only on a later pickup commit. Pickup occurs after storage
+generation, so an emptied buffer refills no earlier than the next tick.

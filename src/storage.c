@@ -59,6 +59,9 @@ void factory_storage_store_add(
     storage->iron_gear_amount = 0U;
     storage->copper_wire_amount = 0U;
     storage->total_capacity = FACTORY_STORAGE_CAPACITY;
+    storage->configured_output_item = FACTORY_ITEM_NONE;
+    storage->output_item = FACTORY_ITEM_NONE;
+    storage->output_occupied = false;
 }
 
 const FactoryStorage *factory_storage_store_find(
@@ -158,4 +161,54 @@ uint32_t factory_storage_get_total_amount(const FactoryStorage *storage)
             + storage->electronic_component_amount
             + storage->iron_gear_amount
             + storage->copper_wire_amount;
+}
+
+static uint32_t *item_amount(
+    FactoryStorage *storage,
+    FactoryItemType item
+)
+{
+    switch (item) {
+        case FACTORY_ITEM_IRON_ORE:
+            return &storage->iron_ore_amount;
+        case FACTORY_ITEM_IRON_PLATE:
+            return &storage->iron_plate_amount;
+        case FACTORY_ITEM_COPPER_ORE:
+            return &storage->copper_ore_amount;
+        case FACTORY_ITEM_COPPER_PLATE:
+            return &storage->copper_plate_amount;
+        case FACTORY_ITEM_ELECTRONIC_COMPONENT:
+            return &storage->electronic_component_amount;
+        case FACTORY_ITEM_IRON_GEAR:
+            return &storage->iron_gear_amount;
+        case FACTORY_ITEM_COPPER_WIRE:
+            return &storage->copper_wire_amount;
+        default:
+            return NULL;
+    }
+}
+
+void factory_storage_store_update(FactoryStorageStore *store)
+{
+    size_t index;
+
+    if (store == NULL) {
+        return;
+    }
+    for (index = 0U; index < store->count; ++index) {
+        FactoryStorage *storage = &store->items[index];
+        uint32_t *amount;
+
+        if (storage->output_occupied
+            || storage->configured_output_item == FACTORY_ITEM_NONE) {
+            continue;
+        }
+        amount = item_amount(storage, storage->configured_output_item);
+        if (amount == NULL || *amount == 0U) {
+            continue;
+        }
+        --*amount;
+        storage->output_item = storage->configured_output_item;
+        storage->output_occupied = true;
+    }
 }

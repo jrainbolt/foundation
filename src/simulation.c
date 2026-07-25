@@ -495,7 +495,9 @@ static FactoryResult validate_demolition(
         *out_x = assembler->x;
         *out_y = assembler->y;
     } else if (storage != NULL) {
-        if (factory_storage_get_total_amount(storage) != 0U) {
+        if (factory_storage_get_total_amount(storage) != 0U
+            || storage->output_occupied
+            || storage->output_item != FACTORY_ITEM_NONE) {
             return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
         }
         *out_type = FACTORY_ENTITY_TYPE_STORAGE;
@@ -692,6 +694,42 @@ static FactoryResult set_assembler_recipe(
         ? FACTORY_RESULT_OK : FACTORY_RESULT_INVALID_ARGUMENT;
 }
 
+static FactoryResult set_storage_output(
+    FactorySimulation *simulation,
+    const FactoryCommand *command,
+    FactoryEntityId *out_id,
+    FactoryItemType *out_previous,
+    FactoryItemType *out_new
+)
+{
+    FactoryEntityId id = command->data.set_storage_output.storage_entity;
+    FactoryItemType item = command->data.set_storage_output.item;
+    FactoryStorage *storage;
+
+    if (item < FACTORY_ITEM_NONE || item > FACTORY_ITEM_COPPER_WIRE) {
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    }
+    if (!factory_entity_is_valid(simulation->entities, id)) {
+        return FACTORY_RESULT_ENTITY_NOT_FOUND;
+    }
+    storage = factory_storage_store_find_mutable(&simulation->storages, id);
+    if (storage == NULL) {
+        return FACTORY_RESULT_UNSUPPORTED_ENTITY;
+    }
+    *out_id = id;
+    *out_previous = storage->configured_output_item;
+    *out_new = item;
+    if (storage->configured_output_item == item) {
+        return FACTORY_RESULT_OK;
+    }
+    if (storage->output_occupied
+        || storage->output_item != FACTORY_ITEM_NONE) {
+        return FACTORY_RESULT_STORAGE_OUTPUT_NOT_EMPTY;
+    }
+    storage->configured_output_item = item;
+    return FACTORY_RESULT_OK;
+}
+
 static void apply_commands(FactorySimulation *simulation)
 {
     size_t index;
@@ -710,6 +748,8 @@ static void apply_commands(FactorySimulation *simulation)
             simulation->construction_inventory.units;
         result->previous_assembler_recipe = FACTORY_ASSEMBLER_RECIPE_NONE;
         result->new_assembler_recipe = FACTORY_ASSEMBLER_RECIPE_NONE;
+        result->previous_storage_output = FACTORY_ITEM_NONE;
+        result->new_storage_output = FACTORY_ITEM_NONE;
         if (placement_type(
                 result->command.type, &result->entity_type)) {
             FactoryConstructionMaterial cost;
@@ -791,6 +831,15 @@ static void apply_commands(FactorySimulation *simulation)
                     &result->entity_id,
                     &result->previous_assembler_recipe,
                     &result->new_assembler_recipe
+                );
+                break;
+            case FACTORY_COMMAND_SET_STORAGE_OUTPUT:
+                result->result = set_storage_output(
+                    simulation,
+                    &result->command,
+                    &result->entity_id,
+                    &result->previous_storage_output,
+                    &result->new_storage_output
                 );
                 break;
         }
@@ -1276,6 +1325,7 @@ static bool inspect_inserter_source(
     const FactorySplitter *splitter;
     const FactoryRefinery *refinery;
     const FactoryAssembler *assembler;
+    const FactoryStorage *storage;
 
     if (tile == NULL || tile->occupying_entity == 0U) {
         return false;
@@ -1343,6 +1393,17 @@ static bool inspect_inserter_source(
         )) {
         *out_endpoint = (FactoryLogisticsEndpoint){
             assembler->entity_id, FACTORY_LOGISTICS_SLOT_OUTPUT
+        };
+        return factory_logistics_endpoint_peek(
+            simulation, *out_endpoint, out_item
+        ) == FACTORY_LOGISTICS_RESULT_OK;
+    }
+    storage = factory_storage_store_find(
+        &simulation->storages, tile->occupying_entity
+    );
+    if (storage != NULL) {
+        *out_endpoint = (FactoryLogisticsEndpoint){
+            storage->entity_id, FACTORY_LOGISTICS_SLOT_STORAGE_OUTPUT
         };
         return factory_logistics_endpoint_peek(
             simulation, *out_endpoint, out_item
@@ -1631,6 +1692,7 @@ void factory_simulation_tick(FactorySimulation *simulation)
     update_belt_transfers(simulation);
     factory_refinery_store_update(&simulation->refineries);
     factory_assembler_store_update(&simulation->assemblers);
+    factory_storage_store_update(&simulation->storages);
     update_inserters(simulation);
     ++simulation->tick;
 }

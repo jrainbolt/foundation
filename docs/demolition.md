@@ -20,3 +20,7 @@ tick; place-then-demolish observes the occupied tile and fails placement first.
 For assemblers, every counted input and output must be zero, processing must be
 false, and progress must be zero. An empty configured assembler and an empty
 recipe-`NONE` assembler both receive the same fixed refund.
+
+A storage output buffer also counts as owned material. Storage demolition
+requires both all inventory counters and the output buffer to be empty; its
+persisted output configuration does not block demolition.

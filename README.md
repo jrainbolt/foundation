@@ -60,3 +60,7 @@ Assemblers now default to no recipe and can select fixed electronic-component,
 iron-gear, or copper-wire recipes through the FIFO command queue. Inputs and
 outputs are bounded counted buffers, including the two-wire output. See
 `docs/assembler-recipes.md` and `docs/conservation.md`.
+
+Storage can export one configured item through a deterministic one-item buffer
+for inserter pickup. Inventory remains private and backpressure stops further
+extraction while the buffer is occupied. See `docs/storage-output.md`.

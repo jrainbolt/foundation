@@ -15,6 +15,7 @@
 - [x] Fixed placement costs and full demolition refunds
 - [x] Fixed assembler recipes and safe FIFO recipe selection
 - [x] Counted generic assembler inputs and multi-item output
+- [x] Configurable one-item storage output for inserters
 - [ ] Inserter variants, filters, and longer arms
 
-The next production milestone is storage output.
+The recommended next milestone is versioned deterministic save/load snapshots.

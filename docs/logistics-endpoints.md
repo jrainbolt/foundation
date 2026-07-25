@@ -56,11 +56,15 @@ entity-specific internal stores. Entity stores do not depend on planners.
 
 Every endpoint belongs to a live entity and uses a slot valid for that entity.
 Planning never changes ownership. A successful commit moves exactly one
-unchanged item; a failed commit changes nothing. Storage remains input-only.
+unchanged item; a failed commit changes nothing.
 
 Assembler endpoints are input 0, input 1, and output. Input acceptance consults
 the selected immutable recipe and current count; unused slots and recipe
 `NONE` are incompatible. Output removal decrements its count by exactly one.
+
+Storage has distinct input and output slots. Input supports insertion into
+inventory. Output supports peek and removal of the single buffered item.
+Inventory counters themselves are never exposed as endpoints.
 
 This is a closed internal dispatch layer. It has no runtime registration,
 callbacks, heap allocation per transfer, public polymorphism, or support for

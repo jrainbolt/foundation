@@ -48,6 +48,11 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
                 >= FACTORY_ASSEMBLER_RECIPE_NONE
                 && command->data.set_assembler_recipe.recipe_id
                     < FACTORY_ASSEMBLER_RECIPE_COUNT;
+        case FACTORY_COMMAND_SET_STORAGE_OUTPUT:
+            return command->data.set_storage_output.item
+                >= FACTORY_ITEM_NONE
+                && command->data.set_storage_output.item
+                    <= FACTORY_ITEM_COPPER_WIRE;
         default:
             return false;
     }

@@ -32,5 +32,6 @@ bool factory_storage_store_remove(
     FactoryStorageStore *store,
     FactoryEntityId entity_id
 );
+void factory_storage_store_update(FactoryStorageStore *store);
 
 #endif

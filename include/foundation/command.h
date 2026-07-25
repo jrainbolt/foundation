@@ -29,7 +29,8 @@ typedef enum {
     FACTORY_COMMAND_PLACE_SPLITTER,
     FACTORY_COMMAND_PLACE_INSERTER,
     FACTORY_COMMAND_GRANT_CONSTRUCTION_UNITS,
-    FACTORY_COMMAND_SET_ASSEMBLER_RECIPE
+    FACTORY_COMMAND_SET_ASSEMBLER_RECIPE,
+    FACTORY_COMMAND_SET_STORAGE_OUTPUT
 } FactoryCommandType;
 
 typedef struct {
@@ -84,6 +85,10 @@ typedef struct {
             FactoryEntityId assembler_entity;
             FactoryAssemblerRecipeId recipe_id;
         } set_assembler_recipe;
+        struct {
+            FactoryEntityId storage_entity;
+            FactoryItemType item;
+        } set_storage_output;
     } data;
 } FactoryCommand;
 
@@ -98,6 +103,8 @@ typedef struct {
     uint32_t construction_units_remaining;
     FactoryAssemblerRecipeId previous_assembler_recipe;
     FactoryAssemblerRecipeId new_assembler_recipe;
+    FactoryItemType previous_storage_output;
+    FactoryItemType new_storage_output;
 } FactoryCommandResult;
 
 /* Returns whether a command's enum fields are recognized. */

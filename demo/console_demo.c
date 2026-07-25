@@ -43,6 +43,99 @@ static const char *assembler_recipe_name(FactoryAssemblerRecipeId recipe_id)
     }
 }
 
+static void storage_output_demo(void)
+{
+    FactoryWorld *world = factory_world_create(5U, 1U);
+    FactorySimulation *simulation;
+    FactoryStorage source;
+    FactoryStorage destination;
+    FactoryInserter inserter;
+
+    if (world == NULL
+        || factory_world_add_resource(
+            world, 0, 0, FACTORY_RESOURCE_IRON, 5U
+        ) != FACTORY_RESULT_OK) {
+        factory_world_destroy(world);
+        return;
+    }
+    simulation = factory_simulation_create_with_construction_units(
+        world, UINT32_MAX
+    );
+    if (simulation == NULL) {
+        factory_world_destroy(world);
+        return;
+    }
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_EXTRACTOR,
+        {.place_extractor = {0, 0, FACTORY_DIRECTION_EAST}}
+    });
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_BELT,
+        {.place_belt = {1, 0, FACTORY_DIRECTION_EAST}}
+    });
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_STORAGE, {.place_storage = {2, 0}}
+    });
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_INSERTER,
+        {.place_inserter = {3, 0, FACTORY_DIRECTION_EAST}}
+    });
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_STORAGE, {.place_storage = {4, 0}}
+    });
+    for (uint32_t tick = 0U; tick < 70U; ++tick) {
+        factory_simulation_tick(simulation);
+    }
+    (void)factory_simulation_get_storage(simulation, 3U, &source);
+    (void)printf(
+        "\nStorage output demo: inventory has %" PRIu32 " iron ore\n",
+        source.iron_ore_amount
+    );
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_SET_STORAGE_OUTPUT,
+        {.set_storage_output = {3U, FACTORY_ITEM_IRON_ORE}}
+    });
+    factory_simulation_tick(simulation);
+    (void)factory_simulation_get_storage(simulation, 3U, &source);
+    (void)factory_simulation_get_inserter(simulation, 4U, &inserter);
+    (void)printf(
+        "Fill tick: buffer=%s, inserter state=%u\n",
+        factory_item_name(source.output_item),
+        (unsigned)inserter.state
+    );
+    factory_simulation_tick(simulation);
+    (void)factory_simulation_get_storage(simulation, 3U, &source);
+    (void)factory_simulation_get_inserter(simulation, 4U, &inserter);
+    (void)printf(
+        "Pickup tick: held=%s, buffer occupied=%s\n",
+        factory_item_name(inserter.held_item),
+        source.output_occupied ? "yes" : "no"
+    );
+    factory_simulation_tick(simulation);
+    (void)factory_simulation_get_storage(simulation, 3U, &source);
+    (void)printf(
+        "Refill tick: buffer=%s, inventory=%" PRIu32 "\n",
+        factory_item_name(source.output_item),
+        source.iron_ore_amount
+    );
+    factory_simulation_tick(simulation);
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_SET_STORAGE_OUTPUT,
+        {.set_storage_output = {5U, FACTORY_ITEM_IRON_ORE}}
+    });
+    factory_simulation_tick(simulation);
+    factory_simulation_tick(simulation);
+    (void)factory_simulation_get_storage(simulation, 5U, &destination);
+    (void)printf(
+        "Uncollected destination buffer remains %s; inventory=%" PRIu32 "\n",
+        factory_item_name(destination.output_item),
+        destination.iron_ore_amount
+    );
+
+    factory_simulation_destroy(simulation);
+    factory_world_destroy(world);
+}
+
 int main(void)
 {
     FactoryWorld *world = factory_world_create(3U, 1U);
@@ -181,5 +274,6 @@ int main(void)
     }
     factory_simulation_destroy(simulation);
     factory_world_destroy(world);
+    storage_output_demo();
     return succeeded ? 0 : 1;
 }

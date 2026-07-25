@@ -42,6 +42,7 @@ FactoryLogisticsResult factory_logistics_endpoint_peek(
     const FactorySplitter *splitter;
     const FactoryRefinery *refinery;
     const FactoryAssembler *assembler;
+    const FactoryStorage *storage;
     const FactoryInserter *inserter;
     FactoryLogisticsResult result = validate_entity(simulation, endpoint);
 
@@ -117,6 +118,20 @@ FactoryLogisticsResult factory_logistics_endpoint_peek(
             return FACTORY_LOGISTICS_RESULT_EMPTY;
         }
         *out_item = assembler->output_item;
+        return FACTORY_LOGISTICS_RESULT_OK;
+    }
+    storage = factory_storage_store_find(
+        &simulation->storages, endpoint.entity_id
+    );
+    if (storage != NULL) {
+        if (endpoint.slot != FACTORY_LOGISTICS_SLOT_STORAGE_OUTPUT) {
+            return FACTORY_LOGISTICS_RESULT_INVALID_SLOT;
+        }
+        if (!storage->output_occupied
+            || storage->output_item == FACTORY_ITEM_NONE) {
+            return FACTORY_LOGISTICS_RESULT_EMPTY;
+        }
+        *out_item = storage->output_item;
         return FACTORY_LOGISTICS_RESULT_OK;
     }
     inserter = factory_inserter_store_find(
@@ -302,6 +317,9 @@ static void remove_unchecked(
     FactoryAssembler *assembler = factory_assembler_store_find_mutable(
         &simulation->assemblers, endpoint.entity_id
     );
+    FactoryStorage *storage = factory_storage_store_find_mutable(
+        &simulation->storages, endpoint.entity_id
+    );
     FactoryInserter *inserter = factory_inserter_store_find_mutable(
         &simulation->inserters, endpoint.entity_id
     );
@@ -322,7 +340,10 @@ static void remove_unchecked(
         if (assembler->output_amount == 0U) {
             assembler->output_item = FACTORY_ITEM_NONE;
         }
-    } else {
+    } else if (storage != NULL) {
+        storage->output_item = FACTORY_ITEM_NONE;
+        storage->output_occupied = false;
+    } else if (inserter != NULL) {
         inserter->held_item = FACTORY_ITEM_NONE;
         inserter->held_amount = 0U;
     }

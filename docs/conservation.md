@@ -19,3 +19,7 @@ Accounting must include deposits, machine inputs, in-process material, counted
 machine outputs, belts, splitter buffers, inserter-held items, and storage.
 Recipe tests derive input and output totals from the immutable recipe definitions
 and these item helpers, preventing a second recipe-accounting table.
+
+Storage inventory and its output buffer are separate ownership locations. When
+storage fills the buffer it decrements exactly one inventory count, preserving
+the scaled total before any later inserter pickup.

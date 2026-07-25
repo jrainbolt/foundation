@@ -12,5 +12,8 @@ iron ore + iron plate + copper ore + copper plate + components + gears + wire
 ```
 
 Invalid item queries fail without indexing an array. Full storage rejects
-incoming items atomically, leaving the source belt occupied and ready. Storage
-remains input-only and has no slots, filters, output, or demolition.
+incoming items atomically, leaving the source belt occupied and ready.
+
+Storage may configure one exported item and moves at most one matching inventory
+item into its output buffer. Inserters can pick up only from this buffer.
+See `storage-output.md` for timing, backpressure, and switching rules.

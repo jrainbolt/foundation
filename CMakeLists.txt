@@ -98,6 +98,15 @@ if(BUILD_TESTING)
     target_link_libraries(factory_storage_tests PRIVATE factory_engine)
     add_test(NAME factory_storage_tests COMMAND factory_storage_tests)
 
+    add_executable(factory_storage_output_tests tests/test_storage_output.c)
+    target_include_directories(
+        factory_storage_output_tests
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(factory_storage_output_tests PRIVATE factory_engine)
+    add_test(NAME factory_storage_output_tests COMMAND factory_storage_output_tests)
+
     add_executable(factory_logistics_tests tests/test_logistics.c)
     target_link_libraries(factory_logistics_tests PRIVATE factory_engine)
     add_test(NAME factory_logistics_tests COMMAND factory_logistics_tests)
