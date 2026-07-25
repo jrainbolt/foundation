@@ -98,3 +98,8 @@ void factory_entity_destroy(
         }
     }
 }
+
+size_t factory_entity_get_count(const FactoryEntityManager *manager)
+{
+    return manager == NULL ? 0U : manager->count;
+}

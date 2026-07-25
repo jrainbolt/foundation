@@ -55,6 +55,7 @@ void factory_storage_store_add(
     storage->iron_plate_amount = 0U;
     storage->copper_ore_amount = 0U;
     storage->copper_plate_amount = 0U;
+    storage->electronic_component_amount = 0U;
     storage->total_capacity = FACTORY_STORAGE_CAPACITY;
 }
 
@@ -84,6 +85,26 @@ FactoryStorage *factory_storage_store_find_mutable(
     return (FactoryStorage *)factory_storage_store_find(store, id);
 }
 
+bool factory_storage_store_remove(
+    FactoryStorageStore *store,
+    FactoryEntityId entity_id
+)
+{
+    size_t index;
+
+    if (store == NULL) {
+        return false;
+    }
+    for (index = 0U; index < store->count; ++index) {
+        if (store->items[index].entity_id == entity_id) {
+            --store->count;
+            store->items[index] = store->items[store->count];
+            return true;
+        }
+    }
+    return false;
+}
+
 bool factory_storage_get_item_amount(
     const FactoryStorage *storage,
     FactoryItemType item,
@@ -109,6 +130,10 @@ bool factory_storage_get_item_amount(
         *out_amount = storage->copper_plate_amount;
         return true;
     }
+    if (item == FACTORY_ITEM_ELECTRONIC_COMPONENT) {
+        *out_amount = storage->electronic_component_amount;
+        return true;
+    }
     return false;
 }
 
@@ -119,5 +144,6 @@ uint32_t factory_storage_get_total_amount(const FactoryStorage *storage)
         : storage->iron_ore_amount
             + storage->iron_plate_amount
             + storage->copper_ore_amount
-            + storage->copper_plate_amount;
+            + storage->copper_plate_amount
+            + storage->electronic_component_amount;
 }

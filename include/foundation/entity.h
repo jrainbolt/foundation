@@ -2,10 +2,21 @@
 #define FOUNDATION_ENTITY_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 typedef uint32_t FactoryEntityId;
 typedef struct FactoryEntityManager FactoryEntityManager;
+
+typedef enum {
+    FACTORY_ENTITY_TYPE_NONE = 0,
+    FACTORY_ENTITY_TYPE_EXTRACTOR,
+    FACTORY_ENTITY_TYPE_BELT,
+    FACTORY_ENTITY_TYPE_REFINERY,
+    FACTORY_ENTITY_TYPE_ASSEMBLER,
+    FACTORY_ENTITY_TYPE_STORAGE,
+    FACTORY_ENTITY_TYPE_SPLITTER
+} FactoryEntityType;
 
 /*
  * Creates an empty entity manager. The caller owns the returned manager and
@@ -33,5 +44,7 @@ void factory_entity_destroy(
     FactoryEntityManager *manager,
     FactoryEntityId id
 );
+
+size_t factory_entity_get_count(const FactoryEntityManager *manager);
 
 #endif

@@ -90,6 +90,26 @@ FactoryRefinery *factory_refinery_store_find_mutable(
     return (FactoryRefinery *)factory_refinery_store_find(store, id);
 }
 
+bool factory_refinery_store_remove(
+    FactoryRefineryStore *store,
+    FactoryEntityId entity_id
+)
+{
+    size_t index;
+
+    if (store == NULL) {
+        return false;
+    }
+    for (index = 0U; index < store->count; ++index) {
+        if (store->items[index].entity_id == entity_id) {
+            --store->count;
+            store->items[index] = store->items[store->count];
+            return true;
+        }
+    }
+    return false;
+}
+
 void factory_refinery_store_update(FactoryRefineryStore *store)
 {
     size_t index;

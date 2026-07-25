@@ -6,7 +6,8 @@ typedef enum {
     FACTORY_ITEM_IRON_ORE,
     FACTORY_ITEM_IRON_PLATE,
     FACTORY_ITEM_COPPER_ORE,
-    FACTORY_ITEM_COPPER_PLATE
+    FACTORY_ITEM_COPPER_PLATE,
+    FACTORY_ITEM_ELECTRONIC_COMPONENT
 } FactoryItemType;
 
 /* Returns a stable name, or "invalid item" for an unknown value. */

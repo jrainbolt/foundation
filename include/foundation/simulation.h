@@ -5,12 +5,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "factory/world.h"
+#include <foundation/world.h>
 #include "foundation/command.h"
 #include "foundation/belt.h"
+#include "foundation/assembler.h"
 #include "foundation/extractor.h"
 #include "foundation/refinery.h"
 #include "foundation/storage.h"
+#include "foundation/splitter.h"
 
 typedef struct FactorySimulation FactorySimulation;
 
@@ -53,6 +55,9 @@ bool factory_simulation_entity_is_valid(
     const FactorySimulation *simulation,
     FactoryEntityId id
 );
+size_t factory_simulation_get_entity_count(
+    const FactorySimulation *simulation
+);
 bool factory_simulation_is_extractor(
     const FactorySimulation *simulation,
     FactoryEntityId id
@@ -91,6 +96,24 @@ bool factory_simulation_get_refinery(
     const FactorySimulation *simulation,
     FactoryEntityId id,
     FactoryRefinery *out_refinery
+);
+bool factory_simulation_is_assembler(
+    const FactorySimulation *simulation,
+    FactoryEntityId id
+);
+bool factory_simulation_get_assembler(
+    const FactorySimulation *simulation,
+    FactoryEntityId id,
+    FactoryAssembler *out_assembler
+);
+bool factory_simulation_is_splitter(
+    const FactorySimulation *simulation,
+    FactoryEntityId id
+);
+bool factory_simulation_get_splitter(
+    const FactorySimulation *simulation,
+    FactoryEntityId id,
+    FactorySplitter *out_splitter
 );
 
 #endif

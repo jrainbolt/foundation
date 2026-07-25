@@ -1,0 +1,82 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  normal:
+    name: Normal (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build/ci-normal -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build
+        run: cmake --build build/ci-normal --parallel
+
+      - name: Test
+        run: ctest --test-dir build/ci-normal --output-on-failure
+
+  sanitizers:
+    name: ${{ matrix.name }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+        sanitizer:
+          - asan
+          - ubsan
+        include:
+          - sanitizer: asan
+            name: AddressSanitizer
+            cmake_option: FOUNDATION_ENABLE_ASAN
+          - sanitizer: ubsan
+            name: UndefinedBehaviorSanitizer
+            cmake_option: FOUNDATION_ENABLE_UBSAN
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build/ci-${{ matrix.sanitizer }}
+          -DCMAKE_BUILD_TYPE=Debug
+          -D${{ matrix.cmake_option }}=ON
+
+      - name: Build
+        run: cmake --build build/ci-${{ matrix.sanitizer }} --parallel
+
+      - name: Test with AddressSanitizer
+        if: matrix.sanitizer == 'asan'
+        env:
+          # LeakSanitizer is unsupported by Apple's bundled ASan runtime.
+          ASAN_OPTIONS: halt_on_error=1:abort_on_error=1:detect_leaks=${{ runner.os == 'macOS' && '0' || '1' }}
+        run: ctest --test-dir build/ci-asan --output-on-failure
+
+      - name: Test with UndefinedBehaviorSanitizer
+        if: matrix.sanitizer == 'ubsan'
+        env:
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build/ci-ubsan --output-on-failure

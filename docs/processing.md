@@ -14,3 +14,7 @@ Both iron and copper use their selected recipe definitions rather than
 hard-coded machine behavior. Material ownership is always exactly one of
 deposit, extractor output, belt, refinery input, refinery in-process state,
 refinery output, or storage.
+
+Assembler input transfer also precedes processing. Both required slots may be
+filled in one transfer phase, after which processing starts at progress 1/15.
+New assembler output cannot move until the next tick.

@@ -13,6 +13,8 @@ const char *factory_item_name(FactoryItemType item)
             return "copper ore";
         case FACTORY_ITEM_COPPER_PLATE:
             return "copper plate";
+        case FACTORY_ITEM_ELECTRONIC_COMPONENT:
+            return "electronic component";
         default:
             return "invalid item";
     }

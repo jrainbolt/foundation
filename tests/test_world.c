@@ -1,4 +1,4 @@
-#include "factory/world.h"
+#include <foundation/world.h>
 
 #include <stdbool.h>
 #include <stdint.h>

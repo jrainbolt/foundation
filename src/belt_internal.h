@@ -29,6 +29,10 @@ FactoryBelt *factory_belt_store_find_mutable(
     FactoryBeltStore *store,
     FactoryEntityId id
 );
+bool factory_belt_store_remove(
+    FactoryBeltStore *store,
+    FactoryEntityId entity_id
+);
 void factory_belt_store_advance(FactoryBeltStore *store);
 
 #endif

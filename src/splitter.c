@@ -1,9 +1,9 @@
-#include "belt_internal.h"
+#include "splitter_internal.h"
 
 #include <stdint.h>
 #include <stdlib.h>
 
-void factory_belt_store_destroy(FactoryBeltStore *store)
+void factory_splitter_store_destroy(FactorySplitterStore *store)
 {
     if (store == NULL) {
         return;
@@ -14,9 +14,9 @@ void factory_belt_store_destroy(FactoryBeltStore *store)
     store->capacity = 0U;
 }
 
-bool factory_belt_store_reserve_one(FactoryBeltStore *store)
+bool factory_splitter_store_reserve_one(FactorySplitterStore *store)
 {
-    FactoryBelt *items;
+    FactorySplitter *items;
     size_t capacity;
 
     if (store == NULL) {
@@ -25,7 +25,7 @@ bool factory_belt_store_reserve_one(FactoryBeltStore *store)
     if (store->count < store->capacity) {
         return true;
     }
-    capacity = store->capacity == 0U ? 8U : store->capacity * 2U;
+    capacity = store->capacity == 0U ? 4U : store->capacity * 2U;
     if (capacity < store->capacity
         || capacity > SIZE_MAX / sizeof(*store->items)) {
         return false;
@@ -39,26 +39,26 @@ bool factory_belt_store_reserve_one(FactoryBeltStore *store)
     return true;
 }
 
-void factory_belt_store_add(
-    FactoryBeltStore *store,
+void factory_splitter_store_add(
+    FactorySplitterStore *store,
     FactoryEntityId id,
     int32_t x,
     int32_t y,
-    FactoryDirection direction
+    FactoryDirection facing
 )
 {
-    FactoryBelt *belt = &store->items[store->count++];
+    FactorySplitter *splitter = &store->items[store->count++];
 
-    belt->entity_id = id;
-    belt->x = x;
-    belt->y = y;
-    belt->direction = direction;
-    belt->item = FACTORY_ITEM_NONE;
-    belt->movement_progress = 0U;
+    splitter->entity_id = id;
+    splitter->x = x;
+    splitter->y = y;
+    splitter->facing = facing;
+    splitter->item = FACTORY_ITEM_NONE;
+    splitter->next_output = FACTORY_SPLITTER_OUTPUT_LEFT;
 }
 
-const FactoryBelt *factory_belt_store_find(
-    const FactoryBeltStore *store,
+const FactorySplitter *factory_splitter_store_find(
+    const FactorySplitterStore *store,
     FactoryEntityId id
 )
 {
@@ -75,17 +75,17 @@ const FactoryBelt *factory_belt_store_find(
     return NULL;
 }
 
-FactoryBelt *factory_belt_store_find_mutable(
-    FactoryBeltStore *store,
+FactorySplitter *factory_splitter_store_find_mutable(
+    FactorySplitterStore *store,
     FactoryEntityId id
 )
 {
-    return (FactoryBelt *)factory_belt_store_find(store, id);
+    return (FactorySplitter *)factory_splitter_store_find(store, id);
 }
 
-bool factory_belt_store_remove(
-    FactoryBeltStore *store,
-    FactoryEntityId entity_id
+bool factory_splitter_store_remove(
+    FactorySplitterStore *store,
+    FactoryEntityId id
 )
 {
     size_t index;
@@ -94,25 +94,11 @@ bool factory_belt_store_remove(
         return false;
     }
     for (index = 0U; index < store->count; ++index) {
-        if (store->items[index].entity_id == entity_id) {
+        if (store->items[index].entity_id == id) {
             --store->count;
             store->items[index] = store->items[store->count];
             return true;
         }
     }
     return false;
-}
-
-void factory_belt_store_advance(FactoryBeltStore *store)
-{
-    size_t index;
-
-    for (index = 0U; index < store->count; ++index) {
-        FactoryBelt *belt = &store->items[index];
-
-        if (belt->item != FACTORY_ITEM_NONE
-            && belt->movement_progress < FACTORY_BELT_TRANSFER_TICKS) {
-            ++belt->movement_progress;
-        }
-    }
 }

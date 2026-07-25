@@ -2,22 +2,29 @@
 
 #include <stdlib.h>
 
+#include "assembler_internal.h"
 #include "belt_internal.h"
 #include "extractor_internal.h"
 #include "refinery_internal.h"
+#include "splitter_internal.h"
 #include "storage_internal.h"
 #include "world_internal.h"
 
 typedef enum {
     TRANSFER_TO_BELT = 0,
     TRANSFER_TO_STORAGE,
-    TRANSFER_TO_REFINERY
+    TRANSFER_TO_REFINERY,
+    TRANSFER_TO_ASSEMBLER_IRON,
+    TRANSFER_TO_ASSEMBLER_COPPER,
+    TRANSFER_TO_SPLITTER
 } TransferKind;
 
 typedef enum {
     SOURCE_BELT = 0,
     SOURCE_EXTRACTOR,
-    SOURCE_REFINERY
+    SOURCE_REFINERY,
+    SOURCE_ASSEMBLER,
+    SOURCE_SPLITTER
 } TransferSourceKind;
 
 typedef struct {
@@ -26,6 +33,7 @@ typedef struct {
     FactoryItemType item;
     TransferKind kind;
     TransferSourceKind source_kind;
+    FactorySplitterOutput splitter_output;
     bool wins;
 } TransferIntent;
 
@@ -35,6 +43,8 @@ struct FactorySimulation {
     FactoryEntityManager *entities;
     FactoryExtractorStore extractors;
     FactoryRefineryStore refineries;
+    FactoryAssemblerStore assemblers;
+    FactorySplitterStore splitters;
     FactoryBeltStore belts;
     FactoryStorageStore storages;
     FactoryCommand commands[FACTORY_COMMAND_QUEUE_CAPACITY];
@@ -69,6 +79,21 @@ static void adjacent_coordinate(
     }
 }
 
+static FactoryDirection opposite_direction(FactoryDirection direction)
+{
+    return (FactoryDirection)(((int)direction + 2) % 4);
+}
+
+static FactoryDirection splitter_output_direction(
+    FactoryDirection facing,
+    FactorySplitterOutput output
+)
+{
+    int offset = output == FACTORY_SPLITTER_OUTPUT_LEFT ? 3 : 1;
+
+    return (FactoryDirection)(((int)facing + offset) % 4);
+}
+
 FactorySimulation *factory_simulation_create(FactoryWorld *world)
 {
     FactorySimulation *simulation;
@@ -96,6 +121,8 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     }
     factory_storage_store_destroy(&simulation->storages);
     factory_belt_store_destroy(&simulation->belts);
+    factory_splitter_store_destroy(&simulation->splitters);
+    factory_assembler_store_destroy(&simulation->assemblers);
     factory_refinery_store_destroy(&simulation->refineries);
     factory_extractor_store_destroy(&simulation->extractors);
     factory_entity_manager_destroy(simulation->entities);
@@ -325,6 +352,216 @@ static FactoryResult set_refinery_recipe(
     return FACTORY_RESULT_OK;
 }
 
+static FactoryResult place_assembler(
+    FactorySimulation *simulation,
+    const FactoryCommand *command,
+    FactoryEntityId *out_id
+)
+{
+    int32_t x = command->data.place_assembler.x;
+    int32_t y = command->data.place_assembler.y;
+    FactoryResult result = validate_empty_tile(simulation, x, y);
+
+    if (result != FACTORY_RESULT_OK) {
+        return result;
+    }
+    if (!factory_assembler_store_reserve_one(&simulation->assemblers)) {
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    }
+    result = occupy_with_entity(simulation, x, y, out_id);
+    if (result != FACTORY_RESULT_OK) {
+        return result;
+    }
+    factory_assembler_store_add(
+        &simulation->assemblers,
+        *out_id,
+        x,
+        y,
+        command->data.place_assembler.output_direction
+    );
+    return FACTORY_RESULT_OK;
+}
+
+static FactoryResult place_splitter(
+    FactorySimulation *simulation,
+    const FactoryCommand *command,
+    FactoryEntityId *out_id
+)
+{
+    int32_t x = command->data.place_splitter.x;
+    int32_t y = command->data.place_splitter.y;
+    FactoryResult result = validate_empty_tile(simulation, x, y);
+
+    if (result != FACTORY_RESULT_OK) {
+        return result;
+    }
+    if (!factory_splitter_store_reserve_one(&simulation->splitters)) {
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    }
+    result = occupy_with_entity(simulation, x, y, out_id);
+    if (result != FACTORY_RESULT_OK) {
+        return result;
+    }
+    factory_splitter_store_add(
+        &simulation->splitters,
+        *out_id,
+        x,
+        y,
+        command->data.place_splitter.facing
+    );
+    return FACTORY_RESULT_OK;
+}
+
+static FactoryResult validate_demolition(
+    FactorySimulation *simulation,
+    FactoryEntityId id,
+    FactoryEntityType *out_type,
+    int32_t *out_x,
+    int32_t *out_y
+)
+{
+    const FactoryExtractor *extractor =
+        factory_extractor_store_find(&simulation->extractors, id);
+    const FactoryBelt *belt =
+        factory_belt_store_find(&simulation->belts, id);
+    const FactoryRefinery *refinery =
+        factory_refinery_store_find(&simulation->refineries, id);
+    const FactoryAssembler *assembler =
+        factory_assembler_store_find(&simulation->assemblers, id);
+    const FactoryStorage *storage =
+        factory_storage_store_find(&simulation->storages, id);
+    const FactorySplitter *splitter =
+        factory_splitter_store_find(&simulation->splitters, id);
+    const FactoryTile *tile;
+
+    if (id == 0U) {
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    }
+    if (!factory_entity_is_valid(simulation->entities, id)) {
+        return FACTORY_RESULT_ENTITY_NOT_FOUND;
+    }
+    if (extractor != NULL) {
+        if (extractor->output_item != FACTORY_ITEM_NONE
+            || extractor->output_amount != 0U) {
+            return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
+        }
+        *out_type = FACTORY_ENTITY_TYPE_EXTRACTOR;
+        *out_x = extractor->x;
+        *out_y = extractor->y;
+    } else if (belt != NULL) {
+        if (belt->item != FACTORY_ITEM_NONE) {
+            return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
+        }
+        if (belt->movement_progress != 0U) {
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        }
+        *out_type = FACTORY_ENTITY_TYPE_BELT;
+        *out_x = belt->x;
+        *out_y = belt->y;
+    } else if (refinery != NULL) {
+        if (refinery->processing || refinery->processing_progress != 0U) {
+            return FACTORY_RESULT_ENTITY_BUSY;
+        }
+        if (refinery->input_item != FACTORY_ITEM_NONE
+            || refinery->input_amount != 0U
+            || refinery->output_item != FACTORY_ITEM_NONE
+            || refinery->output_amount != 0U) {
+            return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
+        }
+        *out_type = FACTORY_ENTITY_TYPE_REFINERY;
+        *out_x = refinery->x;
+        *out_y = refinery->y;
+    } else if (assembler != NULL) {
+        if (assembler->processing || assembler->processing_progress != 0U) {
+            return FACTORY_RESULT_ENTITY_BUSY;
+        }
+        if (assembler->iron_plate_amount != 0U
+            || assembler->copper_plate_amount != 0U
+            || assembler->output_item != FACTORY_ITEM_NONE
+            || assembler->output_amount != 0U) {
+            return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
+        }
+        *out_type = FACTORY_ENTITY_TYPE_ASSEMBLER;
+        *out_x = assembler->x;
+        *out_y = assembler->y;
+    } else if (storage != NULL) {
+        if (factory_storage_get_total_amount(storage) != 0U) {
+            return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
+        }
+        *out_type = FACTORY_ENTITY_TYPE_STORAGE;
+        *out_x = storage->x;
+        *out_y = storage->y;
+    } else if (splitter != NULL) {
+        if (splitter->item != FACTORY_ITEM_NONE) {
+            return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
+        }
+        *out_type = FACTORY_ENTITY_TYPE_SPLITTER;
+        *out_x = splitter->x;
+        *out_y = splitter->y;
+    } else {
+        return FACTORY_RESULT_UNSUPPORTED_ENTITY;
+    }
+    tile = factory_world_get_tile(simulation->world, *out_x, *out_y);
+    if (tile == NULL || tile->occupying_entity != id) {
+        return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+    }
+    return FACTORY_RESULT_OK;
+}
+
+static bool remove_subsystem_record(
+    FactorySimulation *simulation,
+    FactoryEntityType type,
+    FactoryEntityId id
+)
+{
+    switch (type) {
+        case FACTORY_ENTITY_TYPE_EXTRACTOR:
+            return factory_extractor_store_remove(&simulation->extractors, id);
+        case FACTORY_ENTITY_TYPE_BELT:
+            return factory_belt_store_remove(&simulation->belts, id);
+        case FACTORY_ENTITY_TYPE_REFINERY:
+            return factory_refinery_store_remove(&simulation->refineries, id);
+        case FACTORY_ENTITY_TYPE_ASSEMBLER:
+            return factory_assembler_store_remove(&simulation->assemblers, id);
+        case FACTORY_ENTITY_TYPE_STORAGE:
+            return factory_storage_store_remove(&simulation->storages, id);
+        case FACTORY_ENTITY_TYPE_SPLITTER:
+            return factory_splitter_store_remove(&simulation->splitters, id);
+        case FACTORY_ENTITY_TYPE_NONE:
+        default:
+            return false;
+    }
+}
+
+static FactoryResult demolish_entity(
+    FactorySimulation *simulation,
+    const FactoryCommand *command,
+    FactoryEntityType *out_type,
+    int32_t *out_x,
+    int32_t *out_y
+)
+{
+    FactoryEntityId id = command->data.demolish_entity.entity_id;
+    FactoryResult result = validate_demolition(
+        simulation, id, out_type, out_x, out_y
+    );
+
+    if (result != FACTORY_RESULT_OK) {
+        return result;
+    }
+    result = factory_world_clear_occupying_entity(
+        simulation->world, *out_x, *out_y, id
+    );
+    if (result != FACTORY_RESULT_OK) {
+        return result;
+    }
+    if (!remove_subsystem_record(simulation, *out_type, id)) {
+        return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+    }
+    factory_entity_destroy(simulation->entities, id);
+    return FACTORY_RESULT_OK;
+}
+
 static void apply_commands(FactorySimulation *simulation)
 {
     size_t index;
@@ -335,6 +572,9 @@ static void apply_commands(FactorySimulation *simulation)
 
         result->command = simulation->commands[index];
         result->entity_id = 0U;
+        result->entity_type = FACTORY_ENTITY_TYPE_NONE;
+        result->x = 0;
+        result->y = 0;
         switch (result->command.type) {
             case FACTORY_COMMAND_PLACE_EXTRACTOR:
                 result->result = place_extractor(
@@ -359,6 +599,27 @@ static void apply_commands(FactorySimulation *simulation)
             case FACTORY_COMMAND_SET_REFINERY_RECIPE:
                 result->result = set_refinery_recipe(
                     simulation, &result->command, &result->entity_id
+                );
+                break;
+            case FACTORY_COMMAND_PLACE_ASSEMBLER:
+                result->result = place_assembler(
+                    simulation, &result->command, &result->entity_id
+                );
+                break;
+            case FACTORY_COMMAND_PLACE_SPLITTER:
+                result->result = place_splitter(
+                    simulation, &result->command, &result->entity_id
+                );
+                break;
+            case FACTORY_COMMAND_DEMOLISH_ENTITY:
+                result->entity_id =
+                    result->command.data.demolish_entity.entity_id;
+                result->result = demolish_entity(
+                    simulation,
+                    &result->command,
+                    &result->entity_type,
+                    &result->x,
+                    &result->y
                 );
                 break;
         }
@@ -401,6 +662,64 @@ static void add_producer_intent(
     ++*count;
 }
 
+static bool splitter_output_is_available(
+    FactorySimulation *simulation,
+    const FactorySplitter *splitter,
+    FactorySplitterOutput output,
+    FactoryEntityId *out_belt_id
+)
+{
+    FactoryDirection direction = splitter_output_direction(
+        splitter->facing, output
+    );
+    const FactoryTile *tile;
+    const FactoryBelt *belt;
+    int32_t x;
+    int32_t y;
+
+    adjacent_coordinate(splitter->x, splitter->y, direction, &x, &y);
+    tile = factory_world_get_tile(simulation->world, x, y);
+    if (tile == NULL) {
+        return false;
+    }
+    belt = factory_belt_store_find(&simulation->belts, tile->occupying_entity);
+    if (belt == NULL || belt->item != FACTORY_ITEM_NONE) {
+        return false;
+    }
+    *out_belt_id = belt->entity_id;
+    return true;
+}
+
+static void add_splitter_intent(
+    FactorySimulation *simulation,
+    TransferIntent *intents,
+    size_t *count,
+    const FactorySplitter *splitter
+)
+{
+    FactorySplitterOutput selected = splitter->next_output;
+    FactoryEntityId belt_id = 0U;
+
+    if (!splitter_output_is_available(
+            simulation, splitter, selected, &belt_id)) {
+        selected = selected == FACTORY_SPLITTER_OUTPUT_LEFT
+            ? FACTORY_SPLITTER_OUTPUT_RIGHT
+            : FACTORY_SPLITTER_OUTPUT_LEFT;
+        if (!splitter_output_is_available(
+                simulation, splitter, selected, &belt_id)) {
+            return;
+        }
+    }
+    intents[*count].source_id = splitter->entity_id;
+    intents[*count].destination_id = belt_id;
+    intents[*count].item = splitter->item;
+    intents[*count].kind = TRANSFER_TO_BELT;
+    intents[*count].source_kind = SOURCE_SPLITTER;
+    intents[*count].splitter_output = selected;
+    intents[*count].wins = true;
+    ++*count;
+}
+
 static void resolve_transfers(TransferIntent *intents, size_t count)
 {
     size_t first;
@@ -409,7 +728,8 @@ static void resolve_transfers(TransferIntent *intents, size_t count)
     for (first = 0U; first < count; ++first) {
         for (second = first + 1U; second < count; ++second) {
             if (intents[first].destination_id
-                == intents[second].destination_id) {
+                    == intents[second].destination_id
+                && intents[first].kind == intents[second].kind) {
                 if (intents[first].source_id < intents[second].source_id) {
                     intents[second].wins = false;
                 } else {
@@ -422,8 +742,10 @@ static void resolve_transfers(TransferIntent *intents, size_t count)
 
 static void update_producer_transfers(FactorySimulation *simulation)
 {
-    size_t capacity =
-        simulation->extractors.count + simulation->refineries.count;
+    size_t capacity = simulation->extractors.count
+        + simulation->refineries.count
+        + simulation->assemblers.count
+        + simulation->splitters.count;
     TransferIntent *intents;
     size_t count = 0U;
     size_t index;
@@ -457,6 +779,24 @@ static void update_producer_transfers(FactorySimulation *simulation)
             );
         }
     }
+    for (index = 0U; index < simulation->assemblers.count; ++index) {
+        const FactoryAssembler *source = &simulation->assemblers.items[index];
+
+        if (source->output_item != FACTORY_ITEM_NONE) {
+            add_producer_intent(
+                simulation, intents, &count, source->entity_id,
+                SOURCE_ASSEMBLER, source->x, source->y,
+                source->output_direction, source->output_item
+            );
+        }
+    }
+    for (index = 0U; index < simulation->splitters.count; ++index) {
+        const FactorySplitter *source = &simulation->splitters.items[index];
+
+        if (source->item != FACTORY_ITEM_NONE) {
+            add_splitter_intent(simulation, intents, &count, source);
+        }
+    }
     resolve_transfers(intents, count);
     for (index = 0U; index < count; ++index) {
         FactoryBelt *destination;
@@ -475,12 +815,28 @@ static void update_producer_transfers(FactorySimulation *simulation)
             );
             source->output_item = FACTORY_ITEM_NONE;
             source->output_amount = 0U;
-        } else {
+        } else if (intents[index].source_kind == SOURCE_REFINERY) {
             FactoryRefinery *source = factory_refinery_store_find_mutable(
                 &simulation->refineries, intents[index].source_id
             );
             source->output_item = FACTORY_ITEM_NONE;
             source->output_amount = 0U;
+        } else if (intents[index].source_kind == SOURCE_ASSEMBLER) {
+            FactoryAssembler *source = factory_assembler_store_find_mutable(
+                &simulation->assemblers, intents[index].source_id
+            );
+            source->output_item = FACTORY_ITEM_NONE;
+            source->output_amount = 0U;
+        } else {
+            FactorySplitter *source = factory_splitter_store_find_mutable(
+                &simulation->splitters, intents[index].source_id
+            );
+            source->item = FACTORY_ITEM_NONE;
+            source->next_output =
+                intents[index].splitter_output
+                    == FACTORY_SPLITTER_OUTPUT_LEFT
+                ? FACTORY_SPLITTER_OUTPUT_RIGHT
+                : FACTORY_SPLITTER_OUTPUT_LEFT;
         }
     }
     free(intents);
@@ -500,6 +856,8 @@ static size_t plan_belt_transfers(
         const FactoryBelt *destination_belt;
         const FactoryStorage *destination_storage;
         const FactoryRefinery *destination_refinery;
+        const FactoryAssembler *destination_assembler;
+        const FactorySplitter *destination_splitter;
         const FactoryRecipe *destination_recipe;
         int32_t target_x;
         int32_t target_y;
@@ -529,6 +887,12 @@ static size_t plan_belt_transfers(
         destination_recipe = destination_refinery == NULL
             ? NULL
             : factory_recipe_get(destination_refinery->recipe_id);
+        destination_assembler = factory_assembler_store_find(
+            &simulation->assemblers, tile->occupying_entity
+        );
+        destination_splitter = factory_splitter_store_find(
+            &simulation->splitters, tile->occupying_entity
+        );
         if (destination_belt != NULL
             && destination_belt->item == FACTORY_ITEM_NONE) {
             intents[intent_count].kind = TRANSFER_TO_BELT;
@@ -536,7 +900,8 @@ static size_t plan_belt_transfers(
             && (source->item == FACTORY_ITEM_IRON_ORE
                 || source->item == FACTORY_ITEM_IRON_PLATE
                 || source->item == FACTORY_ITEM_COPPER_ORE
-                || source->item == FACTORY_ITEM_COPPER_PLATE)
+                || source->item == FACTORY_ITEM_COPPER_PLATE
+                || source->item == FACTORY_ITEM_ELECTRONIC_COMPONENT)
             && factory_storage_get_total_amount(destination_storage)
                 < destination_storage->total_capacity) {
             intents[intent_count].kind = TRANSFER_TO_STORAGE;
@@ -555,6 +920,27 @@ static size_t plan_belt_transfers(
                 continue;
             }
             intents[intent_count].kind = TRANSFER_TO_REFINERY;
+        } else if (destination_assembler != NULL
+            && source->item == FACTORY_ITEM_IRON_PLATE
+            && destination_assembler->iron_plate_amount == 0U) {
+            intents[intent_count].kind = TRANSFER_TO_ASSEMBLER_IRON;
+        } else if (destination_assembler != NULL
+            && source->item == FACTORY_ITEM_COPPER_PLATE
+            && destination_assembler->copper_plate_amount == 0U) {
+            intents[intent_count].kind = TRANSFER_TO_ASSEMBLER_COPPER;
+        } else if (destination_splitter != NULL
+            && destination_splitter->item == FACTORY_ITEM_NONE) {
+            adjacent_coordinate(
+                destination_splitter->x,
+                destination_splitter->y,
+                opposite_direction(destination_splitter->facing),
+                &input_x,
+                &input_y
+            );
+            if (input_x != source->x || input_y != source->y) {
+                continue;
+            }
+            intents[intent_count].kind = TRANSFER_TO_SPLITTER;
         } else {
             continue;
         }
@@ -601,16 +987,35 @@ static void commit_belt_transfers(
                 ++destination->iron_plate_amount;
             } else if (intents[index].item == FACTORY_ITEM_COPPER_ORE) {
                 ++destination->copper_ore_amount;
-            } else {
+            } else if (intents[index].item == FACTORY_ITEM_COPPER_PLATE) {
                 ++destination->copper_plate_amount;
+            } else {
+                ++destination->electronic_component_amount;
             }
-        } else {
+        } else if (intents[index].kind == TRANSFER_TO_REFINERY) {
             FactoryRefinery *destination =
                 factory_refinery_store_find_mutable(
                     &simulation->refineries, intents[index].destination_id
                 );
             destination->input_item = intents[index].item;
             destination->input_amount = 1U;
+        } else if (intents[index].kind == TRANSFER_TO_ASSEMBLER_IRON
+            || intents[index].kind == TRANSFER_TO_ASSEMBLER_COPPER) {
+            FactoryAssembler *destination =
+                factory_assembler_store_find_mutable(
+                    &simulation->assemblers, intents[index].destination_id
+                );
+            if (intents[index].kind == TRANSFER_TO_ASSEMBLER_IRON) {
+                destination->iron_plate_amount = 1U;
+            } else {
+                destination->copper_plate_amount = 1U;
+            }
+        } else {
+            FactorySplitter *destination =
+                factory_splitter_store_find_mutable(
+                    &simulation->splitters, intents[index].destination_id
+                );
+            destination->item = intents[index].item;
         }
         source->item = FACTORY_ITEM_NONE;
         source->movement_progress = 0U;
@@ -646,6 +1051,7 @@ void factory_simulation_tick(FactorySimulation *simulation)
     factory_belt_store_advance(&simulation->belts);
     update_belt_transfers(simulation);
     factory_refinery_store_update(&simulation->refineries);
+    factory_assembler_store_update(&simulation->assemblers);
     ++simulation->tick;
 }
 
@@ -686,6 +1092,15 @@ bool factory_simulation_entity_is_valid(
 {
     return simulation != NULL
         && factory_entity_is_valid(simulation->entities, id);
+}
+
+size_t factory_simulation_get_entity_count(
+    const FactorySimulation *simulation
+)
+{
+    return simulation == NULL
+        ? 0U
+        : factory_entity_get_count(simulation->entities);
 }
 
 bool factory_simulation_is_extractor(
@@ -797,5 +1212,61 @@ bool factory_simulation_get_refinery(
         return false;
     }
     *out_refinery = *refinery;
+    return true;
+}
+
+bool factory_simulation_is_assembler(
+    const FactorySimulation *simulation,
+    FactoryEntityId id
+)
+{
+    return simulation != NULL
+        && factory_assembler_store_find(&simulation->assemblers, id) != NULL;
+}
+
+bool factory_simulation_get_assembler(
+    const FactorySimulation *simulation,
+    FactoryEntityId id,
+    FactoryAssembler *out_assembler
+)
+{
+    const FactoryAssembler *assembler;
+
+    if (simulation == NULL || out_assembler == NULL) {
+        return false;
+    }
+    assembler = factory_assembler_store_find(&simulation->assemblers, id);
+    if (assembler == NULL) {
+        return false;
+    }
+    *out_assembler = *assembler;
+    return true;
+}
+
+bool factory_simulation_is_splitter(
+    const FactorySimulation *simulation,
+    FactoryEntityId id
+)
+{
+    return simulation != NULL
+        && factory_splitter_store_find(&simulation->splitters, id) != NULL;
+}
+
+bool factory_simulation_get_splitter(
+    const FactorySimulation *simulation,
+    FactoryEntityId id,
+    FactorySplitter *out_splitter
+)
+{
+    const FactorySplitter *splitter;
+
+    if (simulation == NULL || out_splitter == NULL) {
+        return false;
+    }
+    splitter = factory_splitter_store_find(&simulation->splitters, id);
+    if (splitter == NULL) {
+        return false;
+    }
+    *out_splitter = *splitter;
     return true;
 }

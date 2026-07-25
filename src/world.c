@@ -1,4 +1,4 @@
-#include "factory/world.h"
+#include <foundation/world.h>
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -187,6 +187,23 @@ FactoryResult factory_world_consume_resource(
         return FACTORY_RESULT_INVALID_ARGUMENT;
     }
     tile->resource_amount -= amount;
+    return FACTORY_RESULT_OK;
+}
+
+FactoryResult factory_world_clear_occupying_entity(
+    FactoryWorld *world,
+    int32_t x,
+    int32_t y,
+    FactoryEntityId expected_entity_id
+)
+{
+    FactoryTile *tile = factory_world_get_mutable_tile(world, x, y);
+
+    if (tile == NULL || expected_entity_id == 0U
+        || tile->occupying_entity != expected_entity_id) {
+        return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+    }
+    tile->occupying_entity = 0U;
     return FACTORY_RESULT_OK;
 }
 

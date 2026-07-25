@@ -17,6 +17,7 @@ typedef struct {
     uint32_t iron_plate_amount;
     uint32_t copper_ore_amount;
     uint32_t copper_plate_amount;
+    uint32_t electronic_component_amount;
     uint32_t total_capacity;
 } FactoryStorage;
 

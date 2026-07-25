@@ -30,6 +30,14 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
                 && command->data.place_refinery.input_direction != direction;
         case FACTORY_COMMAND_SET_REFINERY_RECIPE:
             return true;
+        case FACTORY_COMMAND_PLACE_ASSEMBLER:
+            direction = command->data.place_assembler.output_direction;
+            break;
+        case FACTORY_COMMAND_DEMOLISH_ENTITY:
+            return true;
+        case FACTORY_COMMAND_PLACE_SPLITTER:
+            direction = command->data.place_splitter.facing;
+            break;
         default:
             return false;
     }

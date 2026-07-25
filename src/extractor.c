@@ -91,6 +91,26 @@ FactoryExtractor *factory_extractor_store_find_mutable(
     return (FactoryExtractor *)factory_extractor_store_find(store, entity_id);
 }
 
+bool factory_extractor_store_remove(
+    FactoryExtractorStore *store,
+    FactoryEntityId entity_id
+)
+{
+    size_t index;
+
+    if (store == NULL) {
+        return false;
+    }
+    for (index = 0U; index < store->count; ++index) {
+        if (store->items[index].entity_id == entity_id) {
+            --store->count;
+            store->items[index] = store->items[store->count];
+            return true;
+        }
+    }
+    return false;
+}
+
 void factory_extractor_store_update(
     FactoryExtractorStore *store,
     FactoryWorld *world

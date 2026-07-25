@@ -28,5 +28,9 @@ FactoryStorage *factory_storage_store_find_mutable(
     FactoryStorageStore *store,
     FactoryEntityId id
 );
+bool factory_storage_store_remove(
+    FactoryStorageStore *store,
+    FactoryEntityId entity_id
+);
 
 #endif

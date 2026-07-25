@@ -3,25 +3,23 @@
 Foundation is a rendering-independent deterministic C17 simulation engine for
 automation, logistics, colony-building, and RTS-style games.
 
-It currently supports parallel iron and copper processing:
+Its current production chain includes:
 
 ```text
-Iron deposit   → iron ore   → refinery → iron plate   → storage
-Copper deposit → copper ore → refinery → copper plate → storage
+Iron deposit   → iron plate ┐
+                            ├→ assembler → electronic component → storage
+Copper deposit → copper plate┘
 ```
 
-Refineries begin recipe-less. A frontend places a refinery, inspects its entity
-ID, then queues a deterministic recipe-selection command on a later tick.
-Recipe changes are rejected while any input, processing, progress, or output
-state exists.
+The fixed assembler recipe consumes one iron plate and one copper plate over
+15 updates. Its two one-item input slots are independent logical transfer
+destinations, so different plates can arrive simultaneously while same-item
+conflicts resolve by lowest source entity ID.
 
-Storage shares 100 total capacity across all four item types. Transfers remain
-item-agnostic, while extractors map resource types and refineries validate
-their selected immutable recipes.
+All public headers are under `include/foundation/`; C symbols retain their
+existing `Factory` and `factory_` prefixes.
 
 ## Build, test, and run
-
-From this directory:
 
 ```sh
 cmake -S . -B build
@@ -30,8 +28,16 @@ ctest --test-dir build --output-on-failure
 ./build/factory_console_demo
 ```
 
-The demo runs iron and copper pipelines together, prints separate elemental
-accounting, and demonstrates a safely rejected busy-refinery recipe switch.
+The demo shows partial input buffering, 15-tick processing, deferred output
+transfer, component storage, separate iron/copper conservation, safely rejected
+busy demolition, and same-tick tile reuse.
 
-See `docs/resources.md`, `docs/items.md`, `docs/recipes.md`, and
-`docs/refinery-system.md` for the public model and exact rules.
+Demolition supports all placed entity types but succeeds only when the target
+owns no material and has no active work. IDs remain invalid forever after
+removal; replacement entities receive newer IDs.
+
+Splitters add passive one-input/two-output routing with a one-item buffer.
+They alternate successful left/right transfers, fall back when the preferred
+output is blocked, and preserve state when both outputs are blocked.
+
+See `docs/splitter-system.md` for orientation, fairness, and blocking rules.

@@ -30,6 +30,10 @@ FactoryRefinery *factory_refinery_store_find_mutable(
     FactoryRefineryStore *store,
     FactoryEntityId id
 );
+bool factory_refinery_store_remove(
+    FactoryRefineryStore *store,
+    FactoryEntityId entity_id
+);
 void factory_refinery_store_update(FactoryRefineryStore *store);
 
 #endif

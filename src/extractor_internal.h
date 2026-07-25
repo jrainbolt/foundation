@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "factory/world.h"
+#include <foundation/world.h>
 #include "foundation/extractor.h"
 
 typedef struct {
@@ -29,6 +29,10 @@ const FactoryExtractor *factory_extractor_store_find(
     FactoryEntityId entity_id
 );
 FactoryExtractor *factory_extractor_store_find_mutable(
+    FactoryExtractorStore *store,
+    FactoryEntityId entity_id
+);
+bool factory_extractor_store_remove(
     FactoryExtractorStore *store,
     FactoryEntityId entity_id
 );
