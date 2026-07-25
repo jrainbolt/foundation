@@ -5,10 +5,11 @@
 - [x] Empty-only demolition and tile reuse
 - [x] One-input, two-output splitters
 - [x] Deterministic round-robin routing and blocking fallback
-- [ ] Inserters
-- [ ] Machine interaction
-- [ ] Belt pickup and belt drop
-- [ ] Rotatable arms
+- [x] Inserters
+- [x] Machine interaction
+- [x] Belt pickup and belt drop
+- [x] Cardinal placement orientation
+- [ ] Inserter variants, filters, and longer arms
 
-The next milestone is inserters with deterministic belt pickup, machine
-interaction, belt drop, and rotatable arms.
+The next milestone can build richer factory-control systems on the deterministic
+logistics core.

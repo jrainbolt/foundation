@@ -5,6 +5,7 @@
 #include "assembler_internal.h"
 #include "belt_internal.h"
 #include "extractor_internal.h"
+#include "inserter_internal.h"
 #include "refinery_internal.h"
 #include "splitter_internal.h"
 #include "storage_internal.h"
@@ -45,6 +46,7 @@ struct FactorySimulation {
     FactoryRefineryStore refineries;
     FactoryAssemblerStore assemblers;
     FactorySplitterStore splitters;
+    FactoryInserterStore inserters;
     FactoryBeltStore belts;
     FactoryStorageStore storages;
     FactoryCommand commands[FACTORY_COMMAND_QUEUE_CAPACITY];
@@ -121,6 +123,7 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     }
     factory_storage_store_destroy(&simulation->storages);
     factory_belt_store_destroy(&simulation->belts);
+    factory_inserter_store_destroy(&simulation->inserters);
     factory_splitter_store_destroy(&simulation->splitters);
     factory_assembler_store_destroy(&simulation->assemblers);
     factory_refinery_store_destroy(&simulation->refineries);
@@ -412,6 +415,36 @@ static FactoryResult place_splitter(
     return FACTORY_RESULT_OK;
 }
 
+static FactoryResult place_inserter(
+    FactorySimulation *simulation,
+    const FactoryCommand *command,
+    FactoryEntityId *out_id
+)
+{
+    int32_t x = command->data.place_inserter.x;
+    int32_t y = command->data.place_inserter.y;
+    FactoryResult result = validate_empty_tile(simulation, x, y);
+
+    if (result != FACTORY_RESULT_OK) {
+        return result;
+    }
+    if (!factory_inserter_store_reserve_one(&simulation->inserters)) {
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    }
+    result = occupy_with_entity(simulation, x, y, out_id);
+    if (result != FACTORY_RESULT_OK) {
+        return result;
+    }
+    factory_inserter_store_add(
+        &simulation->inserters,
+        *out_id,
+        x,
+        y,
+        command->data.place_inserter.facing
+    );
+    return FACTORY_RESULT_OK;
+}
+
 static FactoryResult validate_demolition(
     FactorySimulation *simulation,
     FactoryEntityId id,
@@ -432,6 +465,8 @@ static FactoryResult validate_demolition(
         factory_storage_store_find(&simulation->storages, id);
     const FactorySplitter *splitter =
         factory_splitter_store_find(&simulation->splitters, id);
+    const FactoryInserter *inserter =
+        factory_inserter_store_find(&simulation->inserters, id);
     const FactoryTile *tile;
 
     if (id == 0U) {
@@ -498,6 +533,18 @@ static FactoryResult validate_demolition(
         *out_type = FACTORY_ENTITY_TYPE_SPLITTER;
         *out_x = splitter->x;
         *out_y = splitter->y;
+    } else if (inserter != NULL) {
+        if (inserter->held_item != FACTORY_ITEM_NONE
+            || inserter->held_amount != 0U) {
+            return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
+        }
+        if (inserter->state != FACTORY_INSERTER_STATE_IDLE
+            || inserter->progress != 0U) {
+            return FACTORY_RESULT_ENTITY_BUSY;
+        }
+        *out_type = FACTORY_ENTITY_TYPE_INSERTER;
+        *out_x = inserter->x;
+        *out_y = inserter->y;
     } else {
         return FACTORY_RESULT_UNSUPPORTED_ENTITY;
     }
@@ -527,6 +574,8 @@ static bool remove_subsystem_record(
             return factory_storage_store_remove(&simulation->storages, id);
         case FACTORY_ENTITY_TYPE_SPLITTER:
             return factory_splitter_store_remove(&simulation->splitters, id);
+        case FACTORY_ENTITY_TYPE_INSERTER:
+            return factory_inserter_store_remove(&simulation->inserters, id);
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;
@@ -608,6 +657,11 @@ static void apply_commands(FactorySimulation *simulation)
                 break;
             case FACTORY_COMMAND_PLACE_SPLITTER:
                 result->result = place_splitter(
+                    simulation, &result->command, &result->entity_id
+                );
+                break;
+            case FACTORY_COMMAND_PLACE_INSERTER:
+                result->result = place_inserter(
                     simulation, &result->command, &result->entity_id
                 );
                 break;
@@ -1040,6 +1094,490 @@ static void update_belt_transfers(FactorySimulation *simulation)
     free(intents);
 }
 
+typedef enum {
+    INSERTER_ENDPOINT_BELT = 0,
+    INSERTER_ENDPOINT_SPLITTER,
+    INSERTER_ENDPOINT_REFINERY,
+    INSERTER_ENDPOINT_ASSEMBLER,
+    INSERTER_ENDPOINT_STORAGE
+} InserterEndpointKind;
+
+typedef struct {
+    FactoryEntityId inserter_id;
+    FactoryEntityId endpoint_id;
+    FactoryItemType item;
+    InserterEndpointKind kind;
+    bool wins;
+} InserterIntent;
+
+static bool coordinate_matches_direction(
+    int32_t origin_x,
+    int32_t origin_y,
+    FactoryDirection direction,
+    int32_t expected_x,
+    int32_t expected_y
+)
+{
+    int32_t x;
+    int32_t y;
+
+    adjacent_coordinate(origin_x, origin_y, direction, &x, &y);
+    return x == expected_x && y == expected_y;
+}
+
+static bool splitter_can_output_to_inserter(
+    const FactorySplitter *splitter,
+    const FactoryInserter *inserter
+)
+{
+    return coordinate_matches_direction(
+            splitter->x,
+            splitter->y,
+            splitter_output_direction(
+                splitter->facing, FACTORY_SPLITTER_OUTPUT_LEFT
+            ),
+            inserter->x,
+            inserter->y
+        )
+        || coordinate_matches_direction(
+            splitter->x,
+            splitter->y,
+            splitter_output_direction(
+                splitter->facing, FACTORY_SPLITTER_OUTPUT_RIGHT
+            ),
+            inserter->x,
+            inserter->y
+        );
+}
+
+static bool inspect_inserter_source(
+    FactorySimulation *simulation,
+    const FactoryInserter *inserter,
+    FactoryEntityId *out_id,
+    FactoryItemType *out_item,
+    InserterEndpointKind *out_kind
+)
+{
+    const FactoryTile *tile = factory_world_get_tile(
+        simulation->world, inserter->source_x, inserter->source_y
+    );
+    const FactoryBelt *belt;
+    const FactorySplitter *splitter;
+    const FactoryRefinery *refinery;
+    const FactoryAssembler *assembler;
+
+    if (tile == NULL || tile->occupying_entity == 0U) {
+        return false;
+    }
+    belt = factory_belt_store_find(&simulation->belts, tile->occupying_entity);
+    if (belt != NULL && belt->item != FACTORY_ITEM_NONE) {
+        *out_id = belt->entity_id;
+        *out_item = belt->item;
+        *out_kind = INSERTER_ENDPOINT_BELT;
+        return true;
+    }
+    splitter = factory_splitter_store_find(
+        &simulation->splitters, tile->occupying_entity
+    );
+    if (splitter != NULL
+        && splitter->item != FACTORY_ITEM_NONE
+        && splitter_can_output_to_inserter(splitter, inserter)) {
+        *out_id = splitter->entity_id;
+        *out_item = splitter->item;
+        *out_kind = INSERTER_ENDPOINT_SPLITTER;
+        return true;
+    }
+    refinery = factory_refinery_store_find(
+        &simulation->refineries, tile->occupying_entity
+    );
+    if (refinery != NULL
+        && refinery->output_item != FACTORY_ITEM_NONE
+        && refinery->output_amount == 1U
+        && coordinate_matches_direction(
+            refinery->x,
+            refinery->y,
+            refinery->output_direction,
+            inserter->x,
+            inserter->y
+        )) {
+        *out_id = refinery->entity_id;
+        *out_item = refinery->output_item;
+        *out_kind = INSERTER_ENDPOINT_REFINERY;
+        return true;
+    }
+    assembler = factory_assembler_store_find(
+        &simulation->assemblers, tile->occupying_entity
+    );
+    if (assembler != NULL
+        && assembler->output_item != FACTORY_ITEM_NONE
+        && assembler->output_amount == 1U
+        && coordinate_matches_direction(
+            assembler->x,
+            assembler->y,
+            assembler->output_direction,
+            inserter->x,
+            inserter->y
+        )) {
+        *out_id = assembler->entity_id;
+        *out_item = assembler->output_item;
+        *out_kind = INSERTER_ENDPOINT_ASSEMBLER;
+        return true;
+    }
+    return false;
+}
+
+static void resolve_inserter_intents(
+    InserterIntent *intents,
+    size_t count
+)
+{
+    size_t first;
+    size_t second;
+
+    for (first = 0U; first < count; ++first) {
+        for (second = first + 1U; second < count; ++second) {
+            if (intents[first].endpoint_id == intents[second].endpoint_id) {
+                if (intents[first].inserter_id
+                    < intents[second].inserter_id) {
+                    intents[second].wins = false;
+                } else {
+                    intents[first].wins = false;
+                }
+            }
+        }
+    }
+}
+
+static void clear_inserter_source(
+    FactorySimulation *simulation,
+    const InserterIntent *intent
+)
+{
+    if (intent->kind == INSERTER_ENDPOINT_BELT) {
+        FactoryBelt *belt = factory_belt_store_find_mutable(
+            &simulation->belts, intent->endpoint_id
+        );
+
+        belt->item = FACTORY_ITEM_NONE;
+        belt->movement_progress = 0U;
+    } else if (intent->kind == INSERTER_ENDPOINT_SPLITTER) {
+        FactorySplitter *splitter = factory_splitter_store_find_mutable(
+            &simulation->splitters, intent->endpoint_id
+        );
+
+        splitter->item = FACTORY_ITEM_NONE;
+    } else if (intent->kind == INSERTER_ENDPOINT_REFINERY) {
+        FactoryRefinery *refinery = factory_refinery_store_find_mutable(
+            &simulation->refineries, intent->endpoint_id
+        );
+
+        refinery->output_item = FACTORY_ITEM_NONE;
+        refinery->output_amount = 0U;
+    } else {
+        FactoryAssembler *assembler = factory_assembler_store_find_mutable(
+            &simulation->assemblers, intent->endpoint_id
+        );
+
+        assembler->output_item = FACTORY_ITEM_NONE;
+        assembler->output_amount = 0U;
+    }
+}
+
+static void update_inserter_pickups(FactorySimulation *simulation)
+{
+    InserterIntent *intents;
+    size_t count = 0U;
+    size_t index;
+
+    if (simulation->inserters.count == 0U) {
+        return;
+    }
+    intents = malloc(simulation->inserters.count * sizeof(*intents));
+    if (intents == NULL) {
+        return;
+    }
+    for (index = 0U; index < simulation->inserters.count; ++index) {
+        FactoryInserter *inserter = &simulation->inserters.items[index];
+
+        if (inserter->state == FACTORY_INSERTER_STATE_IDLE) {
+            FactoryEntityId endpoint_id;
+            FactoryItemType item;
+            InserterEndpointKind kind;
+
+            if (inspect_inserter_source(
+                    simulation, inserter, &endpoint_id, &item, &kind)) {
+                inserter->state = FACTORY_INSERTER_STATE_PICKING_UP;
+                inserter->progress = 0U;
+            }
+        } else if (inserter->state
+            == FACTORY_INSERTER_STATE_PICKING_UP) {
+            ++inserter->progress;
+            if (inserter->progress >= FACTORY_INSERTER_ACTION_TICKS) {
+                InserterIntent *intent = &intents[count];
+
+                if (!inspect_inserter_source(
+                        simulation,
+                        inserter,
+                        &intent->endpoint_id,
+                        &intent->item,
+                        &intent->kind)) {
+                    inserter->state = FACTORY_INSERTER_STATE_IDLE;
+                    inserter->progress = 0U;
+                    continue;
+                }
+                intent->inserter_id = inserter->entity_id;
+                intent->wins = true;
+                ++count;
+            }
+        }
+    }
+    resolve_inserter_intents(intents, count);
+    for (index = 0U; index < count; ++index) {
+        FactoryInserter *inserter = factory_inserter_store_find_mutable(
+            &simulation->inserters, intents[index].inserter_id
+        );
+
+        if (!intents[index].wins) {
+            inserter->state = FACTORY_INSERTER_STATE_IDLE;
+            inserter->progress = 0U;
+            continue;
+        }
+        clear_inserter_source(simulation, &intents[index]);
+        inserter->held_item = intents[index].item;
+        inserter->held_amount = 1U;
+        inserter->state = FACTORY_INSERTER_STATE_HOLDING;
+        inserter->progress = 0U;
+    }
+    free(intents);
+}
+
+static bool storage_accepts_item(
+    const FactoryStorage *storage,
+    FactoryItemType item
+)
+{
+    return item != FACTORY_ITEM_NONE
+        && factory_storage_get_total_amount(storage) < storage->total_capacity;
+}
+
+static bool inspect_inserter_destination(
+    FactorySimulation *simulation,
+    const FactoryInserter *inserter,
+    FactoryEntityId *out_id,
+    InserterEndpointKind *out_kind
+)
+{
+    const FactoryTile *tile = factory_world_get_tile(
+        simulation->world,
+        inserter->destination_x,
+        inserter->destination_y
+    );
+    const FactoryBelt *belt;
+    const FactorySplitter *splitter;
+    const FactoryStorage *storage;
+    const FactoryRefinery *refinery;
+    const FactoryAssembler *assembler;
+    const FactoryRecipe *recipe;
+
+    if (tile == NULL || tile->occupying_entity == 0U) {
+        return false;
+    }
+    belt = factory_belt_store_find(&simulation->belts, tile->occupying_entity);
+    if (belt != NULL && belt->item == FACTORY_ITEM_NONE) {
+        *out_id = belt->entity_id;
+        *out_kind = INSERTER_ENDPOINT_BELT;
+        return true;
+    }
+    splitter = factory_splitter_store_find(
+        &simulation->splitters, tile->occupying_entity
+    );
+    if (splitter != NULL
+        && splitter->item == FACTORY_ITEM_NONE
+        && coordinate_matches_direction(
+            splitter->x,
+            splitter->y,
+            opposite_direction(splitter->facing),
+            inserter->x,
+            inserter->y
+        )) {
+        *out_id = splitter->entity_id;
+        *out_kind = INSERTER_ENDPOINT_SPLITTER;
+        return true;
+    }
+    storage = factory_storage_store_find(
+        &simulation->storages, tile->occupying_entity
+    );
+    if (storage != NULL && storage_accepts_item(
+            storage, inserter->held_item)) {
+        *out_id = storage->entity_id;
+        *out_kind = INSERTER_ENDPOINT_STORAGE;
+        return true;
+    }
+    refinery = factory_refinery_store_find(
+        &simulation->refineries, tile->occupying_entity
+    );
+    recipe = refinery == NULL
+        ? NULL
+        : factory_recipe_get(refinery->recipe_id);
+    if (refinery != NULL
+        && recipe != NULL
+        && inserter->held_item == recipe->input_item
+        && refinery->input_item == FACTORY_ITEM_NONE
+        && coordinate_matches_direction(
+            refinery->x,
+            refinery->y,
+            refinery->input_direction,
+            inserter->x,
+            inserter->y
+        )) {
+        *out_id = refinery->entity_id;
+        *out_kind = INSERTER_ENDPOINT_REFINERY;
+        return true;
+    }
+    assembler = factory_assembler_store_find(
+        &simulation->assemblers, tile->occupying_entity
+    );
+    if (assembler != NULL
+        && ((inserter->held_item == FACTORY_ITEM_IRON_PLATE
+                && assembler->iron_plate_amount == 0U)
+            || (inserter->held_item == FACTORY_ITEM_COPPER_PLATE
+                && assembler->copper_plate_amount == 0U))) {
+        *out_id = assembler->entity_id;
+        *out_kind = INSERTER_ENDPOINT_ASSEMBLER;
+        return true;
+    }
+    return false;
+}
+
+static void add_item_to_storage(
+    FactoryStorage *storage,
+    FactoryItemType item
+)
+{
+    if (item == FACTORY_ITEM_IRON_ORE) {
+        ++storage->iron_ore_amount;
+    } else if (item == FACTORY_ITEM_IRON_PLATE) {
+        ++storage->iron_plate_amount;
+    } else if (item == FACTORY_ITEM_COPPER_ORE) {
+        ++storage->copper_ore_amount;
+    } else if (item == FACTORY_ITEM_COPPER_PLATE) {
+        ++storage->copper_plate_amount;
+    } else {
+        ++storage->electronic_component_amount;
+    }
+}
+
+static void commit_inserter_drop(
+    FactorySimulation *simulation,
+    const InserterIntent *intent
+)
+{
+    if (intent->kind == INSERTER_ENDPOINT_BELT) {
+        FactoryBelt *belt = factory_belt_store_find_mutable(
+            &simulation->belts, intent->endpoint_id
+        );
+
+        belt->item = intent->item;
+        belt->movement_progress = 0U;
+    } else if (intent->kind == INSERTER_ENDPOINT_SPLITTER) {
+        FactorySplitter *splitter = factory_splitter_store_find_mutable(
+            &simulation->splitters, intent->endpoint_id
+        );
+
+        splitter->item = intent->item;
+    } else if (intent->kind == INSERTER_ENDPOINT_STORAGE) {
+        FactoryStorage *storage = factory_storage_store_find_mutable(
+            &simulation->storages, intent->endpoint_id
+        );
+
+        add_item_to_storage(storage, intent->item);
+    } else if (intent->kind == INSERTER_ENDPOINT_REFINERY) {
+        FactoryRefinery *refinery = factory_refinery_store_find_mutable(
+            &simulation->refineries, intent->endpoint_id
+        );
+
+        refinery->input_item = intent->item;
+        refinery->input_amount = 1U;
+    } else {
+        FactoryAssembler *assembler = factory_assembler_store_find_mutable(
+            &simulation->assemblers, intent->endpoint_id
+        );
+
+        if (intent->item == FACTORY_ITEM_IRON_PLATE) {
+            assembler->iron_plate_amount = 1U;
+        } else {
+            assembler->copper_plate_amount = 1U;
+        }
+    }
+}
+
+static void update_inserter_drops(FactorySimulation *simulation)
+{
+    InserterIntent *intents;
+    size_t count = 0U;
+    size_t index;
+
+    if (simulation->inserters.count == 0U) {
+        return;
+    }
+    intents = malloc(simulation->inserters.count * sizeof(*intents));
+    if (intents == NULL) {
+        return;
+    }
+    for (index = 0U; index < simulation->inserters.count; ++index) {
+        FactoryInserter *inserter = &simulation->inserters.items[index];
+
+        if (inserter->state == FACTORY_INSERTER_STATE_HOLDING) {
+            inserter->state = FACTORY_INSERTER_STATE_DROPPING;
+            inserter->progress = 0U;
+        } else if (inserter->state == FACTORY_INSERTER_STATE_DROPPING) {
+            InserterIntent *intent;
+
+            if (inserter->progress < FACTORY_INSERTER_ACTION_TICKS) {
+                ++inserter->progress;
+            }
+            if (inserter->progress < FACTORY_INSERTER_ACTION_TICKS) {
+                continue;
+            }
+            intent = &intents[count];
+            if (!inspect_inserter_destination(
+                    simulation,
+                    inserter,
+                    &intent->endpoint_id,
+                    &intent->kind)) {
+                continue;
+            }
+            intent->inserter_id = inserter->entity_id;
+            intent->item = inserter->held_item;
+            intent->wins = true;
+            ++count;
+        }
+    }
+    resolve_inserter_intents(intents, count);
+    for (index = 0U; index < count; ++index) {
+        FactoryInserter *inserter;
+
+        if (!intents[index].wins) {
+            continue;
+        }
+        commit_inserter_drop(simulation, &intents[index]);
+        inserter = factory_inserter_store_find_mutable(
+            &simulation->inserters, intents[index].inserter_id
+        );
+        inserter->held_item = FACTORY_ITEM_NONE;
+        inserter->held_amount = 0U;
+        inserter->state = FACTORY_INSERTER_STATE_IDLE;
+        inserter->progress = 0U;
+    }
+    free(intents);
+}
+
+static void update_inserters(FactorySimulation *simulation)
+{
+    update_inserter_drops(simulation);
+    update_inserter_pickups(simulation);
+}
+
 void factory_simulation_tick(FactorySimulation *simulation)
 {
     if (simulation == NULL) {
@@ -1052,6 +1590,7 @@ void factory_simulation_tick(FactorySimulation *simulation)
     update_belt_transfers(simulation);
     factory_refinery_store_update(&simulation->refineries);
     factory_assembler_store_update(&simulation->assemblers);
+    update_inserters(simulation);
     ++simulation->tick;
 }
 
@@ -1268,5 +1807,33 @@ bool factory_simulation_get_splitter(
         return false;
     }
     *out_splitter = *splitter;
+    return true;
+}
+
+bool factory_simulation_is_inserter(
+    const FactorySimulation *simulation,
+    FactoryEntityId id
+)
+{
+    return simulation != NULL
+        && factory_inserter_store_find(&simulation->inserters, id) != NULL;
+}
+
+bool factory_simulation_get_inserter(
+    const FactorySimulation *simulation,
+    FactoryEntityId id,
+    FactoryInserter *out_inserter
+)
+{
+    const FactoryInserter *inserter;
+
+    if (simulation == NULL || out_inserter == NULL) {
+        return false;
+    }
+    inserter = factory_inserter_store_find(&simulation->inserters, id);
+    if (inserter == NULL) {
+        return false;
+    }
+    *out_inserter = *inserter;
     return true;
 }

@@ -13,6 +13,7 @@
 #include "foundation/refinery.h"
 #include "foundation/storage.h"
 #include "foundation/splitter.h"
+#include "foundation/inserter.h"
 
 typedef struct FactorySimulation FactorySimulation;
 
@@ -114,6 +115,15 @@ bool factory_simulation_get_splitter(
     const FactorySimulation *simulation,
     FactoryEntityId id,
     FactorySplitter *out_splitter
+);
+bool factory_simulation_is_inserter(
+    const FactorySimulation *simulation,
+    FactoryEntityId id
+);
+bool factory_simulation_get_inserter(
+    const FactorySimulation *simulation,
+    FactoryEntityId id,
+    FactoryInserter *out_inserter
 );
 
 #endif

@@ -1,6 +1,7 @@
 # Deterministic Logistics
 
-Items have exactly one owner: an extractor output buffer, one belt, or storage.
+Items have exactly one owner: a deposit, machine buffer, belt, splitter,
+inserter, or storage.
 An extractor transfers only to an empty adjacent belt in its output direction.
 A ready belt transfers to an empty adjacent belt, a correctly oriented
 refinery input, or non-full adjacent storage. Refineries emit only to belts.
@@ -43,3 +44,9 @@ material, so successful lifecycle changes preserve both elemental totals.
 Splitters accept only from the tile opposite their facing direction and route
 to left/right output belts. Round-robin state advances only after successful
 ownership transfer; blocked splitters retain both item and state.
+
+Inserters pick up from the tile opposite facing and drop onto the tile along
+facing. Supported sources are belts, splitter outputs, and refinery/assembler
+outputs. Supported destinations are belts, splitter inputs, storage, and
+compatible refinery/assembler inputs. Storage is drop-only. Pickup and drop
+commit on separate ticks; blocked delivery remains owned by the inserter.

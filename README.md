@@ -28,9 +28,8 @@ ctest --test-dir build --output-on-failure
 ./build/factory_console_demo
 ```
 
-The demo shows partial input buffering, 15-tick processing, deferred output
-transfer, component storage, separate iron/copper conservation, safely rejected
-busy demolition, and same-tick tile reuse.
+The demo shows inserters supplying refinery and assembler inputs, observable
+pickup/holding/drop phases, component production, and final storage delivery.
 
 Demolition supports all placed entity types but succeeds only when the target
 owns no material and has no active work. IDs remain invalid forever after
@@ -41,3 +40,9 @@ They alternate successful left/right transfers, fall back when the preferred
 output is blocked, and preserve state when both outputs are blocked.
 
 See `docs/splitter-system.md` for orientation, fairness, and blocking rules.
+
+Inserters actively move one item between adjacent logistics endpoints using
+separate pickup and drop commits. They retain held material under backpressure,
+and same-endpoint contention is won by the lowest inserter entity ID.
+
+See `docs/inserter-system.md` for timing, ownership, and interaction rules.

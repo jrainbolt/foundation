@@ -11,8 +11,8 @@ Frontend
 ```
 
 The simulation owns its command queue, entity manager, extractor, belt,
-refinery, assembler, and storage records, transfer plans, and command results. It
-borrows a caller-owned world for its lifetime.
+refinery, assembler, splitter, inserter, and storage records, transfer plans,
+and command results. It borrows a caller-owned world for its lifetime.
 Frontends submit value-type commands and inspect tiles or copied extractor
 records; they do not receive mutable gameplay arrays.
 
@@ -39,3 +39,6 @@ and invalidating the monotonic entity ID.
 Splitters participate in the existing transfer plan as one-item consumers and
 producers. Their routing decision is local deterministic state rather than
 pathfinding.
+
+Inserters add an active state machine above the same ownership model. Pickup
+and drop have independent plan, contention-resolution, and commit phases.

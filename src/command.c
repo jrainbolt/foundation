@@ -38,6 +38,9 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
         case FACTORY_COMMAND_PLACE_SPLITTER:
             direction = command->data.place_splitter.facing;
             break;
+        case FACTORY_COMMAND_PLACE_INSERTER:
+            direction = command->data.place_inserter.facing;
+            break;
         default:
             return false;
     }

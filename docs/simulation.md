@@ -10,7 +10,8 @@
 5. Plan and commit belt-to-belt/refinery/assembler/storage transfers
 6. Update refinery processing
 7. Update assembler processing
-8. Increment the tick
+8. Plan and commit inserter drops, then pickups
+9. Increment the tick
 ```
 
 Producer conflicts and belt conflicts use lowest source entity ID. A newly
@@ -28,3 +29,8 @@ a dependent selection command on a later tick.
 Demolition is also applied in step 1. Successfully removed entities cannot
 produce, advance, receive, or transfer later in that tick. Rejected demolition
 leaves the entity active.
+
+Inserter drop processing precedes pickup processing, so an item acquired during
+step 8 remains visibly held until a later tick. Both phases validate current
+endpoint state, resolve contention by lowest inserter entity ID, and only then
+commit ownership.

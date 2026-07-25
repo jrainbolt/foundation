@@ -52,6 +52,7 @@ add_library(factory_engine
     src/entity.c
     src/extractor.c
     src/item.c
+    src/inserter.c
     src/recipe.c
     src/refinery.c
     src/simulation.c
@@ -129,6 +130,10 @@ if(BUILD_TESTING)
     add_executable(factory_splitter_tests tests/test_splitter.c)
     target_link_libraries(factory_splitter_tests PRIVATE factory_engine)
     add_test(NAME factory_splitter_tests COMMAND factory_splitter_tests)
+
+    add_executable(factory_inserter_tests tests/test_inserter.c)
+    target_link_libraries(factory_inserter_tests PRIVATE factory_engine)
+    add_test(NAME factory_inserter_tests COMMAND factory_inserter_tests)
 
     add_executable(factory_simulation_tests tests/test_simulation.c)
     target_link_libraries(factory_simulation_tests PRIVATE factory_engine)

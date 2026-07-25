@@ -25,7 +25,8 @@ typedef enum {
     FACTORY_COMMAND_SET_REFINERY_RECIPE,
     FACTORY_COMMAND_PLACE_ASSEMBLER,
     FACTORY_COMMAND_DEMOLISH_ENTITY,
-    FACTORY_COMMAND_PLACE_SPLITTER
+    FACTORY_COMMAND_PLACE_SPLITTER,
+    FACTORY_COMMAND_PLACE_INSERTER
 } FactoryCommandType;
 
 typedef struct {
@@ -68,6 +69,11 @@ typedef struct {
             int32_t y;
             FactoryDirection facing;
         } place_splitter;
+        struct {
+            int32_t x;
+            int32_t y;
+            FactoryDirection facing;
+        } place_inserter;
     } data;
 } FactoryCommand;
 
