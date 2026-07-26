@@ -6,7 +6,7 @@
 static bool item_is_valid(FactoryItemType item)
 {
     return item > FACTORY_ITEM_NONE
-        && item <= FACTORY_ITEM_COPPER_WIRE;
+        && item <= FACTORY_ITEM_BIOMASS_PELLET;
 }
 
 bool factory_logistics_endpoint_equal(
@@ -164,6 +164,7 @@ FactoryLogisticsResult factory_logistics_endpoint_can_accept(
     const FactoryInserter *inserter;
     const FactoryStorage *storage;
     const FactoryRecipe *recipe;
+    const FactoryBurner *burner;
     FactoryLogisticsResult result = validate_entity(simulation, endpoint);
 
     if (result != FACTORY_LOGISTICS_RESULT_OK) {
@@ -171,6 +172,16 @@ FactoryLogisticsResult factory_logistics_endpoint_can_accept(
     }
     if (!item_is_valid(item)) {
         return FACTORY_LOGISTICS_RESULT_INVALID_ITEM;
+    }
+    burner = factory_burner_store_find(
+        &simulation->burners, endpoint.entity_id
+    );
+    if (burner != NULL) {
+        if (endpoint.slot != FACTORY_LOGISTICS_SLOT_BURNER_INPUT)
+            return FACTORY_LOGISTICS_RESULT_INVALID_SLOT;
+        return factory_burner_can_accept(burner, item)
+            ? FACTORY_LOGISTICS_RESULT_OK
+            : FACTORY_LOGISTICS_RESULT_INCOMPATIBLE_ITEM;
     }
     belt = factory_belt_store_find(&simulation->belts, endpoint.entity_id);
     if (belt != NULL) {
@@ -389,8 +400,14 @@ static void insert_unchecked(
     FactoryStorage *storage = factory_storage_store_find_mutable(
         &simulation->storages, endpoint.entity_id
     );
+    FactoryBurner *burner = factory_burner_store_find_mutable(
+        &simulation->burners, endpoint.entity_id
+    );
 
-    if (belt != NULL) {
+    if (burner != NULL
+        && endpoint.slot == FACTORY_LOGISTICS_SLOT_BURNER_INPUT) {
+        (void)factory_burner_insert(burner, item);
+    } else if (belt != NULL) {
         belt->item = item;
         belt->movement_progress = 0U;
     } else if (splitter != NULL) {
@@ -419,8 +436,10 @@ static void insert_unchecked(
         ++storage->electronic_component_amount;
     } else if (item == FACTORY_ITEM_IRON_GEAR) {
         ++storage->iron_gear_amount;
-    } else {
+    } else if (item == FACTORY_ITEM_COPPER_WIRE) {
         ++storage->copper_wire_amount;
+    } else {
+        ++storage->biomass_pellet_amount;
     }
 }
 

@@ -1,5 +1,6 @@
 #include "foundation/snapshot.h"
 #include "../src/power_internal.h"
+#include "power_fixture.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -11,6 +12,9 @@ static int failures = 0;
 
 static void submit(FactorySimulation *simulation, FactoryCommand command)
 {
+    if (command.type == FACTORY_COMMAND_PLACE_POWER_GENERATOR)
+        simulation->fixture_initial_generator_fuel =
+            FACTORY_TEST_GENERATOR_FUEL_QUANTITY;
     CHECK(factory_simulation_submit_command(simulation, &command)
         == FACTORY_RESULT_OK);
 }
@@ -28,6 +32,22 @@ static FactoryCommand generator(int32_t x, int32_t y)
         FACTORY_COMMAND_PLACE_POWER_GENERATOR,
         {.place_power_generator = {x, y}}
     };
+}
+
+static void empty_fixture_burner(
+    FactorySimulation *simulation, FactoryEntityId id
+)
+{
+    FactoryBurner *burner =
+        factory_burner_store_find_mutable(&simulation->burners, id);
+    CHECK(burner != NULL);
+    if (burner != NULL) {
+        burner->inventory_item = FACTORY_ITEM_NONE;
+        burner->inventory_quantity = 0U;
+        burner->current_fuel_item = FACTORY_ITEM_NONE;
+        burner->remaining_burn_ticks = 0U;
+        burner->released_energy = 0U;
+    }
 }
 
 static bool snapshot_equal(
@@ -278,6 +298,7 @@ static void test_no_implicit_power_and_source_boundary(void)
     CHECK(factory_simulation_get_extractor(simulation, 1U, &extractor));
     CHECK(extractor.production_progress == 1U);
 
+    empty_fixture_burner(simulation, 3U);
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_DEMOLISH_ENTITY, {.demolish_entity = {3U}}
     });
@@ -378,7 +399,7 @@ static void test_snapshot_continuation(void)
     submit(a, pole(9, 0)); /* pending power command */
     CHECK(factory_simulation_create_snapshot(a, &snapshot)
         == FACTORY_RESULT_OK);
-    CHECK(snapshot.data[8] == 2U);
+    CHECK(snapshot.data[8] == FACTORY_SNAPSHOT_VERSION);
     CHECK(factory_simulation_load_snapshot(
         snapshot.data, snapshot.size, &b
     ) == FACTORY_RESULT_OK);
@@ -399,6 +420,85 @@ static void test_snapshot_continuation(void)
     factory_world_destroy(world);
 }
 
+static void test_multiple_generator_actual_energy_consumption(void)
+{
+    FactoryWorld *world = factory_world_create(8U, 5U);
+    FactorySimulation *a =
+        factory_simulation_create_with_construction_units(world, UINT32_MAX);
+    FactorySimulation *b = NULL;
+    FactorySnapshotBuffer snapshot = {0};
+    FactoryPowerNetworkInspection network;
+    FactoryBurnerInspection first;
+    FactoryBurnerInspection second;
+
+    submit(a, pole(3, 2));                                  /* 1 */
+    submit(a, generator(2, 3));                             /* 2 */
+    submit(a, generator(4, 3));                             /* 3 */
+    submit(a, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_ASSEMBLER,
+        {.place_assembler = {2, 1, FACTORY_DIRECTION_NORTH}}
+    });                                                     /* 4 */
+    submit(a, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_ASSEMBLER,
+        {.place_assembler = {4, 1, FACTORY_DIRECTION_NORTH}}
+    });                                                     /* 5 */
+    CHECK(factory_simulation_tick(a) == FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_power_network(a, 0U, &network)
+        == FACTORY_RESULT_OK);
+    CHECK(network.allocated_power == 50U);
+    CHECK(factory_simulation_get_burner(a, 2U, &first)
+        == FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_burner(a, 3U, &second)
+        == FACTORY_RESULT_OK);
+    CHECK(first.released_energy == 50U);
+    CHECK(second.released_energy == 100U);
+
+    submit(a, (FactoryCommand){
+        FACTORY_COMMAND_DEMOLISH_ENTITY, {.demolish_entity = {1U}}
+    });
+    CHECK(factory_simulation_tick(a) == FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_burner(a, 2U, &first)
+        == FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_burner(a, 3U, &second)
+        == FACTORY_RESULT_OK);
+    CHECK(first.released_energy == 150U);
+    CHECK(second.released_energy == 200U);
+
+    submit(a, pole(3, 2));                                  /* 6 */
+    CHECK(factory_simulation_tick(a) == FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_burner(a, 2U, &first)
+        == FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_burner(a, 3U, &second)
+        == FACTORY_RESULT_OK);
+    CHECK(first.released_energy == 200U);
+    CHECK(second.released_energy == 300U);
+
+    CHECK(factory_simulation_create_snapshot(a, &snapshot)
+        == FACTORY_RESULT_OK);
+    CHECK(factory_simulation_load_snapshot(
+        snapshot.data, snapshot.size, &b) == FACTORY_RESULT_OK);
+    for (uint32_t tick = 0U; tick < 20U; ++tick) {
+        CHECK(factory_simulation_tick(a) == FACTORY_RESULT_OK);
+        CHECK(factory_simulation_tick(b) == FACTORY_RESULT_OK);
+        CHECK(snapshot_equal(a, b));
+        CHECK(factory_simulation_get_burner(a, 2U, &first)
+            == FACTORY_RESULT_OK);
+        {
+            FactoryBurnerInspection loaded;
+            CHECK(factory_simulation_get_burner(b, 2U, &loaded)
+                == FACTORY_RESULT_OK);
+            CHECK(first.released_energy == loaded.released_energy);
+            CHECK(first.unreleased_fuel_energy
+                == loaded.unreleased_fuel_energy);
+        }
+    }
+
+    factory_snapshot_buffer_destroy(&snapshot);
+    factory_simulation_destroy(b);
+    factory_simulation_destroy(a);
+    factory_world_destroy(world);
+}
+
 int main(void)
 {
     test_topology_allocation_and_pause();
@@ -406,6 +506,7 @@ int main(void)
     test_no_implicit_power_and_source_boundary();
     test_zero_power_snapshot_and_duplicate_determinism();
     test_snapshot_continuation();
+    test_multiple_generator_actual_energy_consumption();
     if (failures != 0) return 1;
     (void)printf("All power tests passed.\n");
     return 0;

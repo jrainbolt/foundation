@@ -1,4 +1,4 @@
-# Snapshot format version 2
+# Snapshot format version 4
 
 Foundation snapshots are canonical little-endian binary files. Every value is
 written field-by-field; no C structure, pointer, enum representation, padding,
@@ -9,7 +9,7 @@ timestamp, or process-specific value enters the format.
 | Offset | Width | Field |
 |---:|---:|---|
 | 0 | 8 | Magic bytes `FOUNDATN` |
-| 8 | 4 | Version (`2`) |
+| 8 | 4 | Version (`4`) |
 | 12 | 4 | Header size (`48`) |
 | 16 | 8 | Total snapshot size |
 | 24 | 8 | Payload size |
@@ -32,7 +32,7 @@ Each section starts with four 32-bit fields:
 | Record count | Number of fixed-width records |
 | Payload size | Bytes following the section header |
 
-Version 2 requires each section exactly once in this order:
+Version 4 requires each section exactly once in this order:
 
 | Type | Section | Record width |
 |---:|---|---:|
@@ -45,9 +45,9 @@ Version 2 requires each section exactly once in this order:
 | 7 | Refineries | 48 |
 | 8 | Assemblers | 64 |
 | 9 | Inserters | 48 |
-| 10 | Storage | 56 |
+| 10 | Storage | 60 |
 | 11 | Power poles | 12 |
-| 12 | Basic generators | 16 |
+| 12 | Basic generators and burners | 44 |
 | 13 | Pending commands | 24 |
 | 14 | Command results | 68 |
 
@@ -60,14 +60,18 @@ row-major. Commands use a type plus five explicit 32-bit payload fields; unused
 fields are zero. Results contain that command encoding followed by result,
 entity, position, construction, assembler-recipe, and storage-output fields.
 
-Storage records include all seven counters, capacity, output configuration,
+Storage records include all eight counters, capacity, output configuration,
 buffer item, and occupancy. Assembler records include recipe, both generic
 counted slots, processing fields, and counted output. Inserter records include
 the complete state-machine state and source/destination coordinates.
 
-Power edges, network membership, attachments, and allocation are not serialized;
+Generator records include the burner fuel-class mask, input inventory, current
+fuel, remaining burn ticks, and released available energy. The active fuel
+definition and remaining ticks derive the exact unreleased energy and next
+release position. Power edges, network membership,
+attachments, and allocation are not serialized;
 they are rebuilt from pole and generator positions after loading.
 
-Version 2 has no compression, encryption, checksum, optional sections, or
+Version 4 has no compression, encryption, checksum, optional sections, or
 migration decoder. A future incompatible change must introduce a deliberate
 new-version decoder or compatibility policy.

@@ -173,7 +173,7 @@ static bool read_u64(SnapshotReader *reader, uint64_t *out_value)
 
 static bool item_valid_or_none(uint32_t value)
 {
-    return value <= (uint32_t)FACTORY_ITEM_COPPER_WIRE;
+    return value <= (uint32_t)FACTORY_ITEM_BIOMASS_PELLET;
 }
 
 static bool item_valid(uint32_t value)
@@ -255,9 +255,9 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_records(&size, simulation->refineries.count, 48U)
         || !checked_records(&size, simulation->assemblers.count, 64U)
         || !checked_records(&size, simulation->inserters.count, 48U)
-        || !checked_records(&size, simulation->storages.count, 56U)
+        || !checked_records(&size, simulation->storages.count, 60U)
         || !checked_records(&size, simulation->power_poles.count, 12U)
-        || !checked_records(&size, simulation->power_generators.count, 16U)
+        || !checked_records(&size, simulation->power_generators.count, 44U)
         || !checked_records(&size, simulation->command_count, 24U)
         || !checked_records(&size, simulation->result_count, 68U)
         || !size_to_u32(simulation->entities->count)
@@ -280,9 +280,9 @@ static FactoryResult snapshot_size_unvalidated(
         || !section_size_valid(simulation->refineries.count, 48U, 0U)
         || !section_size_valid(simulation->assemblers.count, 64U, 0U)
         || !section_size_valid(simulation->inserters.count, 48U, 0U)
-        || !section_size_valid(simulation->storages.count, 56U, 0U)
+        || !section_size_valid(simulation->storages.count, 60U, 0U)
         || !section_size_valid(simulation->power_poles.count, 12U, 0U)
-        || !section_size_valid(simulation->power_generators.count, 16U, 0U)
+        || !section_size_valid(simulation->power_generators.count, 44U, 0U)
         || size > UINT64_MAX) {
         return FACTORY_RESULT_SNAPSHOT_SIZE_OVERFLOW;
     }
@@ -588,7 +588,7 @@ static FactoryResult validate_simulation(
             + value->iron_plate_amount + value->copper_ore_amount
             + value->copper_plate_amount
             + value->electronic_component_amount + value->iron_gear_amount
-            + value->copper_wire_amount;
+            + value->copper_wire_amount + value->biomass_pellet_amount;
         if (total > value->total_capacity
             || value->total_capacity != FACTORY_STORAGE_CAPACITY
             || !item_valid_or_none(
@@ -601,11 +601,47 @@ static FactoryResult validate_simulation(
         }
     }
     for (index = 0U; index < simulation->power_generators.count; ++index) {
-        if (simulation->power_generators.items[index].generation_capacity
-            != FACTORY_BASIC_GENERATOR_CAPACITY) {
+        const FactoryPowerGenerator *generator =
+            &simulation->power_generators.items[index];
+        const FactoryBurner *burner = factory_burner_store_find(
+            &simulation->burners, generator->entity_id);
+        const FactoryFuelDefinition *inventory_definition;
+        const FactoryFuelDefinition *current_definition;
+        if (generator->generation_capacity
+                != FACTORY_BASIC_GENERATOR_CAPACITY
+            || burner == NULL
+            || burner->accepted_fuel_classes != FACTORY_FUEL_CLASS_SOLID) {
+            return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+        }
+        inventory_definition =
+            factory_fuel_definition_get(burner->inventory_item);
+        current_definition =
+            factory_fuel_definition_get(burner->current_fuel_item);
+        if ((burner->inventory_quantity == 0U)
+                != (burner->inventory_item == FACTORY_ITEM_NONE)
+            || (burner->remaining_burn_ticks == 0U)
+                != (burner->current_fuel_item == FACTORY_ITEM_NONE)
+            || (inventory_definition != NULL
+                && (inventory_definition->fuel_class
+                    & burner->accepted_fuel_classes) == 0U)
+            || (burner->inventory_quantity != 0U
+                && inventory_definition == NULL)
+            || (burner->remaining_burn_ticks != 0U
+                && (current_definition == NULL
+                    || burner->remaining_burn_ticks
+                        >= current_definition->burn_duration_ticks))
+            || burner->released_energy
+                > FACTORY_BURNER_RELEASED_ENERGY_CAPACITY
+            || (burner->remaining_burn_ticks != 0U
+                && factory_burner_unreleased_energy(burner)
+                    > FACTORY_BURNER_RELEASED_ENERGY_CAPACITY
+                        - burner->released_energy)) {
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
         }
     }
+    if (simulation->burners.count
+        != simulation->power_generators.count)
+        return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     for (index = 0U; index < simulation->command_count; ++index) {
         if (!snapshot_command_valid(&simulation->commands[index])) {
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
@@ -985,7 +1021,7 @@ static void write_snapshot(
 
     write_section_header(
         writer, SNAPSHOT_SECTION_STORAGES,
-        simulation->storages.count, simulation->storages.count * 56U
+        simulation->storages.count, simulation->storages.count * 60U
     );
     for (index = 0U; index < simulation->storages.count; ++index) {
         const FactoryStorage *value = &simulation->storages.items[index];
@@ -998,6 +1034,7 @@ static void write_snapshot(
         write_u32(writer, value->electronic_component_amount);
         write_u32(writer, value->iron_gear_amount);
         write_u32(writer, value->copper_wire_amount);
+        write_u32(writer, value->biomass_pellet_amount);
         write_u32(writer, value->total_capacity);
         write_u32(writer, value->configured_output_item);
         write_u32(writer, value->output_item);
@@ -1034,7 +1071,7 @@ static void write_snapshot(
     write_section_header(
         writer, SNAPSHOT_SECTION_POWER_GENERATORS,
         simulation->power_generators.count,
-        simulation->power_generators.count * 16U
+        simulation->power_generators.count * 44U
     );
     for (index = 0U; index < simulation->power_generators.count; ++index) {
         const FactoryPowerGenerator *value = NULL;
@@ -1058,6 +1095,17 @@ static void write_snapshot(
         write_i32(writer, value->x);
         write_i32(writer, value->y);
         write_u32(writer, value->generation_capacity);
+        {
+            const FactoryBurner *burner =
+                factory_burner_store_find(&simulation->burners,
+                                          value->entity_id);
+            write_u32(writer, burner->accepted_fuel_classes);
+            write_u32(writer, burner->inventory_item);
+            write_u32(writer, burner->inventory_quantity);
+            write_u32(writer, burner->current_fuel_item);
+            write_u32(writer, burner->remaining_burn_ticks);
+            write_u64(writer, burner->released_energy);
+        }
     }
 
     write_section_header(
@@ -1422,7 +1470,7 @@ static bool load_sections(
             || !read_i32(reader, &v->destination_y)) return false;
     }
 
-    LOAD_STORE(SNAPSHOT_SECTION_STORAGES, storages, FactoryStorage, 56U);
+    LOAD_STORE(SNAPSHOT_SECTION_STORAGES, storages, FactoryStorage, 60U);
     for (index = 0U; index < count; ++index) {
         FactoryStorage *v = &simulation->storages.items[index];
         if (!read_u32(reader, &v->entity_id)
@@ -1434,6 +1482,7 @@ static bool load_sections(
             || !read_u32(reader, &v->electronic_component_amount)
             || !read_u32(reader, &v->iron_gear_amount)
             || !read_u32(reader, &v->copper_wire_amount)
+            || !read_u32(reader, &v->biomass_pellet_amount)
             || !read_u32(reader, &v->total_capacity)
             || !read_u32(reader, &value)) return false;
         v->configured_output_item = (FactoryItemType)value;
@@ -1460,7 +1509,7 @@ static bool load_sections(
     }
 
     if (!read_section_header(
-            reader, SNAPSHOT_SECTION_POWER_GENERATORS, 16U, 0U, &count)
+            reader, SNAPSHOT_SECTION_POWER_GENERATORS, 44U, 0U, &count)
         || !allocate_records(
             (void **)&simulation->power_generators.items,
             count, sizeof(FactoryPowerGenerator))) {
@@ -1468,13 +1517,28 @@ static bool load_sections(
     }
     simulation->power_generators.count = count;
     simulation->power_generators.capacity = count;
+    if (!allocate_records(
+            (void **)&simulation->burners.items,
+            count, sizeof(FactoryBurner))) return false;
+    simulation->burners.count = count;
+    simulation->burners.capacity = count;
     for (index = 0U; index < count; ++index) {
         FactoryPowerGenerator *v =
             &simulation->power_generators.items[index];
+        FactoryBurner *burner = &simulation->burners.items[index];
         if (!read_u32(reader, &v->entity_id)
             || !read_i32(reader, &v->x)
             || !read_i32(reader, &v->y)
-            || !read_u32(reader, &v->generation_capacity)) return false;
+            || !read_u32(reader, &v->generation_capacity)
+            || !read_u32(reader, &burner->accepted_fuel_classes)
+            || !read_u32(reader, &value)) return false;
+        burner->owner_entity_id = v->entity_id;
+        burner->inventory_item = (FactoryItemType)value;
+        if (!read_u32(reader, &burner->inventory_quantity)
+            || !read_u32(reader, &value)) return false;
+        burner->current_fuel_item = (FactoryItemType)value;
+        if (!read_u32(reader, &burner->remaining_burn_ticks)
+            || !read_u64(reader, &burner->released_energy)) return false;
     }
 
     if (!read_section_header(

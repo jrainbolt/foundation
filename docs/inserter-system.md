@@ -57,4 +57,4 @@ zero progress. Pickup/drop activity is busy; held material cannot be deleted.
 
 There are no long-handed, stack, filter, fast, or burner variants. Inserters
 have fixed one-tile reach, one-item capacity, fixed orientation, fixed timing,
-and no power, fuel, circuits, animation, or dynamic rotation.
+and no burner-powered variant, circuits, animation, or dynamic rotation.

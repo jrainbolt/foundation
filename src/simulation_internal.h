@@ -15,6 +15,7 @@
 #include "world_internal.h"
 #include "power_internal.h"
 #include "event_internal.h"
+#include "burner_internal.h"
 
 struct FactorySimulation {
     uint64_t tick;
@@ -30,6 +31,9 @@ struct FactorySimulation {
     FactoryStorageStore storages;
     FactoryPowerPoleStore power_poles;
     FactoryPowerGeneratorStore power_generators;
+    FactoryBurnerStore burners;
+    /* Test-fixture setup only; production simulations leave this zero. */
+    uint32_t fixture_initial_generator_fuel;
     FactoryPowerState power;
     FactoryEventBatch events;
     FactoryConstructionInventory construction_inventory;

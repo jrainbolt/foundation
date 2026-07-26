@@ -101,7 +101,10 @@ Entity dictionaries contain `id`, `type`, `x`, `y`, `direction`, `status`, and
 `powered`, plus type-specific integer/bool payloads. Resource dictionaries
 contain `x`, `y`, `type`, `remaining`, and `occupying_entity_id`. Power edges
 contain canonical endpoint IDs `a` and `b`. Event dictionaries copy every
-public `FactoryEvent` field.
+public `FactoryEvent` field. Generator dictionaries expose
+`maximum_output`, `allocated`, `fuel_item`, `fuel_ticks`, `fuel_active`, and
+`energy_available`; the adapter copies these authoritative presentation fields
+and does not derive burn state.
 
 Godot Variant integers are signed 64-bit. One shared checked conversion accepts
 Foundation unsigned values from zero through `INT64_MAX` exactly. Larger values

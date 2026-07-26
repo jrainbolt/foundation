@@ -19,6 +19,8 @@ const char *factory_item_name(FactoryItemType item)
             return "iron gear";
         case FACTORY_ITEM_COPPER_WIRE:
             return "copper wire";
+        case FACTORY_ITEM_BIOMASS_PELLET:
+            return "biomass pellet";
         default:
             return "invalid item";
     }

@@ -15,7 +15,9 @@ typedef enum {
     FACTORY_EVENT_PRODUCTION_COMPLETED,
     FACTORY_EVENT_ITEM_TRANSFERRED,
     FACTORY_EVENT_POWER_GAINED,
-    FACTORY_EVENT_POWER_LOST
+    FACTORY_EVENT_POWER_LOST,
+    FACTORY_EVENT_FUEL_IGNITED,
+    FACTORY_EVENT_FUEL_EXHAUSTED
 } FactoryEventType;
 
 /*
@@ -26,6 +28,7 @@ typedef enum {
  * production: entity_id produced quantity units of item_type.
  * transfer: entity_id is the source and related_entity_id the destination.
  * power gained/lost: entity_id identifies the consumer.
+ * fuel ignited/exhausted: entity_id owns the burner and item_type is fuel.
  *
  * tick is the simulation tick at the start of the step that emitted the
  * event. quantity is currently one for every item transfer.

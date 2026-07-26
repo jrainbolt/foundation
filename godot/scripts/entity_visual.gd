@@ -33,6 +33,16 @@ func _draw() -> void:
 		ThemeDB.fallback_font, Vector2(7, 53),
 		"#%d" % int(state.get("id", 0)), HORIZONTAL_ALIGNMENT_LEFT, -1, 11
 	)
+	if entity_type == 9:
+		draw_string(
+			ThemeDB.fallback_font, Vector2(7, 39),
+			"F%d E%d %s" % [
+				int(state.get("fuel_ticks", 0)),
+				int(state.get("energy_available", 0)),
+				"ON" if bool(state.get("fuel_active", false)) else "OFF"
+			],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9
+		)
 	var duration := int(state.get("duration", 0))
 	if duration > 0:
 		var ratio: float = clampf(

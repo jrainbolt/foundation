@@ -48,6 +48,7 @@ add_library(factory_engine
     src/assembler.c
     src/assembler_recipe.c
     src/belt.c
+    src/burner.c
     src/command.c
     src/construction.c
     src/construction_inventory.c
@@ -239,4 +240,11 @@ if(BUILD_TESTING)
         NAME factory_presentation_tests
         COMMAND factory_presentation_tests
     )
+
+    add_executable(factory_burner_tests tests/test_burner.c)
+    target_include_directories(
+        factory_burner_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(factory_burner_tests PRIVATE factory_engine)
+    add_test(NAME factory_burner_tests COMMAND factory_burner_tests)
 endif()

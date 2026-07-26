@@ -4,6 +4,7 @@
 #include "assembler_internal.h"
 #include "presentation_internal.h"
 #include "simulation_internal.h"
+#include "power_fixture.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -15,6 +16,9 @@ static int failures = 0;
 
 static void submit(FactorySimulation *simulation, FactoryCommand command)
 {
+    if (command.type == FACTORY_COMMAND_PLACE_POWER_GENERATOR)
+        simulation->fixture_initial_generator_fuel =
+            FACTORY_TEST_GENERATOR_FUEL_QUANTITY;
     CHECK(factory_simulation_submit_command(simulation, &command)
         == FACTORY_RESULT_OK);
 }
@@ -125,8 +129,8 @@ static bool entity_equal(
                 && a->data.power_pole.connected_pole_count
                     == b->data.power_pole.connected_pole_count;
         case FACTORY_ENTITY_TYPE_POWER_GENERATOR:
-            return a->data.power_source.available_generation
-                    == b->data.power_source.available_generation
+            return a->data.power_source.maximum_output_per_tick
+                    == b->data.power_source.maximum_output_per_tick
                 && a->data.power_source.attached_pole_id
                     == b->data.power_source.attached_pole_id
                 && a->data.power_source.network_id
@@ -134,7 +138,25 @@ static bool entity_equal(
                 && a->data.power_source.network_allocated_power
                     == b->data.power_source.network_allocated_power
                 && a->data.power_source.connected
-                    == b->data.power_source.connected;
+                    == b->data.power_source.connected
+                && a->data.power_source.burner.inventory_item
+                    == b->data.power_source.burner.inventory_item
+                && a->data.power_source.burner.inventory_quantity
+                    == b->data.power_source.burner.inventory_quantity
+                && a->data.power_source.burner.current_fuel_item
+                    == b->data.power_source.burner.current_fuel_item
+                && a->data.power_source.burner.remaining_burn_ticks
+                    == b->data.power_source.burner.remaining_burn_ticks
+                && a->data.power_source.burner.total_burn_duration_ticks
+                    == b->data.power_source.burner
+                        .total_burn_duration_ticks
+                && a->data.power_source.burner.unreleased_fuel_energy
+                    == b->data.power_source.burner
+                        .unreleased_fuel_energy
+                && a->data.power_source.burner.released_energy
+                    == b->data.power_source.burner.released_energy
+                && a->data.power_source.burner.active
+                    == b->data.power_source.burner.active;
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;
@@ -254,7 +276,7 @@ static void test_empty_and_full_coverage(void)
     });                                                     /* 10 */
     CHECK(factory_simulation_tick(simulation) == FACTORY_RESULT_OK);
     events = factory_simulation_get_event_count(simulation);
-    CHECK(events == 10U);
+    CHECK(events == 11U);
     CHECK(factory_presentation_snapshot_rebuild(snapshot, simulation)
         == FACTORY_RESULT_OK);
     CHECK(factory_presentation_snapshot_rebuild(same_state, simulation)
@@ -306,7 +328,7 @@ static void test_empty_and_full_coverage(void)
     CHECK(entity->data.power_pole.network_id == 8U);
     entity = factory_presentation_snapshot_get_entity(snapshot, 9U);
     CHECK(entity->entity_type == FACTORY_ENTITY_TYPE_POWER_GENERATOR);
-    CHECK(entity->data.power_source.available_generation == 100U);
+    CHECK(entity->data.power_source.maximum_output_per_tick == 100U);
     CHECK(entity->data.power_source.network_id == 8U);
     CHECK(entity->data.power_source.network_allocated_power == 60U);
 
@@ -477,6 +499,18 @@ static void test_statuses_logistics_and_transactionality(void)
     CHECK(before.size == after.size);
     CHECK(memcmp(before.data, after.data, before.size) == 0);
 
+    {
+        FactoryBurner *burner =
+            factory_burner_store_find_mutable(&simulation->burners, 9U);
+        CHECK(burner != NULL);
+        if (burner != NULL) {
+            burner->inventory_item = FACTORY_ITEM_NONE;
+            burner->inventory_quantity = 0U;
+            burner->current_fuel_item = FACTORY_ITEM_NONE;
+            burner->remaining_burn_ticks = 0U;
+            burner->released_energy = 0U;
+        }
+    }
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_DEMOLISH_ENTITY, {.demolish_entity = {9U}}
     });

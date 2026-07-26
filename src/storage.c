@@ -58,6 +58,7 @@ void factory_storage_store_add(
     storage->electronic_component_amount = 0U;
     storage->iron_gear_amount = 0U;
     storage->copper_wire_amount = 0U;
+    storage->biomass_pellet_amount = 0U;
     storage->total_capacity = FACTORY_STORAGE_CAPACITY;
     storage->configured_output_item = FACTORY_ITEM_NONE;
     storage->output_item = FACTORY_ITEM_NONE;
@@ -147,6 +148,10 @@ bool factory_storage_get_item_amount(
         *out_amount = storage->copper_wire_amount;
         return true;
     }
+    if (item == FACTORY_ITEM_BIOMASS_PELLET) {
+        *out_amount = storage->biomass_pellet_amount;
+        return true;
+    }
     return false;
 }
 
@@ -160,7 +165,8 @@ uint32_t factory_storage_get_total_amount(const FactoryStorage *storage)
             + storage->copper_plate_amount
             + storage->electronic_component_amount
             + storage->iron_gear_amount
-            + storage->copper_wire_amount;
+            + storage->copper_wire_amount
+            + storage->biomass_pellet_amount;
 }
 
 static uint32_t *item_amount(
@@ -183,6 +189,8 @@ static uint32_t *item_amount(
             return &storage->iron_gear_amount;
         case FACTORY_ITEM_COPPER_WIRE:
             return &storage->copper_wire_amount;
+        case FACTORY_ITEM_BIOMASS_PELLET:
+            return &storage->biomass_pellet_amount;
         default:
             return NULL;
     }

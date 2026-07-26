@@ -215,11 +215,52 @@ FactoryPowerUnits factory_power_source_available_generation(
 )
 {
     const FactoryPowerGenerator *generator;
+    const FactoryBurner *burner;
     if (simulation == NULL) return 0U;
     generator = factory_power_generator_store_find(
         &simulation->power_generators, entity_id
     );
-    return generator == NULL ? 0U : generator->generation_capacity;
+    burner = factory_burner_store_find(&simulation->burners, entity_id);
+    return generator == NULL || burner == NULL
+        ? 0U
+        : burner->released_energy < generator->generation_capacity
+            ? (FactoryPowerUnits)burner->released_energy
+            : generator->generation_capacity;
+}
+
+void factory_power_consume_generation(FactorySimulation *simulation)
+{
+    size_t network_index;
+    if (simulation == NULL) return;
+    for (network_index = 0U;
+        network_index < simulation->power.network_count;
+        ++network_index) {
+        FactoryPowerTotal remaining =
+            simulation->power.networks[network_index].allocated_power;
+        size_t generator_index;
+        for (generator_index = 0U;
+            generator_index < simulation->power.generator_count
+                && remaining != 0U;
+            ++generator_index) {
+            const FactoryPowerGeneratorInspection *inspection =
+                &simulation->power.generators[generator_index];
+            FactoryBurner *burner;
+            FactoryEnergy amount;
+            FactoryPowerUnits available;
+            if (inspection->network_id
+                != simulation->power.networks[network_index].network_id)
+                continue;
+            available = factory_power_source_available_generation(
+                simulation, inspection->entity_id);
+            if (available == 0U) continue;
+            amount = remaining > available ? available : remaining;
+            burner = factory_burner_store_find_mutable(
+                &simulation->burners, inspection->entity_id
+            );
+            if (factory_burner_consume_energy(burner, amount))
+                remaining -= amount;
+        }
+    }
 }
 
 FactoryResult factory_power_rebuild(

@@ -1,5 +1,6 @@
 #include "foundation/snapshot.h"
 #include "logistics_endpoint_internal.h"
+#include "power_fixture.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -11,6 +12,9 @@ static int failures = 0;
 
 static void submit(FactorySimulation *simulation, FactoryCommand command)
 {
+    if (command.type == FACTORY_COMMAND_PLACE_POWER_GENERATOR)
+        simulation->fixture_initial_generator_fuel =
+            FACTORY_TEST_GENERATOR_FUEL_QUANTITY;
     CHECK(factory_simulation_submit_command(simulation, &command)
         == FACTORY_RESULT_OK);
 }
@@ -147,8 +151,10 @@ static void test_extractor_production_transfer_and_blocking(void)
     submit(simulation, pole(1, 1));                         /* 3 */
     submit(simulation, generator(1, 2));                    /* 4 */
     factory_simulation_tick(simulation);
-    CHECK(factory_simulation_get_event_count(simulation) == 3U);
+    CHECK(factory_simulation_get_event_count(simulation) == 4U);
     CHECK(factory_simulation_get_event(simulation, 2U)->type
+        == FACTORY_EVENT_FUEL_IGNITED);
+    CHECK(factory_simulation_get_event(simulation, 3U)->type
         == FACTORY_EVENT_POWER_GAINED);
     for (uint32_t step = 1U; step < 20U; ++step) {
         factory_simulation_tick(simulation);
@@ -332,6 +338,15 @@ static void test_power_transitions(void)
     factory_simulation_tick(simulation);
     factory_simulation_tick(simulation);
     CHECK(factory_simulation_get_event_count(simulation) == 0U);
+    {
+        FactoryBurner *burner =
+            factory_burner_store_find_mutable(&simulation->burners, 4U);
+        burner->inventory_item = FACTORY_ITEM_NONE;
+        burner->inventory_quantity = 0U;
+        burner->current_fuel_item = FACTORY_ITEM_NONE;
+        burner->remaining_burn_ticks = 0U;
+        burner->released_energy = 0U;
+    }
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_DEMOLISH_ENTITY, {.demolish_entity = {4U}}
     });
@@ -347,11 +362,11 @@ static void test_power_transitions(void)
     CHECK(factory_simulation_get_event_count(simulation) == 0U);
     submit(simulation, generator(3, 2));                    /* 5 */
     factory_simulation_tick(simulation);
-    CHECK(factory_simulation_get_event_count(simulation) == 3U);
-    event = factory_simulation_get_event(simulation, 1U);
+    CHECK(factory_simulation_get_event_count(simulation) == 4U);
+    event = factory_simulation_get_event(simulation, 2U);
     CHECK(event != NULL && event->type == FACTORY_EVENT_POWER_GAINED);
     CHECK(event != NULL && event->entity_id == 1U);
-    event = factory_simulation_get_event(simulation, 2U);
+    event = factory_simulation_get_event(simulation, 3U);
     CHECK(event != NULL && event->type == FACTORY_EVENT_POWER_GAINED);
     CHECK(event != NULL && event->entity_id == 2U);
     factory_simulation_tick(simulation);
@@ -382,7 +397,7 @@ static void test_snapshot_exclusion_and_continuation(void)
     submit(a, pole(1, 1));
     submit(a, generator(1, 2));
     factory_simulation_tick(a);
-    CHECK(factory_simulation_get_event_count(a) == 3U);
+    CHECK(factory_simulation_get_event_count(a) == 4U);
     CHECK(factory_simulation_create_snapshot(a, &before_clear)
         == FACTORY_RESULT_OK);
     factory_simulation_clear_events(a);

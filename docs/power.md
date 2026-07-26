@@ -11,7 +11,9 @@ ascending entity-ID order, and a component's network ID is its lowest pole ID.
 A consumer or generator attaches to the lowest-ID covering pole, even if
 another pole is nearer. It belongs only to that pole's component.
 
-Basic generators provide a constant 100 units when covered by a pole. Network
+Basic generators can provide up to 100 units per tick when covered by a pole.
+Their available generation is the lesser of this maximum and their burner's
+released energy. Network
 aggregation asks the internal power-source boundary for each connected
 source's available output; topology and allocation do not calculate a basic
 generator's production themselves. Fixed consumer demands are:
@@ -39,14 +41,13 @@ There is no implicit or compatibility power source. A consumer is unpowered
 when the world has no poles or generators, when no pole covers it, or when its
 connected network cannot allocate its full demand.
 
-Power poles cost 3 construction units and basic generators cost 30. Both have
-no material state, may be demolished immediately, and refund their full fixed
-cost. Removing poles can split networks; adding bridge poles can merge them.
+Power poles cost 3 construction units and basic generators cost 30. Generators
+own a generic solid-fuel burner; see `burners.md`. Removing poles can split
+networks; adding bridge poles can merge them.
 All topology and allocation inspection is rebuilt deterministically.
 
 Public inspection exposes poles, generators, consumers, networks, and canonical
 connections. Network totals use 64-bit `FactoryPowerTotal`.
 
-Limitations are intentional: no manual wires, switches, batteries, fuel,
-fluids, solar, voltage, losses, priorities, brownout speed scaling, or stored
-energy.
+Limitations are intentional: no manual wires, switches, batteries, fluids,
+solar, voltage, losses, priorities, or brownout speed scaling.

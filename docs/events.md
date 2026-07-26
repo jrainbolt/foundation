@@ -31,20 +31,24 @@ Every `FactoryEvent` is fully initialized. Unused fields are zero or their
 | `ITEM_TRANSFERRED` | source owner | destination owner | unused | transferred item and count |
 | `POWER_GAINED` | consumer | unused | unused | unused |
 | `POWER_LOST` | consumer | unused | unused | unused |
+| `FUEL_IGNITED` | burner owner | unused | unused | one consumed fuel item |
+| `FUEL_EXHAUSTED` | burner owner | unused | unused | exhausted fuel item |
 
 Construction and demolition events appear only after successful transactional
 commands. Production events appear only when output is committed. Transfer
 events appear once at the atomic logistics ownership commit. Power events
 compare consecutive derived allocations, omit newly created or loaded
-consumers, and are emitted in ascending consumer entity-ID order.
+consumers, and are emitted in ascending consumer entity-ID order. Fuel events
+occur only on ignition and final burn-tick completion, never for steady-state
+burning or released-buffer depletion.
 
-Within a step, command events follow command FIFO order. Power transitions
-follow next, then extractor production and producer transfers, belt transfers,
-refinery completion, assembler completion, and inserter drop/pickup transfers
-according to the normal authoritative update phases. There is no event sorting
-pass.
+Within a step, command events follow command FIFO order. Burner ignition events
+follow next, then power transitions, then fuel-completion events. Extractor
+production and producer transfers, belt transfers, refinery completion,
+assembler completion, and inserter drop/pickup transfers follow according to
+the normal authoritative update phases. There is no event sorting pass.
 
 Events and their allocation capacity are observer state. They are not encoded
-in version 2 snapshots and do not affect canonical bytes. A loaded simulation
+in version 4 snapshots and do not affect canonical bytes. A loaded simulation
 starts with an empty batch. Failed loads create no simulation and cannot alter
 an existing simulation or its visible batch.

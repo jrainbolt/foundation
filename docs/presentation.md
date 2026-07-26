@@ -29,10 +29,12 @@ stable entity IDs. No synthetic IDs are invented.
 
 Every entity record contains its ID, type, grid position, integer direction,
 derived machine status, and powered flag. Its tagged union contains the active
-entity type's integer-only state. Storage uses seven fixed item quantities in
-`FactoryItemType` order from iron ore through copper wire. Progress is always a
-tick numerator and duration denominator; no percentage or interpolation value
-is calculated.
+entity type's integer-only state. Storage uses eight fixed item quantities in
+`FactoryItemType` order from iron ore through biomass pellets. Generator
+presentation includes burner inventory, current fuel, total and remaining
+ticks, unreleased fuel energy, released available energy, and activity.
+Progress is always a tick numerator and duration denominator; no percentage
+or interpolation value is calculated.
 
 Machine-status precedence is:
 
@@ -68,7 +70,7 @@ Presentation rebuild does not clear or copy events. Event clearing does not
 alter an existing presentation snapshot. If a tick or rebuild fails, a caller
 may continue displaying its previous presentation snapshot.
 
-Presentation data is excluded from canonical version 2 simulation snapshots.
+Presentation data is excluded from canonical version 4 simulation snapshots.
 After simulation load, callers rebuild a new presentation snapshot. Equivalent
 authoritative simulations produce field-wise equivalent presentation records.
 

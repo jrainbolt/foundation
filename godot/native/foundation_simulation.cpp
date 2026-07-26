@@ -452,9 +452,9 @@ bool FoundationSimulation::entity_to_dictionary(
                 entity.data.power_source.attached_pole_id,
                 "entity.power_source.attached_pole_id"
             ) || !set_unsigned(
-                &value, "generation",
-                entity.data.power_source.available_generation,
-                "entity.power_source.generation"
+                &value, "maximum_output",
+                entity.data.power_source.maximum_output_per_tick,
+                "entity.power_source.maximum_output"
             ) || !set_unsigned(
                 &value, "allocated",
                 entity.data.power_source.network_allocated_power,
@@ -462,6 +462,17 @@ bool FoundationSimulation::entity_to_dictionary(
             ))
             return false;
         value["connected"] = entity.data.power_source.connected;
+        value["fuel_item"] =
+            (int64_t)entity.data.power_source.burner.current_fuel_item;
+        value["fuel_ticks"] =
+            (int64_t)entity.data.power_source.burner.remaining_burn_ticks;
+        value["fuel_active"] = entity.data.power_source.burner.active;
+        if (!set_unsigned(
+                &value, "energy_available",
+                entity.data.power_source.burner.released_energy,
+                "entity.power_source.burner.released_energy"
+            ))
+            return false;
         break;
     default:
         break;

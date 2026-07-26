@@ -98,6 +98,7 @@ void factory_simulation_destroy(FactorySimulation *simulation)
         return;
     }
     factory_event_batch_destroy(&simulation->events);
+    factory_burner_store_destroy(&simulation->burners);
     factory_power_state_destroy(&simulation->power);
     factory_power_generator_store_destroy(&simulation->power_generators);
     factory_power_pole_store_destroy(&simulation->power_poles);
@@ -137,7 +138,8 @@ static FactoryResult place_power_entity(
     if (result != FACTORY_RESULT_OK) return result;
     if (generator) {
         if (!factory_power_generator_store_reserve_one(
-                &simulation->power_generators)) {
+                &simulation->power_generators)
+            || !factory_burner_store_reserve_one(&simulation->burners)) {
             return FACTORY_RESULT_OUT_OF_MEMORY;
         }
     } else if (!factory_power_pole_store_reserve_one(
@@ -150,6 +152,16 @@ static FactoryResult place_power_entity(
         factory_power_generator_store_add(
             &simulation->power_generators, *out_id, x, y
         );
+        factory_burner_store_add(
+            &simulation->burners, *out_id, FACTORY_FUEL_CLASS_SOLID
+        );
+        if (simulation->fixture_initial_generator_fuel != 0U) {
+            FactoryBurner *burner = factory_burner_store_find_mutable(
+                &simulation->burners, *out_id);
+            burner->inventory_item = FACTORY_ITEM_BIOMASS_PELLET;
+            burner->inventory_quantity =
+                simulation->fixture_initial_generator_fuel;
+        }
     } else {
         factory_power_pole_store_add(
             &simulation->power_poles, *out_id, x, y
@@ -582,6 +594,14 @@ static FactoryResult validate_demolition(
         *out_x = power_pole->x;
         *out_y = power_pole->y;
     } else if (power_generator != NULL) {
+        const FactoryBurner *burner =
+            factory_burner_store_find(&simulation->burners, id);
+        if (burner == NULL)
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        if (burner->inventory_quantity != 0U
+            || burner->remaining_burn_ticks != 0U
+            || burner->released_energy != 0U)
+            return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
         *out_type = FACTORY_ENTITY_TYPE_POWER_GENERATOR;
         *out_x = power_generator->x;
         *out_y = power_generator->y;
@@ -621,9 +641,10 @@ static bool remove_subsystem_record(
                 &simulation->power_poles, id
             );
         case FACTORY_ENTITY_TYPE_POWER_GENERATOR:
+            if (!factory_burner_store_remove(&simulation->burners, id))
+                return false;
             return factory_power_generator_store_remove(
-                &simulation->power_generators, id
-            );
+                &simulation->power_generators, id);
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;
@@ -783,7 +804,8 @@ static FactoryResult set_storage_output(
     FactoryItemType item = command->data.set_storage_output.item;
     FactoryStorage *storage;
 
-    if (item < FACTORY_ITEM_NONE || item > FACTORY_ITEM_COPPER_WIRE) {
+    if (item < FACTORY_ITEM_NONE
+        || item > FACTORY_ITEM_BIOMASS_PELLET) {
         return FACTORY_RESULT_INVALID_ARGUMENT;
     }
     if (!factory_entity_is_valid(simulation->entities, id)) {
@@ -974,6 +996,7 @@ static void apply_commands(FactorySimulation *simulation)
             simulation->construction_inventory.units;
     }
     simulation->command_count = 0U;
+    simulation->fixture_initial_generator_fuel = 0U;
 }
 
 FactoryConstructionMaterial factory_simulation_construction_units(
@@ -1219,6 +1242,7 @@ static size_t plan_belt_transfers(
         const FactoryAssembler *destination_assembler;
         const FactorySplitter *destination_splitter;
         const FactoryStorage *destination_storage;
+        const FactoryPowerGenerator *destination_generator;
         FactoryLogisticsEndpoint destination = {0};
         int32_t target_x;
         int32_t target_y;
@@ -1242,6 +1266,9 @@ static size_t plan_belt_transfers(
         destination_storage = factory_storage_store_find(
             &simulation->storages, tile->occupying_entity
         );
+        destination_generator = factory_power_generator_store_find(
+            &simulation->power_generators, tile->occupying_entity
+        );
         destination_refinery = factory_refinery_store_find(
             &simulation->refineries, tile->occupying_entity
         );
@@ -1259,6 +1286,11 @@ static size_t plan_belt_transfers(
             destination = (FactoryLogisticsEndpoint){
                 destination_storage->entity_id,
                 FACTORY_LOGISTICS_SLOT_STORAGE_INPUT
+            };
+        } else if (destination_generator != NULL) {
+            destination = (FactoryLogisticsEndpoint){
+                destination_generator->entity_id,
+                FACTORY_LOGISTICS_SLOT_BURNER_INPUT
             };
         } else if (destination_refinery != NULL) {
             adjacent_coordinate(
@@ -1635,6 +1667,7 @@ static bool inspect_inserter_destination(
     const FactoryStorage *storage;
     const FactoryRefinery *refinery;
     const FactoryAssembler *assembler;
+    const FactoryPowerGenerator *generator;
 
     *out_endpoint = (FactoryLogisticsEndpoint){
         0U, FACTORY_LOGISTICS_SLOT_NONE
@@ -1709,6 +1742,14 @@ static bool inspect_inserter_destination(
                 break;
             }
         }
+    }
+    generator = factory_power_generator_store_find(
+        &simulation->power_generators, tile->occupying_entity
+    );
+    if (generator != NULL) {
+        *out_endpoint = (FactoryLogisticsEndpoint){
+            generator->entity_id, FACTORY_LOGISTICS_SLOT_BURNER_INPUT
+        };
     }
     return out_endpoint->entity_id != 0U
         && factory_logistics_endpoint_can_accept(
@@ -1806,17 +1847,20 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     }
     possible_entities =
         simulation->entities->count + simulation->command_count;
-    if (possible_entities > (SIZE_MAX - 1U) / 6U) {
+    if (possible_entities > (SIZE_MAX - 1U) / 8U) {
         return FACTORY_RESULT_POWER_OVERFLOW;
     }
-    event_limit = possible_entities * 6U + 1U;
+    event_limit = possible_entities * 8U + 1U;
     if (!factory_event_batch_reserve(&simulation->events, event_limit)) {
         return FACTORY_RESULT_OUT_OF_MEMORY;
     }
     simulation->events.count = 0U;
     simulation->events.recording = true;
     apply_commands(simulation);
+    factory_burner_store_begin_tick(&simulation->burners, simulation);
     (void)factory_power_rebuild(simulation, true);
+    factory_power_consume_generation(simulation);
+    factory_burner_store_finish_tick(&simulation->burners, simulation);
     factory_extractor_store_update(
         &simulation->extractors, simulation->world, simulation
     );

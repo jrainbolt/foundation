@@ -2,6 +2,9 @@
 #define FOUNDATION_TEST_POWER_FIXTURE_H
 
 #include "foundation/simulation.h"
+#include "../src/simulation_internal.h"
+
+#define FACTORY_TEST_GENERATOR_FUEL_QUANTITY 10000U
 
 static inline bool factory_test_submit_power_pair(
     FactorySimulation *simulation,
@@ -11,6 +14,8 @@ static inline bool factory_test_submit_power_pair(
     int32_t generator_y
 )
 {
+    simulation->fixture_initial_generator_fuel =
+        FACTORY_TEST_GENERATOR_FUEL_QUANTITY;
     FactoryCommand pole = {
         FACTORY_COMMAND_PLACE_POWER_POLE,
         {.place_power_pole = {pole_x, pole_y}}
@@ -41,6 +46,8 @@ static inline bool factory_test_submit_power_row(
     uint32_t last_pole = 0U;
     if (simulation == NULL || width == 0U || gameplay_height > INT32_MAX - 1)
         return false;
+    simulation->fixture_initial_generator_fuel =
+        FACTORY_TEST_GENERATOR_FUEL_QUANTITY;
     for (pole_x = 2U; pole_x < width; pole_x += 6U) {
         FactoryCommand pole = {
             FACTORY_COMMAND_PLACE_POWER_POLE,

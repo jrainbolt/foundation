@@ -245,6 +245,8 @@ static FactoryResult populate_entity(
             storage->electronic_component_amount;
         out->data.storage.item_quantities[5] = storage->iron_gear_amount;
         out->data.storage.item_quantities[6] = storage->copper_wire_amount;
+        out->data.storage.item_quantities[7] =
+            storage->biomass_pellet_amount;
         out->data.storage.total_capacity = storage->total_capacity;
         out->data.storage.configured_output_item =
             storage->configured_output_item;
@@ -286,13 +288,24 @@ static FactoryResult populate_entity(
         };
     } else if (factory_simulation_get_power_generator(
             simulation, id, &generator) == FACTORY_RESULT_OK) {
+        FactoryBurnerInspection burner;
+        if (factory_simulation_get_burner(
+                simulation, id, &burner) != FACTORY_RESULT_OK)
+            return FACTORY_RESULT_ENTITY_NOT_FOUND;
         out->entity_type = FACTORY_ENTITY_TYPE_POWER_GENERATOR;
         out->x = generator.x; out->y = generator.y;
         out->data.power_source = (FactoryPresentationPowerSource){
             generator.generation_capacity, generator.attached_pole_id,
             generator.network_id,
             network_allocated(simulation, generator.network_id),
-            generator.connected
+            generator.connected,
+            {
+                burner.inventory_item, burner.inventory_quantity,
+                burner.current_fuel_item, burner.remaining_burn_ticks,
+                burner.total_burn_duration_ticks,
+                burner.unreleased_fuel_energy,
+                burner.released_energy, burner.active
+            }
         };
     } else {
         return FACTORY_RESULT_UNSUPPORTED_ENTITY;

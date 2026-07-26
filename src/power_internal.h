@@ -60,6 +60,7 @@ FactoryPowerUnits factory_power_source_available_generation(
 FactoryResult factory_power_rebuild(
     FactorySimulation *simulation, bool emit_transitions
 );
+void factory_power_consume_generation(FactorySimulation *simulation);
 bool factory_power_is_entity_powered(
     const FactorySimulation *simulation, FactoryEntityId entity_id
 );

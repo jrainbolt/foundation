@@ -8,7 +8,7 @@
 #include "foundation/simulation.h"
 
 #define FACTORY_PRESENTATION_DIRECTION_NONE (-1)
-#define FACTORY_PRESENTATION_STORAGE_ITEM_COUNT 7U
+#define FACTORY_PRESENTATION_STORAGE_ITEM_COUNT 8U
 
 typedef enum {
     FACTORY_PRESENTATION_MACHINE_STATUS_NONE = 0,
@@ -91,11 +91,23 @@ typedef struct {
 } FactoryPresentationPowerPole;
 
 typedef struct {
-    FactoryPowerUnits available_generation;
+    FactoryItemType inventory_item;
+    uint32_t inventory_quantity;
+    FactoryItemType current_fuel_item;
+    uint32_t remaining_burn_ticks;
+    uint32_t total_burn_duration_ticks;
+    FactoryEnergy unreleased_fuel_energy;
+    FactoryEnergy released_energy;
+    bool active;
+} FactoryPresentationBurner;
+
+typedef struct {
+    FactoryPowerUnits maximum_output_per_tick;
     FactoryEntityId attached_pole_id;
     FactoryPowerNetworkId network_id;
     FactoryPowerTotal network_allocated_power;
     bool connected;
+    FactoryPresentationBurner burner;
 } FactoryPresentationPowerSource;
 
 typedef struct {

@@ -52,7 +52,7 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
             return command->data.set_storage_output.item
                 >= FACTORY_ITEM_NONE
                 && command->data.set_storage_output.item
-                    <= FACTORY_ITEM_COPPER_WIRE;
+                    <= FACTORY_ITEM_BIOMASS_PELLET;
         case FACTORY_COMMAND_PLACE_POWER_POLE:
         case FACTORY_COMMAND_PLACE_POWER_GENERATOR:
             return true;
