@@ -80,17 +80,28 @@ void factory_boiler_store_add(
 }
 
 #define FIND(NAME, TYPE, STORE) const TYPE *NAME(const STORE *s,             \
-    FactoryEntityId id) { if (s == NULL) return NULL;                       \
-    for (size_t i = 0U; i < s->count; ++i)                                 \
-        if (s->items[i].entity_id == id) return &s->items[i]; return NULL; }
+    FactoryEntityId id) {                                                    \
+    if (s == NULL) return NULL;                                              \
+    for (size_t i = 0U; i < s->count; ++i) {                                \
+        if (s->items[i].entity_id == id) return &s->items[i];                \
+    }                                                                        \
+    return NULL;                                                             \
+}
 FIND(factory_water_extractor_store_find, FactoryWaterExtractor,
     FactoryWaterExtractorStore)
 FIND(factory_boiler_store_find, FactoryBoiler, FactoryBoilerStore)
 
 #define REMOVE(NAME, STORE) bool NAME(STORE *s, FactoryEntityId id) {        \
-    if (s == NULL) return false; for (size_t i = 0U; i < s->count; ++i)     \
-    if (s->items[i].entity_id == id) { --s->count;                          \
-    s->items[i] = s->items[s->count]; return true; } return false; }
+    if (s == NULL) return false;                                             \
+    for (size_t i = 0U; i < s->count; ++i) {                                \
+        if (s->items[i].entity_id == id) {                                   \
+            --s->count;                                                      \
+            s->items[i] = s->items[s->count];                               \
+            return true;                                                     \
+        }                                                                    \
+    }                                                                        \
+    return false;                                                            \
+}
 REMOVE(factory_water_extractor_store_remove, FactoryWaterExtractorStore)
 REMOVE(factory_boiler_store_remove, FactoryBoilerStore)
 
