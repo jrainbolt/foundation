@@ -1,0 +1,76 @@
+extends SceneTree
+
+func _fail(message: String) -> void:
+	push_error(message)
+	quit(1)
+
+func _initialize() -> void:
+	call_deferred("_run")
+
+func _run() -> void:
+	var packed: PackedScene = load("res://scenes/main.tscn")
+	if packed == null:
+		_fail("main scene did not load")
+		return
+	var main: Control = packed.instantiate()
+	root.add_child(main)
+	await process_frame
+	await physics_frame
+
+	if main.simulation == null:
+		_fail("main scene did not construct adapter")
+		return
+	var initial_tick := int(main.simulation.get_tick())
+	var canvas: Node = main.canvas
+	if initial_tick != 2 or canvas.entity_nodes.size() != 26:
+		_fail("deterministic demo or entity visuals are incorrect")
+		return
+	if canvas.resources.size() != 2 or canvas.edges.is_empty():
+		_fail("resource or power-edge visuals are missing")
+		return
+	if not main.tick_label.text.contains("2"):
+		_fail("debug tick panel did not update")
+		return
+
+	main._on_run_pressed()
+	for unused in range(12):
+		await physics_frame
+	var running_tick := int(main.simulation.get_tick())
+	if running_tick <= initial_tick:
+		_fail("run mode did not advance")
+		return
+
+	main._on_run_pressed()
+	var paused_tick := int(main.simulation.get_tick())
+	for unused in range(12):
+		await physics_frame
+	if int(main.simulation.get_tick()) != paused_tick:
+		_fail("pause did not stop advancement")
+		return
+
+	main._on_step_pressed()
+	if int(main.simulation.get_tick()) != paused_tick + 1:
+		_fail("single step did not advance exactly once")
+		return
+
+	main._on_reset_pressed()
+	if int(main.simulation.get_tick()) != initial_tick:
+		_fail("reset did not restore initial tick")
+		return
+	if canvas.entity_nodes.size() != 26 or canvas.resources.size() != 2:
+		_fail("reset did not restore deterministic visuals")
+		return
+
+	main.queue_free()
+	await process_frame
+	var reloaded: Control = packed.instantiate()
+	root.add_child(reloaded)
+	await process_frame
+	await physics_frame
+	if reloaded.simulation == null or reloaded.simulation.get_tick() != initial_tick:
+		_fail("scene reload did not recreate deterministic adapter state")
+		return
+	reloaded.queue_free()
+	await process_frame
+	print("Foundation main scene smoke test passed")
+	quit(0)

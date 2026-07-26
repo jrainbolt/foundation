@@ -80,3 +80,7 @@ power-state transitions. See `docs/events.md`.
 External frontends can independently own a deterministic full presentation
 snapshot containing visible entities, deposits, and canonical power edges.
 See `docs/presentation.md`.
+
+A separate Godot 4.5 GDExtension and minimal read-only visualizer live under
+`godot/`. They are not part of the normal CMake build. See `godot/README.md`
+for the pinned dependency, build, run, and headless smoke-test instructions.

@@ -1,0 +1,36 @@
+#!/usr/bin/env python
+import os
+import sys
+
+local_env = Environment(tools=["default"], PLATFORM="")
+godot_cpp_dir = os.environ.get("GODOT_CPP_DIR", "")
+
+if not godot_cpp_dir or not os.path.isfile(
+    os.path.join(godot_cpp_dir, "SConstruct")
+):
+    print(
+        "GODOT_CPP_DIR must name a checkout of godot-cpp at "
+        "tag godot-4.5-stable."
+    )
+    sys.exit(1)
+
+env = SConscript(
+    os.path.join(godot_cpp_dir, "SConstruct"),
+    {"env": local_env, "customs": []},
+)
+env.Append(
+    CPPPATH=["native", "../include", "../src"],
+    CFLAGS=["-std=c17"],
+    CXXFLAGS=["-std=c++17"],
+)
+
+sources = Glob("native/*.cpp") + Glob("../src/*.c")
+suffix = env["suffix"].replace(".dev", "").replace(".universal", "")
+library_name = "{}foundation{}{}".format(
+    env.subst("$SHLIBPREFIX"), suffix, env.subst("$SHLIBSUFFIX")
+)
+library = env.SharedLibrary(
+    "assets/bin/{}/{}".format(env["platform"], library_name),
+    source=sources,
+)
+Default(library)

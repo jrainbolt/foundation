@@ -13,6 +13,7 @@ Testing/
 
 # Compiled binaries and libraries
 *.o
+*.os
 *.obj
 *.a
 *.so
@@ -30,3 +31,8 @@ Testing/
 
 # Logs
 *.log
+
+# Godot generated/imported files and native extension output
+.godot/
+godot/assets/bin/
+.sconsign.dblite
