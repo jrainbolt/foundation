@@ -78,6 +78,9 @@ FactoryCommand place(
     case FACTORY_COMMAND_PLACE_HEAT_EXCHANGER:
         command.data.place_heat_exchanger = {x, y};
         break;
+    case FACTORY_COMMAND_PLACE_STEAM_TURBINE:
+        command.data.place_steam_turbine = {x, y};
+        break;
     default:
         break;
     }
@@ -381,7 +384,7 @@ FactoryResult FoundationSimulation::build_demo()
         FACTORY_COMMAND_PLACE_INSERTER, 10, 1, FACTORY_DIRECTION_EAST));
     if (result != FACTORY_RESULT_OK)
         return result;
-    result = submit(place(FACTORY_COMMAND_PLACE_REACTOR_CORE, 9, 0));
+    result = submit(place(FACTORY_COMMAND_PLACE_REACTOR_CORE, 6, 1));
     if (result != FACTORY_RESULT_OK)
         return result;
     FactoryCommand reactor_fuel = {};
@@ -404,6 +407,8 @@ FactoryResult FoundationSimulation::build_demo()
     result = submit(place(FACTORY_COMMAND_PLACE_FLUID_TANK, 5, 0));
     if (result != FACTORY_RESULT_OK) return result;
     result = submit(place(FACTORY_COMMAND_PLACE_PIPE, 8, 0));
+    if (result != FACTORY_RESULT_OK) return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_STEAM_TURBINE, 9, 0));
     if (result != FACTORY_RESULT_OK) return result;
     result = factory_simulation_submit_fluid_insert(
         simulation_, 44U, FACTORY_FLUID_WATER, 200U);
@@ -871,6 +876,36 @@ bool FoundationSimulation::entity_to_dictionary(
             (int64_t)entity.data.heat_exchanger.produced_steam_last_tick;
         value["heat_exchanger_activity"] =
             (int64_t)entity.data.heat_exchanger.activity;
+        break;
+    case FACTORY_ENTITY_TYPE_STEAM_TURBINE:
+        value["steam_fluid"] =
+            (int64_t)entity.data.steam_turbine.steam_fluid;
+        value["stored_steam"] =
+            (int64_t)entity.data.steam_turbine.stored_steam;
+        value["steam_capacity"] =
+            (int64_t)entity.data.steam_turbine.steam_capacity;
+        value["fluid_network_id"] =
+            (int64_t)entity.data.steam_turbine.fluid_network_id;
+        value["power_network_id"] =
+            (int64_t)entity.data.steam_turbine.power_network_id;
+        value["fluid_connected"] =
+            entity.data.steam_turbine.fluid_connected;
+        value["power_connected"] =
+            entity.data.steam_turbine.power_connected;
+        value["turbine_definition_id"] =
+            (int64_t)entity.data.steam_turbine.definition_id;
+        value["maximum_output"] =
+            (int64_t)entity.data.steam_turbine.maximum_output;
+        value["available_generation"] =
+            (int64_t)entity.data.steam_turbine.available_output;
+        value["generated_last_tick"] =
+            (int64_t)entity.data.steam_turbine.actual_output;
+        value["steam_consumed_last_tick"] =
+            (int64_t)entity.data.steam_turbine.steam_consumed_last_tick;
+        value["completed_cycles_last_tick"] =
+            (int64_t)entity.data.steam_turbine.completed_cycles_last_tick;
+        value["turbine_activity"] =
+            (int64_t)entity.data.steam_turbine.activity;
         break;
     default:
         break;

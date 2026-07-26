@@ -182,6 +182,8 @@ static FactoryResult populate_entity(
         factory_boiler_store_find(&simulation->boilers, id);
     const FactorySteamEngine *steam_engine =
         factory_steam_engine_store_find(&simulation->steam_engines, id);
+    const FactorySteamTurbine *steam_turbine =
+        factory_steam_turbine_store_find(&simulation->steam_turbines,id);
     const FactorySolarGenerator *solar_generator =
         factory_solar_generator_store_find(&simulation->solar_generators, id);
     const FactoryAccumulator *accumulator =
@@ -428,6 +430,26 @@ static FactoryResult populate_entity(
             inspection.steam_capacity,inspection.consumed_heat_last_tick,
             inspection.consumed_water_last_tick,
             inspection.produced_steam_last_tick,inspection.activity};
+    } else if (steam_turbine!=NULL) {
+        FactorySteamTurbineInspection machine;
+        out->entity_type=FACTORY_ENTITY_TYPE_STEAM_TURBINE;
+        out->x=steam_turbine->x; out->y=steam_turbine->y;
+        if (factory_simulation_get_steam_turbine(simulation,id,&machine)
+                !=FACTORY_RESULT_OK) return FACTORY_RESULT_ENTITY_NOT_FOUND;
+        out->status=machine.activity==FACTORY_STEAM_TURBINE_WORKING
+            ?FACTORY_PRESENTATION_MACHINE_STATUS_WORKING
+            :machine.activity==FACTORY_STEAM_TURBINE_IDLE
+                ?FACTORY_PRESENTATION_MACHINE_STATUS_IDLE
+                :FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_INPUT;
+        out->powered=machine.power_connected;
+        out->data.steam_turbine=(FactoryPresentationSteamTurbine){
+            machine.steam_fluid,machine.stored_steam,machine.steam_capacity,
+            machine.fluid_network_id,machine.power_network_id,
+            machine.fluid_connected,machine.power_connected,
+            machine.definition_id,machine.maximum_output_per_tick,
+            machine.available_output,machine.actual_output,
+            machine.steam_consumed_last_tick,
+            machine.completed_cycles_last_tick,machine.activity};
     } else if (solar_generator != NULL) {
         FactorySolarGeneratorInspection machine;
         FactoryPowerGeneratorInspection power_generator;

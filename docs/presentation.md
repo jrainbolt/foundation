@@ -1,5 +1,9 @@
 # Renderer-neutral presentation snapshots
 
+Steam Turbine records expose steam, fluid/power network IDs and connections,
+definition ID, maximum/available/actual output, consumed steam, completed
+cycles, and activity. Presentation never calculates conversion or allocation.
+
 A presentation snapshot is an externally owned, transient copy of the current
 visible simulation state. It answers “what exists now,” while the simulation
 event batch answers “what happened during the latest successful step.” Neither

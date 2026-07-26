@@ -1,4 +1,8 @@
-# Snapshot format version 12
+# Snapshot format version 13
+
+Version 13 adds the authoritative Steam Turbine component section. Turbine
+steam remains in generic fluid storage; topology and latest-tick fields are
+reconstructed or cleared.
 
 Foundation snapshots are canonical little-endian binary files. Every value is
 written field-by-field; no C structure, pointer, enum representation, padding,
@@ -9,12 +13,12 @@ timestamp, or process-specific value enters the format.
 | Offset | Width | Field |
 |---:|---:|---|
 | 0 | 8 | Magic bytes `FOUNDATN` |
-| 8 | 4 | Version (`10`) |
+| 8 | 4 | Version (`13`) |
 | 12 | 4 | Header size (`48`) |
 | 16 | 8 | Total snapshot size |
 | 24 | 8 | Payload size |
 | 32 | 8 | Simulation tick |
-| 40 | 4 | Section count (`24`) |
+| 40 | 4 | Section count (`25`) |
 | 44 | 4 | Reserved zero |
 
 Unsigned and signed integers use 32-bit or 64-bit two's-complement
@@ -32,7 +36,7 @@ Each section starts with four 32-bit fields:
 | Record count | Number of fixed-width records |
 | Payload size | Bytes following the section header |
 
-Version 12 requires each section exactly once in this order:
+Version 13 requires each section exactly once in this order:
 
 | Type | Section | Record width |
 |---:|---|---:|
@@ -58,8 +62,9 @@ Version 12 requires each section exactly once in this order:
 | 20 | Reactor cores | 40 |
 | 21 | Heat conductors | 12 |
 | 22 | Heat exchangers | 12 |
-| 23 | Pending commands | 24 |
-| 24 | Command results | 68 |
+| 23 | Steam turbines | 16 |
+| 24 | Pending commands | 24 |
+| 25 | Command results | 68 |
 
 Unknown, reordered, duplicated, missing, incorrectly sized, or unsupported
 sections are rejected. Exact full-buffer consumption is required.
@@ -118,6 +123,10 @@ Exchanger water and steam remain in the generic fluid-storage section.
 Connection masks, heat ports, heat/fluid network IDs, latest conversion
 quantities, and activity are reconstructed or transient.
 
-Version 12 has no compression, encryption, checksum, optional sections, or
+Steam-turbine records contain entity ID, grid position, and stable definition
+ID. Steam is carried by generic fluid storage. Network IDs, availability,
+actual output, consumption, completed cycles, and activity are transient.
+
+Version 13 has no compression, encryption, checksum, optional sections, or
 migration decoder. A future incompatible change must introduce a deliberate
 new-version decoder or compatibility policy.

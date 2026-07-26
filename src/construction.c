@@ -68,6 +68,9 @@ bool factory_entity_construction_cost(
         case FACTORY_ENTITY_TYPE_HEAT_EXCHANGER:
             cost = FACTORY_CONSTRUCTION_COST_HEAT_EXCHANGER;
             break;
+        case FACTORY_ENTITY_TYPE_STEAM_TURBINE:
+            cost = FACTORY_CONSTRUCTION_COST_STEAM_TURBINE;
+            break;
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;

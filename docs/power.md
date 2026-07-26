@@ -1,5 +1,9 @@
 # Deterministic power networks
 
+Steam Turbines are ordinary generators in ascending stable entity-ID order.
+Their atomic 200-energy quantum is preflighted against consumer demand and
+accumulator charge capacity before matching steam can be committed.
+
 Power uses integer units and Factorio-style pole coverage. A pole covers
 machines within Chebyshev distance 3 and connects automatically to every pole
 within Chebyshev distance 6. Connections are undirected and derived each tick.

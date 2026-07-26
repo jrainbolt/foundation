@@ -73,6 +73,7 @@ add_library(factory_engine
     src/solar.c
     src/snapshot.c
     src/steam_engine.c
+    src/steam_turbine.c
     src/splitter.c
     src/storage.c
     src/world.c
@@ -285,6 +286,13 @@ if(BUILD_TESTING)
     )
     target_link_libraries(factory_steam_engine_tests PRIVATE factory_engine)
     add_test(NAME factory_steam_engine_tests COMMAND factory_steam_engine_tests)
+
+    add_executable(factory_steam_turbine_tests tests/test_steam_turbine.c)
+    target_include_directories(
+        factory_steam_turbine_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(factory_steam_turbine_tests PRIVATE factory_engine)
+    add_test(NAME factory_steam_turbine_tests COMMAND factory_steam_turbine_tests)
 
     add_executable(factory_solar_tests tests/test_solar.c)
     target_include_directories(

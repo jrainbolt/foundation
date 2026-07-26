@@ -1,5 +1,9 @@
 # Deterministic Simulation
 
+Steam Turbine availability follows the single fluid transport pass and
+precedes ordinary power allocation. Exact steam consumption follows committed
+allocation; reactors and Heat Exchangers run later, with no second transport.
+
 `factory_simulation_tick()` executes this fixed order:
 
 ```text

@@ -48,7 +48,8 @@ typedef enum {
     FACTORY_COMMAND_PLACE_REACTOR_CORE,
     FACTORY_COMMAND_INSERT_REACTOR_FUEL,
     FACTORY_COMMAND_PLACE_HEAT_CONDUCTOR,
-    FACTORY_COMMAND_PLACE_HEAT_EXCHANGER
+    FACTORY_COMMAND_PLACE_HEAT_EXCHANGER,
+    FACTORY_COMMAND_PLACE_STEAM_TURBINE
 } FactoryCommandType;
 
 typedef struct {
@@ -149,6 +150,7 @@ typedef struct {
         } insert_reactor_fuel;
         struct { int32_t x; int32_t y; } place_heat_conductor;
         struct { int32_t x; int32_t y; } place_heat_exchanger;
+        struct { int32_t x; int32_t y; } place_steam_turbine;
     } data;
 } FactoryCommand;
 

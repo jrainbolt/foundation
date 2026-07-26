@@ -207,6 +207,23 @@ typedef struct {
 } FactoryPresentationHeatExchanger;
 
 typedef struct {
+    FactoryFluidType steam_fluid;
+    FactoryFluidQuantity stored_steam;
+    FactoryFluidQuantity steam_capacity;
+    FactoryFluidNetworkId fluid_network_id;
+    FactoryPowerNetworkId power_network_id;
+    bool fluid_connected;
+    bool power_connected;
+    FactorySteamTurbineDefinitionId definition_id;
+    FactoryPowerUnits maximum_output;
+    FactoryPowerUnits available_output;
+    FactoryPowerUnits actual_output;
+    FactoryFluidQuantity steam_consumed_last_tick;
+    uint32_t completed_cycles_last_tick;
+    FactorySteamTurbineActivity activity;
+} FactoryPresentationSteamTurbine;
+
+typedef struct {
     FactoryEntityId entity_id;
     FactoryEntityType entity_type;
     int32_t x;
@@ -234,6 +251,7 @@ typedef struct {
         FactoryPresentationReactor reactor;
         FactoryPresentationHeatConductor heat_conductor;
         FactoryPresentationHeatExchanger heat_exchanger;
+        FactoryPresentationSteamTurbine steam_turbine;
     } data;
 } FactoryPresentationEntity;
 

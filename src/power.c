@@ -233,6 +233,10 @@ FactoryPowerUnits factory_power_source_available_generation(
             &simulation->steam_engines, entity_id) != NULL)
         return factory_steam_engine_available_generation(
             simulation, entity_id);
+    if (factory_steam_turbine_store_find(
+            &simulation->steam_turbines,entity_id)!=NULL)
+        return factory_steam_turbine_available_generation(
+            simulation,entity_id);
     if (factory_solar_generator_store_find(
             &simulation->solar_generators, entity_id) != NULL)
         return factory_solar_generator_available(simulation, entity_id);
@@ -271,7 +275,19 @@ void factory_power_consume_generation(FactorySimulation *simulation)
                 simulation, inspection->entity_id);
             if (available == 0U) continue;
             amount = remaining > available ? available : remaining;
-            if (factory_steam_engine_store_find(
+            if (factory_steam_turbine_store_find(
+                    &simulation->steam_turbines,
+                    inspection->entity_id)!=NULL) {
+                const FactorySteamTurbineDefinition *definition=
+                    factory_steam_turbine_definition_get(
+                        FACTORY_STEAM_TURBINE_DEFINITION_BASIC);
+                amount=(amount/definition->energy_per_cycle)
+                    *definition->energy_per_cycle;
+                if (amount!=0U&&factory_steam_turbine_consume_for_generation(
+                        simulation,inspection->entity_id,
+                        (FactoryPowerUnits)amount))
+                    remaining-=amount;
+            } else if (factory_steam_engine_store_find(
                     &simulation->steam_engines,
                     inspection->entity_id) != NULL) {
                 if (factory_steam_engine_consume_for_generation(
@@ -507,6 +523,51 @@ FactoryResult factory_power_rebuild(
             network->total_demand += c->demand;
             ++network->consumer_count;
         }
+    }
+    /*
+     * Atomic-cycle generators may contribute only when the network can use a
+     * complete output quantum. Conservative preflight avoids crediting a
+     * consumer or accumulator with power whose steam commit would be partial.
+     * Non-turbine sources are counted first; this can defer otherwise usable
+     * turbine capacity, but never over-allocates or consumes steam.
+     */
+    for (i=0U;i<next.network_count;++i) {
+        FactoryPowerNetworkInspection *network=&next.networks[i];
+        FactoryPowerTotal ordinary=0U;
+        FactoryPowerTotal turbine=0U;
+        FactoryPowerTotal absorbable=network->total_demand;
+        bool has_turbine=false;
+        for (j=0U;j<next.accumulator_count;++j) {
+            FactoryPowerAccumulatorInspection *inspection=&next.accumulators[j];
+            const FactoryAccumulator *a;
+            FactoryElectricalEnergy capacity;
+            if (inspection->network_id!=network->network_id) continue;
+            a=factory_accumulator_store_find(
+                &simulation->accumulators,inspection->entity_id);
+            if (a==NULL) continue;
+            capacity=FACTORY_ACCUMULATOR_CAPACITY-a->stored_energy;
+            absorbable+=capacity<FACTORY_ACCUMULATOR_MAX_CHARGE_RATE
+                ?capacity:FACTORY_ACCUMULATOR_MAX_CHARGE_RATE;
+        }
+        for (j=0U;j<next.generator_count;++j) {
+            FactoryPowerGeneratorInspection *g=&next.generators[j];
+            FactoryPowerUnits available;
+            if (g->network_id!=network->network_id) continue;
+            available=factory_power_source_available_generation(
+                simulation,g->entity_id);
+            if (factory_steam_turbine_store_find(
+                    &simulation->steam_turbines,g->entity_id)!=NULL) {
+                turbine+=available;
+                has_turbine=true;
+            } else ordinary+=available;
+        }
+        if (!has_turbine) continue;
+        if (ordinary>absorbable) ordinary=absorbable;
+        absorbable-=ordinary;
+        turbine=(turbine<absorbable?turbine:absorbable)
+            /FACTORY_STEAM_TURBINE_MAX_OUTPUT
+            *FACTORY_STEAM_TURBINE_MAX_OUTPUT;
+        network->total_generation=ordinary+turbine;
     }
     for (i = 0U; i < consumers; ++i) {
         FactoryPowerConsumerInspection *c = &next.consumers[i];
