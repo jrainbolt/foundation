@@ -107,6 +107,7 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     factory_steam_engine_store_destroy(&simulation->steam_engines);
     factory_solar_generator_store_destroy(&simulation->solar_generators);
     factory_accumulator_store_destroy(&simulation->accumulators);
+    factory_reactor_store_destroy(&simulation->reactors);
     factory_burner_store_destroy(&simulation->burners);
     factory_power_state_destroy(&simulation->power);
     factory_power_generator_store_destroy(&simulation->power_generators);
@@ -523,6 +524,43 @@ static FactoryResult place_accumulator(
     return FACTORY_RESULT_OK;
 }
 
+static FactoryResult place_reactor_core(
+    FactorySimulation *s, const FactoryCommand *command, FactoryEntityId *out_id
+)
+{
+    int32_t x = command->data.place_reactor_core.x;
+    int32_t y = command->data.place_reactor_core.y;
+    FactoryResult result = validate_empty_tile(s, x, y);
+    if (result != FACTORY_RESULT_OK) return result;
+    if (!factory_reactor_store_reserve_one(&s->reactors))
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    result = occupy_with_entity(s, x, y, out_id);
+    if (result != FACTORY_RESULT_OK) return result;
+    factory_reactor_store_add(&s->reactors, *out_id, x, y);
+    return FACTORY_RESULT_OK;
+}
+
+static FactoryResult insert_reactor_fuel(
+    FactorySimulation *s, const FactoryCommand *command,
+    FactoryEntityId *out_id)
+{
+    FactoryReactor *reactor = factory_reactor_store_find_mutable(
+        &s->reactors, command->data.insert_reactor_fuel.reactor_entity_id);
+    FactoryResult result;
+    if (reactor == NULL) return FACTORY_RESULT_ENTITY_NOT_FOUND;
+    result = factory_reactor_insert_fuel(
+        reactor, command->data.insert_reactor_fuel.fuel_id);
+    if (result != FACTORY_RESULT_OK) return result;
+    *out_id = reactor->entity_id;
+    factory_simulation_emit_event(s, (FactoryEvent){
+        .type = FACTORY_EVENT_REACTOR_FUELED,
+        .entity_id = reactor->entity_id,
+        .nuclear_fuel_id = command->data.insert_reactor_fuel.fuel_id,
+        .quantity = 1U
+    });
+    return FACTORY_RESULT_OK;
+}
+
 static FactoryResult place_refinery(
     FactorySimulation *simulation,
     const FactoryCommand *command,
@@ -721,6 +759,8 @@ static FactoryResult validate_demolition(
         factory_solar_generator_store_find(&simulation->solar_generators, id);
     const FactoryAccumulator *accumulator =
         factory_accumulator_store_find(&simulation->accumulators, id);
+    const FactoryReactor *reactor =
+        factory_reactor_store_find(&simulation->reactors, id);
     const FactoryTile *tile;
 
     if (id == 0U) {
@@ -809,6 +849,10 @@ static FactoryResult validate_demolition(
         *out_type = FACTORY_ENTITY_TYPE_ACCUMULATOR;
         *out_x = accumulator->x;
         *out_y = accumulator->y;
+    } else if (reactor != NULL) {
+        *out_type = FACTORY_ENTITY_TYPE_REACTOR_CORE;
+        *out_x = reactor->x;
+        *out_y = reactor->y;
     } else if (solar_generator != NULL) {
         if (power_generator == NULL)
             return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
@@ -972,6 +1016,8 @@ static bool remove_subsystem_record(
         case FACTORY_ENTITY_TYPE_ACCUMULATOR:
             return factory_accumulator_store_remove(
                 &simulation->accumulators, id);
+        case FACTORY_ENTITY_TYPE_REACTOR_CORE:
+            return factory_reactor_store_remove(&simulation->reactors, id);
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;
@@ -1071,6 +1117,9 @@ static bool placement_type(
             return true;
         case FACTORY_COMMAND_PLACE_ACCUMULATOR:
             *out_type = FACTORY_ENTITY_TYPE_ACCUMULATOR;
+            return true;
+        case FACTORY_COMMAND_PLACE_REACTOR_CORE:
+            *out_type = FACTORY_ENTITY_TYPE_REACTOR_CORE;
             return true;
         default:
             return false;
@@ -1403,6 +1452,14 @@ static void apply_commands(FactorySimulation *simulation)
                 break;
             case FACTORY_COMMAND_PLACE_ACCUMULATOR:
                 result->result = place_accumulator(
+                    simulation, &result->command, &result->entity_id);
+                break;
+            case FACTORY_COMMAND_PLACE_REACTOR_CORE:
+                result->result = place_reactor_core(
+                    simulation, &result->command, &result->entity_id);
+                break;
+            case FACTORY_COMMAND_INSERT_REACTOR_FUEL:
+                result->result = insert_reactor_fuel(
                     simulation, &result->command, &result->entity_id);
                 break;
             case FACTORY_COMMAND_FLUID_INSERT:
@@ -2327,6 +2384,7 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     (void)factory_power_rebuild(simulation, true);
     factory_power_consume_generation(simulation);
     factory_burner_store_finish_tick(&simulation->burners, simulation);
+    factory_reactor_store_update(&simulation->reactors, simulation);
     factory_extractor_store_update(
         &simulation->extractors, simulation->world, simulation
     );

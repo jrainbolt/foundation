@@ -1,4 +1,4 @@
-# Snapshot format version 10
+# Snapshot format version 11
 
 Foundation snapshots are canonical little-endian binary files. Every value is
 written field-by-field; no C structure, pointer, enum representation, padding,
@@ -14,7 +14,7 @@ timestamp, or process-specific value enters the format.
 | 16 | 8 | Total snapshot size |
 | 24 | 8 | Payload size |
 | 32 | 8 | Simulation tick |
-| 40 | 4 | Section count (`21`) |
+| 40 | 4 | Section count (`22`) |
 | 44 | 4 | Reserved zero |
 
 Unsigned and signed integers use 32-bit or 64-bit two's-complement
@@ -32,7 +32,7 @@ Each section starts with four 32-bit fields:
 | Record count | Number of fixed-width records |
 | Payload size | Bytes following the section header |
 
-Version 10 requires each section exactly once in this order:
+Version 11 requires each section exactly once in this order:
 
 | Type | Section | Record width |
 |---:|---|---:|
@@ -55,8 +55,9 @@ Version 10 requires each section exactly once in this order:
 | 17 | Steam engines | 16 |
 | 18 | Solar generators | 12 |
 | 19 | Accumulators | 20 |
-| 20 | Pending commands | 24 |
-| 21 | Command results | 68 |
+| 20 | Reactor cores | 40 |
+| 21 | Pending commands | 24 |
+| 22 | Command results | 68 |
 
 Unknown, reordered, duplicated, missing, incorrectly sized, or unsupported
 sections are rejected. Exact full-buffer consumption is required.
@@ -105,6 +106,11 @@ energy. Capacity and rates are immutable definition values. Attachment,
 network ID, charge/discharge activity, and latest-tick quantities are derived
 or transient.
 
-Version 10 has no compression, encryption, checksum, optional sections, or
+Reactor-core records contain entity ID, grid position, queued fuel ID and
+quantity, active fuel ID, remaining 64-bit heat yield, and authoritative
+64-bit stored heat. Heat capacity is an immutable reactor definition value.
+Latest generated heat, activity, presentation, and events are transient.
+
+Version 11 has no compression, encryption, checksum, optional sections, or
 migration decoder. A future incompatible change must introduce a deliberate
 new-version decoder or compatibility policy.

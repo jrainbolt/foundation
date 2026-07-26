@@ -84,6 +84,12 @@ generation retains priority; a second indivisible-consumer pass draws explicit
 stored energy, and a final pass charges from ordinary generation that would
 otherwise remain unused. Both accumulator passes use ascending stable IDs.
 
+Reactor cores are independent simulation-owned heat producers. They move
+immutable nuclear-fuel definitions through an explicit one-rod inventory into
+authoritative remaining-yield state, then add bounded integer heat to a
+reusable `FactoryHeatStorage`. Reactors do not participate in power or fluid
+topology, and full heat storage pauses fuel consumption without loss.
+
 The simulation also owns a transient event batch. Tick preflight reserves its
 worst-case capacity before mutation, after which authoritative commit points
 append fully initialized facts without allocation or callbacks. No subsystem

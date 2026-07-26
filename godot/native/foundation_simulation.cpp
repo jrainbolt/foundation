@@ -69,6 +69,9 @@ FactoryCommand place(
     case FACTORY_COMMAND_PLACE_ACCUMULATOR:
         command.data.place_accumulator = {x, y};
         break;
+    case FACTORY_COMMAND_PLACE_REACTOR_CORE:
+        command.data.place_reactor_core = {x, y};
+        break;
     default:
         break;
     }
@@ -131,6 +134,10 @@ const char *result_name_c(FactoryResult result)
     case FACTORY_RESULT_INSUFFICIENT_FLUID: return "insufficient fluid";
     case FACTORY_RESULT_FLUID_NETWORK_NOT_FOUND:
         return "fluid network not found";
+    case FACTORY_RESULT_FUEL_INCOMPATIBLE:
+        return "fuel incompatible";
+    case FACTORY_RESULT_FUEL_INVENTORY_FULL:
+        return "fuel inventory full";
     }
     return "unknown result";
 }
@@ -364,6 +371,16 @@ FactoryResult FoundationSimulation::build_demo()
         return result;
     result = submit(place(
         FACTORY_COMMAND_PLACE_INSERTER, 10, 1, FACTORY_DIRECTION_EAST));
+    if (result != FACTORY_RESULT_OK)
+        return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_REACTOR_CORE, 9, 0));
+    if (result != FACTORY_RESULT_OK)
+        return result;
+    FactoryCommand reactor_fuel = {};
+    reactor_fuel.type = FACTORY_COMMAND_INSERT_REACTOR_FUEL;
+    reactor_fuel.data.insert_reactor_fuel = {
+        38U, FACTORY_NUCLEAR_FUEL_BASIC_ROD};
+    result = submit(reactor_fuel);
     if (result != FACTORY_RESULT_OK)
         return result;
     result = factory_simulation_submit_fluid_insert(
@@ -764,6 +781,36 @@ bool FoundationSimulation::entity_to_dictionary(
             (int64_t)entity.data.accumulator.power_network_id;
         value["connected"] = entity.data.accumulator.connected;
         break;
+    case FACTORY_ENTITY_TYPE_REACTOR_CORE:
+        if (!set_unsigned(
+                &value, "stored_heat",
+                entity.data.reactor.stored_heat,
+                "entity.reactor.stored_heat"
+            ) || !set_unsigned(
+                &value, "heat_capacity",
+                entity.data.reactor.heat_capacity,
+                "entity.reactor.heat_capacity"
+            ) || !set_unsigned(
+                &value, "remaining_heat_yield",
+                entity.data.reactor.remaining_heat_yield,
+                "entity.reactor.remaining_heat_yield"
+            ) || !set_unsigned(
+                &value, "generated_last_tick",
+                entity.data.reactor.generated_last_tick,
+                "entity.reactor.generated_last_tick"
+            ))
+            return false;
+        value["inventory_fuel_id"] =
+            (int64_t)entity.data.reactor.inventory_fuel_id;
+        value["inventory_quantity"] =
+            (int64_t)entity.data.reactor.inventory_quantity;
+        value["active_fuel_id"] =
+            (int64_t)entity.data.reactor.active_fuel_id;
+        value["remaining_burn_ticks"] =
+            (int64_t)entity.data.reactor.remaining_burn_ticks;
+        value["reactor_activity"] =
+            (int64_t)entity.data.reactor.activity;
+        break;
     default:
         break;
     }
@@ -874,6 +921,8 @@ Array FoundationSimulation::get_events() const
         value["fluid_type"] = (int64_t)event->fluid_type;
         value["related_fluid_type"] =
             (int64_t)event->related_fluid_type;
+        value["nuclear_fuel_id"] =
+            (int64_t)event->nuclear_fuel_id;
         value["quantity"] = (int64_t)event->quantity;
         value["related_quantity"] =
             (int64_t)event->related_quantity;

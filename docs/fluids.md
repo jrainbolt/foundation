@@ -20,7 +20,7 @@ external ingress and egress; transfer is conservation-neutral.
 
 Successful operations emit exactly one observational event at their command
 position. Failed operations emit none. Fluid state is included in canonical
-snapshot version 10; pending fluid commands retain FIFO order. Loaded empty,
+snapshot version 11; pending fluid commands retain FIFO order. Loaded empty,
 partial, and full tanks preserve their exact integer state, while transient
 events and presentation copies remain excluded.
 

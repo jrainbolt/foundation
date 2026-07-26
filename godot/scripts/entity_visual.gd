@@ -12,6 +12,7 @@ const COLORS := {
 	14: Color("#7aa6d8"),
 	15: Color("#f0b429"),
 	16: Color("#8bd450"),
+	17: Color("#6ee7b7"),
 }
 const NAMES := {
 	1: "EX", 2: "BELT", 3: "REF", 4: "ASM", 5: "BOX",
@@ -21,6 +22,7 @@ const NAMES := {
 	14: "STEAM",
 	15: "SOLAR",
 	16: "ACC",
+	17: "CORE",
 }
 
 var state: Dictionary = {}
@@ -124,6 +126,17 @@ func _draw() -> void:
 				int(state.get("capacity", 0)),
 				int(state.get("charged_last_tick", 0)),
 				int(state.get("discharged_last_tick", 0))
+			],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 8
+		)
+	if entity_type == 17:
+		draw_string(
+			ThemeDB.fallback_font, Vector2(7, 39),
+			"H%d/%d F%d %s" % [
+				int(state.get("stored_heat", 0)),
+				int(state.get("heat_capacity", 0)),
+				int(state.get("remaining_burn_ticks", 0)),
+				"ON" if int(state.get("reactor_activity", 0)) == 1 else "OFF"
 			],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 8
 		)

@@ -48,6 +48,9 @@ Every `FactoryEvent` is fully initialized. Unused fields are zero or their
 | `SUNSET` | unused | unused | none |
 | `ACCUMULATOR_CHARGED` | accumulator | unused | charged energy in `quantity`, resulting stored energy in `related_quantity` |
 | `ACCUMULATOR_DISCHARGED` | accumulator | unused | discharged energy in `quantity`, resulting stored energy in `related_quantity` |
+| `REACTOR_FUELED` | reactor core | unused | `nuclear_fuel_id`, quantity one |
+| `REACTOR_HEAT_GENERATED` | reactor core | unused | generated heat in `quantity`, resulting stored heat in `related_quantity` |
+| `REACTOR_FUEL_EXHAUSTED` | reactor core | unused | `nuclear_fuel_id`, quantity one |
 
 Construction and demolition events appear only after successful transactional
 commands. Production events appear only when output is committed. Transfer
@@ -63,13 +66,15 @@ extraction and boiler conversion run in ascending stable machine-store order.
 Power allocation follows: accumulator charge/discharge events are emitted in
 ascending accumulator entity-ID order, then consumer power transitions are
 emitted in ascending consumer entity-ID order. Fuel-completion events follow.
-Extractor
+Reactor cores then update in deterministic component-store order, emitting one
+aggregate heat event per producing core and an exhaustion event immediately
+after the final heat commit. Extractor
 production and producer transfers, belt transfers, refinery completion,
 assembler completion, and inserter drop/pickup transfers follow according to
 the normal authoritative update phases. Fluid command events occupy their FIFO
 command positions. There is no event sorting pass.
 
 Events and their allocation capacity are observer state. They are not encoded
-in version 10 snapshots and do not affect canonical bytes. A loaded simulation
+in version 11 snapshots and do not affect canonical bytes. A loaded simulation
 starts with an empty batch. Failed loads create no simulation and cannot alter
 an existing simulation or its visible batch.

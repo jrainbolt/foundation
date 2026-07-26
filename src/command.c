@@ -62,7 +62,12 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
         case FACTORY_COMMAND_PLACE_STEAM_ENGINE:
         case FACTORY_COMMAND_PLACE_SOLAR_GENERATOR:
         case FACTORY_COMMAND_PLACE_ACCUMULATOR:
+        case FACTORY_COMMAND_PLACE_REACTOR_CORE:
             return true;
+        case FACTORY_COMMAND_INSERT_REACTOR_FUEL:
+            return command->data.insert_reactor_fuel.reactor_entity_id != 0U
+                && factory_nuclear_fuel_definition_get(
+                    command->data.insert_reactor_fuel.fuel_id) != NULL;
         case FACTORY_COMMAND_FLUID_INSERT:
             return command->data.fluid_insert.destination_entity_id != 0U
                 && factory_fluid_definition_get(

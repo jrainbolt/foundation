@@ -6,7 +6,7 @@
 
 #include "foundation/simulation.h"
 
-#define FACTORY_SNAPSHOT_VERSION 10U
+#define FACTORY_SNAPSHOT_VERSION 11U
 
 typedef struct {
     uint8_t *data;

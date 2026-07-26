@@ -186,6 +186,8 @@ static FactoryResult populate_entity(
         factory_solar_generator_store_find(&simulation->solar_generators, id);
     const FactoryAccumulator *accumulator =
         factory_accumulator_store_find(&simulation->accumulators, id);
+    const FactoryReactor *reactor =
+        factory_reactor_store_find(&simulation->reactors, id);
     FactoryPipeInspection pipe;
     FactoryPowerPoleInspection pole;
     FactoryPowerGeneratorInspection generator;
@@ -369,6 +371,25 @@ static FactoryResult populate_entity(
             inspection.discharged_last_tick,
             inspection.activity, inspection.network_id,
             inspection.connected};
+    } else if (reactor != NULL) {
+        FactoryReactorInspection inspection;
+        out->entity_type = FACTORY_ENTITY_TYPE_REACTOR_CORE;
+        out->x = reactor->x; out->y = reactor->y;
+        if (factory_simulation_get_reactor(
+                simulation, id, &inspection) != FACTORY_RESULT_OK)
+            return FACTORY_RESULT_ENTITY_NOT_FOUND;
+        out->status =
+            inspection.activity == FACTORY_REACTOR_GENERATING
+                ? FACTORY_PRESENTATION_MACHINE_STATUS_WORKING
+                : inspection.activity == FACTORY_REACTOR_BLOCKED_HEAT_FULL
+                    ? FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_OUTPUT
+                    : FACTORY_PRESENTATION_MACHINE_STATUS_IDLE;
+        out->data.reactor = (FactoryPresentationReactor){
+            inspection.stored_heat, inspection.heat_capacity,
+            inspection.inventory_fuel_id, inspection.inventory_quantity,
+            inspection.active_fuel_id, inspection.remaining_burn_ticks,
+            inspection.remaining_heat_yield,
+            inspection.generated_last_tick, inspection.activity};
     } else if (solar_generator != NULL) {
         FactorySolarGeneratorInspection machine;
         FactoryPowerGeneratorInspection power_generator;

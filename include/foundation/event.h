@@ -33,7 +33,10 @@ typedef enum {
     FACTORY_EVENT_SUNRISE,
     FACTORY_EVENT_SUNSET,
     FACTORY_EVENT_ACCUMULATOR_CHARGED,
-    FACTORY_EVENT_ACCUMULATOR_DISCHARGED
+    FACTORY_EVENT_ACCUMULATOR_DISCHARGED,
+    FACTORY_EVENT_REACTOR_FUELED,
+    FACTORY_EVENT_REACTOR_HEAT_GENERATED,
+    FACTORY_EVENT_REACTOR_FUEL_EXHAUSTED
 } FactoryEventType;
 
 /*
@@ -58,6 +61,10 @@ typedef enum {
  * sunrise/sunset carry no payload and occur once at their clock boundary.
  * accumulator charged/discharged: entity_id identifies the accumulator,
  * quantity is transferred energy, and related_quantity is resulting storage.
+ * reactor fueled/exhausted: entity_id identifies the reactor,
+ * nuclear_fuel_id identifies the rod, and quantity is one.
+ * reactor heat generated: entity_id identifies the reactor, quantity is
+ * generated heat, and related_quantity is resulting stored heat.
  *
  * tick is the simulation tick at the start of the step that emitted the
  * event. Item-transfer quantity is currently one.
@@ -71,6 +78,7 @@ typedef struct {
     FactoryItemType item_type;
     FactoryFluidType fluid_type;
     FactoryFluidType related_fluid_type;
+    uint32_t nuclear_fuel_id;
     uint32_t quantity;
     uint32_t related_quantity;
 } FactoryEvent;

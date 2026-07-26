@@ -24,7 +24,7 @@ and energy released in the same tick participate in a boiler conversion.
 Machine stores and network ports are visited in their deterministic stable
 order; no event sorting pass is used.
 
-Snapshot version 10 serializes extractor progress, boiler recipe/activity,
+Snapshot version 11 serializes extractor progress, boiler recipe/activity,
 boiler burner state, and every slotted fluid storage. Ports and fluid networks
 are derived after load. Events and presentation remain transient, and
 save/load continuation produces the same future per-tick event batches.

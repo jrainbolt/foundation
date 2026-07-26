@@ -24,6 +24,8 @@
 #include "foundation/clock.h"
 #include "foundation/solar.h"
 #include "foundation/accumulator.h"
+#include "foundation/heat.h"
+#include "foundation/reactor.h"
 
 typedef struct FactorySimulation FactorySimulation;
 

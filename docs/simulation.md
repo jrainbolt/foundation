@@ -4,16 +4,18 @@
 
 ```text
 1. Reserve event capacity and clear the previous successful batch
-2. Apply queued commands FIFO
-3. Rebuild power and emit changed existing-consumer allocations
-4. Update extractor production
-5. Plan and commit existing producer outputs
-6. Advance belts and commit belt transfers
-7. Update refinery processing
-8. Update assembler processing
-9. Fill storage outputs
-10. Plan and commit inserter drops, then pickups
-11. Increment the tick
+2. Apply queued commands FIFO and process clock-boundary events
+3. Rebuild fluid topology and transfer fluid
+4. Begin burner release; update water, boilers, steam, and solar availability
+5. Reset accumulator activity, rebuild power, and consume ordinary generation
+6. Finish burner ticks
+7. Generate reactor heat once per core
+8. Update extractor production and commit existing producer outputs
+9. Advance belts and commit belt transfers
+10. Update refinery and assembler processing
+11. Fill storage outputs
+12. Plan and commit inserter drops, then pickups
+13. Increment the clock tick
 ```
 
 Events append at these authoritative commits without controlling them. A

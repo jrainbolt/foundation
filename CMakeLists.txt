@@ -59,6 +59,7 @@ add_library(factory_engine
     src/extractor.c
     src/fluid.c
     src/fluid_machine.c
+    src/heat.c
     src/item.c
     src/inserter.c
     src/logistics_endpoint.c
@@ -66,6 +67,7 @@ add_library(factory_engine
     src/presentation.c
     src/recipe.c
     src/refinery.c
+    src/reactor.c
     src/simulation.c
     src/solar.c
     src/snapshot.c
@@ -296,4 +298,11 @@ if(BUILD_TESTING)
     )
     target_link_libraries(factory_accumulator_tests PRIVATE factory_engine)
     add_test(NAME factory_accumulator_tests COMMAND factory_accumulator_tests)
+
+    add_executable(factory_reactor_tests tests/test_reactor.c)
+    target_include_directories(
+        factory_reactor_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(factory_reactor_tests PRIVATE factory_engine)
+    add_test(NAME factory_reactor_tests COMMAND factory_reactor_tests)
 endif()

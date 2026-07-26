@@ -48,6 +48,9 @@ activity. The snapshot also copies the authoritative day and time-of-day.
 Accumulator presentation contains authoritative stored energy, capacity,
 immutable rates, derived network connectivity, latest-tick charge/discharge
 quantities, and the derived idle/charging/discharging activity state.
+Reactor presentation contains authoritative stored heat, capacity, queued and
+active fuel IDs, remaining burn ticks and heat yield, latest generated heat,
+and derived idle/generating/heat-full activity.
 Progress is always a tick numerator and duration denominator; no percentage
 or interpolation value is calculated.
 
@@ -85,7 +88,7 @@ Presentation rebuild does not clear or copy events. Event clearing does not
 alter an existing presentation snapshot. If a tick or rebuild fails, a caller
 may continue displaying its previous presentation snapshot.
 
-Presentation data is excluded from canonical version 10 simulation snapshots.
+Presentation data is excluded from canonical version 11 simulation snapshots.
 After simulation load, callers rebuild a new presentation snapshot. Equivalent
 authoritative simulations produce field-wise equivalent presentation records.
 

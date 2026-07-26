@@ -173,6 +173,18 @@ typedef struct {
 } FactoryPresentationAccumulator;
 
 typedef struct {
+    FactoryHeatQuantity stored_heat;
+    FactoryHeatQuantity heat_capacity;
+    FactoryNuclearFuelId inventory_fuel_id;
+    uint32_t inventory_quantity;
+    FactoryNuclearFuelId active_fuel_id;
+    uint32_t remaining_burn_ticks;
+    FactoryHeatQuantity remaining_heat_yield;
+    FactoryHeatQuantity generated_last_tick;
+    FactoryReactorActivity activity;
+} FactoryPresentationReactor;
+
+typedef struct {
     FactoryEntityId entity_id;
     FactoryEntityType entity_type;
     int32_t x;
@@ -197,6 +209,7 @@ typedef struct {
         FactoryPresentationSteamEngine steam_engine;
         FactoryPresentationSolarGenerator solar_generator;
         FactoryPresentationAccumulator accumulator;
+        FactoryPresentationReactor reactor;
     } data;
 } FactoryPresentationEntity;
 
