@@ -16,10 +16,19 @@ typedef struct {
 } FactoryPowerGeneratorStore;
 
 typedef struct {
+    FactoryEntityId entity_id;
+    FactoryEntityId attached_pole_id;
+    FactoryPowerNetworkId network_id;
+    bool connected;
+} FactoryPowerAccumulatorInspection;
+
+typedef struct {
     FactoryPowerPoleInspection *poles;
     size_t pole_count;
     FactoryPowerGeneratorInspection *generators;
     size_t generator_count;
+    FactoryPowerAccumulatorInspection *accumulators;
+    size_t accumulator_count;
     FactoryPowerConsumerInspection *consumers;
     size_t consumer_count;
     FactoryPowerConnectionInspection *connections;

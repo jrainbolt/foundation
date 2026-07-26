@@ -9,7 +9,7 @@
 
 #define SNAPSHOT_HEADER_SIZE 48U
 #define SNAPSHOT_SECTION_HEADER_SIZE 16U
-#define SNAPSHOT_SECTION_COUNT 20U
+#define SNAPSHOT_SECTION_COUNT 21U
 
 static const uint8_t snapshot_magic[8] = {
     'F', 'O', 'U', 'N', 'D', 'A', 'T', 'N'
@@ -34,6 +34,7 @@ typedef enum {
     SNAPSHOT_SECTION_BOILERS,
     SNAPSHOT_SECTION_STEAM_ENGINES,
     SNAPSHOT_SECTION_SOLAR_GENERATORS,
+    SNAPSHOT_SECTION_ACCUMULATORS,
     SNAPSHOT_SECTION_COMMANDS,
     SNAPSHOT_SECTION_RESULTS
 } SnapshotSection;
@@ -270,6 +271,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_records(&size, simulation->boilers.count, 48U)
         || !checked_records(&size, simulation->steam_engines.count, 16U)
         || !checked_records(&size, simulation->solar_generators.count, 12U)
+        || !checked_records(&size, simulation->accumulators.count, 20U)
         || !checked_records(&size, simulation->command_count, 24U)
         || !checked_records(&size, simulation->result_count, 68U)
         || !size_to_u32(simulation->entities->count)
@@ -289,6 +291,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !size_to_u32(simulation->boilers.count)
         || !size_to_u32(simulation->steam_engines.count)
         || !size_to_u32(simulation->solar_generators.count)
+        || !size_to_u32(simulation->accumulators.count)
         || !section_size_valid(
             simulation->entities->count, 4U, 8U)
         || !section_size_valid(tiles, 16U, 8U)
@@ -307,6 +310,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !section_size_valid(simulation->boilers.count, 48U, 0U)
         || !section_size_valid(simulation->steam_engines.count, 16U, 0U)
         || !section_size_valid(simulation->solar_generators.count, 12U, 0U)
+        || !section_size_valid(simulation->accumulators.count, 20U, 0U)
         || size > UINT64_MAX) {
         return FACTORY_RESULT_SNAPSHOT_SIZE_OVERFLOW;
     }
@@ -351,6 +355,8 @@ static bool entity_has_subsystem(
         factory_steam_engine_store_find(&simulation->steam_engines, id);
     const FactorySolarGenerator *solar_generator =
         factory_solar_generator_store_find(&simulation->solar_generators, id);
+    const FactoryAccumulator *accumulator =
+        factory_accumulator_store_find(&simulation->accumulators, id);
     bool tank = fluid_storage != NULL && water_extractor == NULL
         && steam_engine == NULL;
     size_t found = (extractor != NULL) + (belt != NULL)
@@ -358,7 +364,8 @@ static bool entity_has_subsystem(
         + (inserter != NULL) + (storage != NULL)
         + (pole != NULL) + (generator != NULL) + tank
         + (pipe != NULL) + (water_extractor != NULL) + (boiler != NULL)
-        + (steam_engine != NULL) + (solar_generator != NULL);
+        + (steam_engine != NULL) + (solar_generator != NULL)
+        + (accumulator != NULL);
     if (steam_engine != NULL && generator != NULL) --found;
     if (solar_generator != NULL && generator != NULL) --found;
 
@@ -391,6 +398,8 @@ static bool entity_has_subsystem(
         *out_x = steam_engine->x; *out_y = steam_engine->y;
     } else if (solar_generator != NULL) {
         *out_x = solar_generator->x; *out_y = solar_generator->y;
+    } else if (accumulator != NULL) {
+        *out_x = accumulator->x; *out_y = accumulator->y;
     } else if (tank) {
         *out_x = fluid_storage->x; *out_y = fluid_storage->y;
     } else {
@@ -486,6 +495,7 @@ static FactoryResult validate_simulation(
         + simulation->water_extractors.count + simulation->boilers.count
         + simulation->steam_engines.count
         + simulation->solar_generators.count
+        + simulation->accumulators.count
         + simulation->fluid_storages.count
         - simulation->water_extractors.count - simulation->boilers.count * 2U
         - simulation->steam_engines.count
@@ -766,6 +776,18 @@ static FactoryResult validate_simulation(
                     simulation, solar->entity_id))
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
+    for (index = 0U; index < simulation->accumulators.count; ++index) {
+        const FactoryAccumulator *accumulator =
+            &simulation->accumulators.items[index];
+        if (accumulator->stored_energy > FACTORY_ACCUMULATOR_CAPACITY
+            || accumulator->charged_last_tick
+                > FACTORY_ACCUMULATOR_MAX_CHARGE_RATE
+            || accumulator->discharged_last_tick
+                > FACTORY_ACCUMULATOR_MAX_DISCHARGE_RATE
+            || (accumulator->charged_last_tick != 0U
+                && accumulator->discharged_last_tick != 0U))
+            return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
     for (index = 0U; index < simulation->water_extractors.count; ++index) {
         const FactoryWaterExtractor *machine =
             &simulation->water_extractors.items[index];
@@ -894,7 +916,7 @@ static FactoryResult validate_simulation(
         const FactoryCommandResult *value = &simulation->results[index];
         if (!snapshot_command_valid(&value->command)
             || value->result > FACTORY_RESULT_FLUID_NETWORK_NOT_FOUND
-            || value->entity_type > FACTORY_ENTITY_TYPE_SOLAR_GENERATOR
+            || value->entity_type > FACTORY_ENTITY_TYPE_ACCUMULATOR
             || value->previous_assembler_recipe
                 >= FACTORY_ASSEMBLER_RECIPE_COUNT
             || value->new_assembler_recipe
@@ -1017,6 +1039,10 @@ static void write_command(
             fields[0] = (uint32_t)command->data.place_solar_generator.x;
             fields[1] = (uint32_t)command->data.place_solar_generator.y;
             break;
+        case FACTORY_COMMAND_PLACE_ACCUMULATOR:
+            fields[0] = (uint32_t)command->data.place_accumulator.x;
+            fields[1] = (uint32_t)command->data.place_accumulator.y;
+            break;
     }
     write_u32(writer, (uint32_t)command->type);
     for (index = 0U; index < 5U; ++index) {
@@ -1039,7 +1065,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             return false;
         }
     }
-    if (type > FACTORY_COMMAND_PLACE_SOLAR_GENERATOR) {
+    if (type > FACTORY_COMMAND_PLACE_ACCUMULATOR) {
         return false;
     }
     command->type = (FactoryCommandType)type;
@@ -1071,6 +1097,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             case FACTORY_COMMAND_PLACE_BOILER:
             case FACTORY_COMMAND_PLACE_STEAM_ENGINE:
             case FACTORY_COMMAND_PLACE_SOLAR_GENERATOR:
+            case FACTORY_COMMAND_PLACE_ACCUMULATOR:
                 used = 2U;
                 break;
             case FACTORY_COMMAND_DEMOLISH_ENTITY:
@@ -1194,6 +1221,10 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
         case FACTORY_COMMAND_PLACE_SOLAR_GENERATOR:
             command->data.place_solar_generator.x = (int32_t)fields[0];
             command->data.place_solar_generator.y = (int32_t)fields[1];
+            break;
+        case FACTORY_COMMAND_PLACE_ACCUMULATOR:
+            command->data.place_accumulator.x = (int32_t)fields[0];
+            command->data.place_accumulator.y = (int32_t)fields[1];
             break;
     }
     return snapshot_command_valid(command);
@@ -1534,6 +1565,20 @@ static void write_snapshot(
         write_u32(writer, value->entity_id);
         write_i32(writer, value->x);
         write_i32(writer, value->y);
+    }
+
+    write_section_header(
+        writer, SNAPSHOT_SECTION_ACCUMULATORS,
+        simulation->accumulators.count,
+        simulation->accumulators.count * 20U
+    );
+    for (index = 0U; index < simulation->accumulators.count; ++index) {
+        const FactoryAccumulator *value =
+            &simulation->accumulators.items[index];
+        write_u32(writer, value->entity_id);
+        write_i32(writer, value->x);
+        write_i32(writer, value->y);
+        write_u64(writer, value->stored_energy);
     }
 
     write_section_header(
@@ -2096,6 +2141,23 @@ static bool load_sections(
             || !read_i32(reader, &v->x)
             || !read_i32(reader, &v->y)) return false;
         v->generated_last_tick = 0U;
+    }
+
+    if (!read_section_header(
+            reader, SNAPSHOT_SECTION_ACCUMULATORS, 20U, 0U, &count)
+        || !allocate_records(
+            (void **)&simulation->accumulators.items,
+            count, sizeof(FactoryAccumulator))) return false;
+    simulation->accumulators.count = count;
+    simulation->accumulators.capacity = count;
+    for (index = 0U; index < count; ++index) {
+        FactoryAccumulator *v = &simulation->accumulators.items[index];
+        if (!read_u32(reader, &v->entity_id)
+            || !read_i32(reader, &v->x)
+            || !read_i32(reader, &v->y)
+            || !read_u64(reader, &v->stored_energy)) return false;
+        v->charged_last_tick = 0U;
+        v->discharged_last_tick = 0U;
     }
 
     if (!read_section_header(

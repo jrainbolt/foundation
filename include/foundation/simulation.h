@@ -23,6 +23,7 @@
 #include "foundation/steam_engine.h"
 #include "foundation/clock.h"
 #include "foundation/solar.h"
+#include "foundation/accumulator.h"
 
 typedef struct FactorySimulation FactorySimulation;
 

@@ -21,7 +21,7 @@ validation prevents capacity overflow, underflow, class incompatibility, and
 fluid mixing. Failed pairs are skipped without mutation. Networks never own a
 hidden reservoir, so the sum of storage quantities is conserved.
 
-Snapshot version 9 stores pipe entity IDs and positions plus the existing
+Snapshot version 10 stores pipe entity IDs and positions plus the existing
 storage state. Ports and network state are reconstructed before the loaded
 simulation is returned, preserving continuation determinism.
 

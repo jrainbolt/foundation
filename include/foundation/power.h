@@ -70,8 +70,11 @@ typedef struct {
     FactoryPowerTotal total_demand;
     FactoryPowerTotal allocated_power;
     FactoryPowerTotal unused_generation;
+    FactoryPowerTotal accumulator_charge;
+    FactoryPowerTotal accumulator_discharge;
     uint32_t pole_count;
     uint32_t generator_count;
+    uint32_t accumulator_count;
     uint32_t consumer_count;
     uint32_t powered_consumer_count;
     uint32_t unpowered_consumer_count;

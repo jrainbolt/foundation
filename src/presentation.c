@@ -184,6 +184,8 @@ static FactoryResult populate_entity(
         factory_steam_engine_store_find(&simulation->steam_engines, id);
     const FactorySolarGenerator *solar_generator =
         factory_solar_generator_store_find(&simulation->solar_generators, id);
+    const FactoryAccumulator *accumulator =
+        factory_accumulator_store_find(&simulation->accumulators, id);
     FactoryPipeInspection pipe;
     FactoryPowerPoleInspection pole;
     FactoryPowerGeneratorInspection generator;
@@ -349,6 +351,24 @@ static FactoryResult populate_entity(
                     out->data.boiler.output_network_id =
                         simulation->fluid_networks.ports[i].network_id;
             }
+    } else if (accumulator != NULL) {
+        FactoryAccumulatorInspection inspection;
+        out->entity_type = FACTORY_ENTITY_TYPE_ACCUMULATOR;
+        out->x = accumulator->x; out->y = accumulator->y;
+        if (factory_simulation_get_accumulator(
+                simulation, id, &inspection) != FACTORY_RESULT_OK)
+            return FACTORY_RESULT_ENTITY_NOT_FOUND;
+        out->status = inspection.activity == FACTORY_ACCUMULATOR_IDLE
+            ? FACTORY_PRESENTATION_MACHINE_STATUS_IDLE
+            : FACTORY_PRESENTATION_MACHINE_STATUS_WORKING;
+        out->data.accumulator = (FactoryPresentationAccumulator){
+            inspection.stored_energy, inspection.capacity,
+            inspection.maximum_charge_rate,
+            inspection.maximum_discharge_rate,
+            inspection.charged_last_tick,
+            inspection.discharged_last_tick,
+            inspection.activity, inspection.network_id,
+            inspection.connected};
     } else if (solar_generator != NULL) {
         FactorySolarGeneratorInspection machine;
         FactoryPowerGeneratorInspection power_generator;

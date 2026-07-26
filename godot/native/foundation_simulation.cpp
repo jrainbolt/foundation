@@ -66,6 +66,9 @@ FactoryCommand place(
     case FACTORY_COMMAND_PLACE_SOLAR_GENERATOR:
         command.data.place_solar_generator = {x, y};
         break;
+    case FACTORY_COMMAND_PLACE_ACCUMULATOR:
+        command.data.place_accumulator = {x, y};
+        break;
     default:
         break;
     }
@@ -351,6 +354,16 @@ FactoryResult FoundationSimulation::build_demo()
     if (result != FACTORY_RESULT_OK)
         return result;
     result = submit(place(FACTORY_COMMAND_PLACE_SOLAR_GENERATOR, 11, 0));
+    if (result != FACTORY_RESULT_OK)
+        return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_POWER_POLE, 11, 1));
+    if (result != FACTORY_RESULT_OK)
+        return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_ACCUMULATOR, 10, 0));
+    if (result != FACTORY_RESULT_OK)
+        return result;
+    result = submit(place(
+        FACTORY_COMMAND_PLACE_INSERTER, 10, 1, FACTORY_DIRECTION_EAST));
     if (result != FACTORY_RESULT_OK)
         return result;
     result = factory_simulation_submit_fluid_insert(
@@ -725,6 +738,31 @@ bool FoundationSimulation::entity_to_dictionary(
         value["generated_last_tick"] =
             (int64_t)entity.data.solar_generator.actual_output;
         value["generation_active"] = entity.data.solar_generator.active;
+        break;
+    case FACTORY_ENTITY_TYPE_ACCUMULATOR:
+        if (!set_unsigned(
+                &value, "stored_energy",
+                entity.data.accumulator.stored_energy,
+                "entity.accumulator.stored_energy"
+            ) || !set_unsigned(
+                &value, "capacity",
+                entity.data.accumulator.capacity,
+                "entity.accumulator.capacity"
+            ))
+            return false;
+        value["maximum_charge_rate"] =
+            (int64_t)entity.data.accumulator.maximum_charge_rate;
+        value["maximum_discharge_rate"] =
+            (int64_t)entity.data.accumulator.maximum_discharge_rate;
+        value["charged_last_tick"] =
+            (int64_t)entity.data.accumulator.charged_last_tick;
+        value["discharged_last_tick"] =
+            (int64_t)entity.data.accumulator.discharged_last_tick;
+        value["accumulator_activity"] =
+            (int64_t)entity.data.accumulator.activity;
+        value["power_network_id"] =
+            (int64_t)entity.data.accumulator.power_network_id;
+        value["connected"] = entity.data.accumulator.connected;
         break;
     default:
         break;

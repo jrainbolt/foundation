@@ -42,7 +42,8 @@ typedef enum {
     FACTORY_COMMAND_PLACE_WATER_EXTRACTOR,
     FACTORY_COMMAND_PLACE_BOILER,
     FACTORY_COMMAND_PLACE_STEAM_ENGINE,
-    FACTORY_COMMAND_PLACE_SOLAR_GENERATOR
+    FACTORY_COMMAND_PLACE_SOLAR_GENERATOR,
+    FACTORY_COMMAND_PLACE_ACCUMULATOR
 } FactoryCommandType;
 
 typedef struct {
@@ -135,6 +136,7 @@ typedef struct {
         struct { int32_t x; int32_t y; } place_boiler;
         struct { int32_t x; int32_t y; } place_steam_engine;
         struct { int32_t x; int32_t y; } place_solar_generator;
+        struct { int32_t x; int32_t y; } place_accumulator;
     } data;
 } FactoryCommand;
 

@@ -53,7 +53,7 @@ without advancing it produces the original bytes.
 There are currently no file wrappers, compression, encryption, save slots,
 autosaving, background I/O, partial loads, or migration from other versions.
 
-Snapshot version 9 includes authoritative power-pole, generator, burner,
+Snapshot version 10 includes authoritative power-pole, generator, burner,
 biomass-storage, slotted fluid-storage, water-extractor, and boiler records,
 steam-engine recipe records, plus queued placement and fluid commands, pipe
 positions, and results. Pole

@@ -56,6 +56,9 @@ bool factory_entity_construction_cost(
         case FACTORY_ENTITY_TYPE_SOLAR_GENERATOR:
             cost = FACTORY_CONSTRUCTION_COST_SOLAR_GENERATOR;
             break;
+        case FACTORY_ENTITY_TYPE_ACCUMULATOR:
+            cost = FACTORY_CONSTRUCTION_COST_ACCUMULATOR;
+            break;
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;

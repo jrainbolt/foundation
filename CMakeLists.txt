@@ -45,6 +45,7 @@ elseif(FOUNDATION_ENABLE_ASAN OR FOUNDATION_ENABLE_UBSAN)
 endif()
 
 add_library(factory_engine
+    src/accumulator.c
     src/assembler.c
     src/assembler_recipe.c
     src/belt.c
@@ -288,4 +289,11 @@ if(BUILD_TESTING)
     )
     target_link_libraries(factory_solar_tests PRIVATE factory_engine)
     add_test(NAME factory_solar_tests COMMAND factory_solar_tests)
+
+    add_executable(factory_accumulator_tests tests/test_accumulator.c)
+    target_include_directories(
+        factory_accumulator_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(factory_accumulator_tests PRIVATE factory_engine)
+    add_test(NAME factory_accumulator_tests COMMAND factory_accumulator_tests)
 endif()

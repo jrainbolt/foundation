@@ -79,6 +79,11 @@ tick derives day and time-of-day, and solar generators query its reusable
 piecewise-linear intensity curve through the same generic power-source
 availability boundary used by burner and steam generation.
 
+Accumulators are electrical nodes in that same derived topology. Ordinary
+generation retains priority; a second indivisible-consumer pass draws explicit
+stored energy, and a final pass charges from ordinary generation that would
+otherwise remain unused. Both accumulator passes use ascending stable IDs.
+
 The simulation also owns a transient event batch. Tick preflight reserves its
 worst-case capacity before mutation, after which authoritative commit points
 append fully initialized facts without allocation or callbacks. No subsystem

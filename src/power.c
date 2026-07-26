@@ -103,6 +103,7 @@ void factory_power_state_destroy(FactoryPowerState *state)
     if (state == NULL) return;
     free(state->poles);
     free(state->generators);
+    free(state->accumulators);
     free(state->consumers);
     free(state->connections);
     free(state->networks);
@@ -139,6 +140,13 @@ static int compare_consumers(const void *a, const void *b)
 {
     const FactoryPowerConsumerInspection *x = a;
     const FactoryPowerConsumerInspection *y = b;
+    return x->entity_id < y->entity_id ? -1 : x->entity_id > y->entity_id;
+}
+
+static int compare_accumulators(const void *a, const void *b)
+{
+    const FactoryPowerAccumulatorInspection *x = a;
+    const FactoryPowerAccumulatorInspection *y = b;
     return x->entity_id < y->entity_id ? -1 : x->entity_id > y->entity_id;
 }
 
@@ -244,7 +252,9 @@ void factory_power_consume_generation(FactorySimulation *simulation)
         network_index < simulation->power.network_count;
         ++network_index) {
         FactoryPowerTotal remaining =
-            simulation->power.networks[network_index].allocated_power;
+            simulation->power.networks[network_index].allocated_power
+            - simulation->power.networks[network_index].accumulator_discharge
+            + simulation->power.networks[network_index].accumulator_charge;
         size_t generator_index;
         for (generator_index = 0U;
             generator_index < simulation->power.generator_count
@@ -299,6 +309,7 @@ FactoryResult factory_power_rebuild(
 
     next.pole_count = simulation->power_poles.count;
     next.generator_count = simulation->power_generators.count;
+    next.accumulator_count = simulation->accumulators.count;
     next.consumer_count = consumers;
     if ((next.pole_count != 0U
             && (next.poles = calloc(next.pole_count, sizeof(*next.poles)))
@@ -306,6 +317,9 @@ FactoryResult factory_power_rebuild(
         || (next.generator_count != 0U
             && (next.generators = calloc(
                 next.generator_count, sizeof(*next.generators))) == NULL)
+        || (next.accumulator_count != 0U
+            && (next.accumulators = calloc(
+                next.accumulator_count, sizeof(*next.accumulators))) == NULL)
         || (consumers != 0U
             && (next.consumers = calloc(
                 consumers, sizeof(*next.consumers))) == NULL)) {
@@ -404,6 +418,27 @@ FactoryResult factory_power_rebuild(
             0U, FACTORY_POWER_NETWORK_NONE, false
         };
     }
+    for (i = 0U; i < next.accumulator_count; ++i) {
+        const FactoryAccumulator *a = &simulation->accumulators.items[i];
+        next.accumulators[i] = (FactoryPowerAccumulatorInspection){
+            a->entity_id, 0U, FACTORY_POWER_NETWORK_NONE, false};
+    }
+    if (next.accumulator_count > 1U)
+        qsort(next.accumulators, next.accumulator_count,
+              sizeof(*next.accumulators), compare_accumulators);
+    for (i = 0U; i < next.accumulator_count; ++i) {
+        FactoryPowerAccumulatorInspection *a = &next.accumulators[i];
+        const FactoryAccumulator *component =
+            factory_accumulator_store_find(
+                &simulation->accumulators, a->entity_id);
+        FactoryPowerNetworkInspection *network;
+        a->attached_pole_id =
+            attachment(&next, component->x, component->y);
+        a->network_id = pole_network(&next, a->attached_pole_id);
+        a->connected = a->attached_pole_id != 0U;
+        network = network_for(&next, a->network_id);
+        if (network != NULL) ++network->accumulator_count;
+    }
     if (next.generator_count > 1U) {
         qsort(
             next.generators, next.generator_count,
@@ -483,14 +518,109 @@ FactoryResult factory_power_rebuild(
             c->powered = true;
             network->allocated_power += c->demand;
             ++network->powered_consumer_count;
-        } else if (network != NULL) {
-            ++network->unpowered_consumer_count;
         }
     }
-    for (i = 0U; i < next.network_count; ++i)
-        next.networks[i].unused_generation =
-            next.networks[i].total_generation
-            - next.networks[i].allocated_power;
+    if (emit_transitions) for (i = 0U; i < consumers; ++i) {
+        FactoryPowerConsumerInspection *c = &next.consumers[i];
+        FactoryPowerNetworkInspection *network =
+            network_for(&next, c->network_id);
+        FactoryPowerTotal usable = 0U;
+        FactoryPowerUnits needed;
+        if (network == NULL || c->powered) continue;
+        needed = c->demand;
+        for (j = 0U; j < next.accumulator_count && usable < needed; ++j) {
+            FactoryPowerAccumulatorInspection *inspection =
+                &next.accumulators[j];
+            FactoryAccumulator *a;
+            FactoryPowerUnits available;
+            if (inspection->network_id != c->network_id) continue;
+            a = factory_accumulator_store_find_mutable(
+                &simulation->accumulators, inspection->entity_id);
+            if (a == NULL || a->charged_last_tick != 0U) continue;
+            available = FACTORY_ACCUMULATOR_MAX_DISCHARGE_RATE
+                - a->discharged_last_tick;
+            if (a->stored_energy < available)
+                available = (FactoryPowerUnits)a->stored_energy;
+            usable += available;
+        }
+        if (usable < needed) continue;
+        for (j = 0U; j < next.accumulator_count && needed != 0U; ++j) {
+            FactoryPowerAccumulatorInspection *inspection =
+                &next.accumulators[j];
+            FactoryAccumulator *a;
+            FactoryPowerUnits amount;
+            if (inspection->network_id != c->network_id) continue;
+            a = factory_accumulator_store_find_mutable(
+                &simulation->accumulators, inspection->entity_id);
+            if (a == NULL || a->charged_last_tick != 0U) continue;
+            amount = FACTORY_ACCUMULATOR_MAX_DISCHARGE_RATE
+                - a->discharged_last_tick;
+            if (a->stored_energy < amount)
+                amount = (FactoryPowerUnits)a->stored_energy;
+            if (amount > needed) amount = needed;
+            a->stored_energy -= amount;
+            a->discharged_last_tick += amount;
+            needed -= amount;
+            network->accumulator_discharge += amount;
+        }
+        c->powered = true;
+        network->allocated_power += c->demand;
+        ++network->powered_consumer_count;
+    }
+    for (i = 0U; i < next.consumer_count; ++i) {
+        FactoryPowerConsumerInspection *c = &next.consumers[i];
+        FactoryPowerNetworkInspection *network =
+            network_for(&next, c->network_id);
+        if (network != NULL && !c->powered)
+            ++network->unpowered_consumer_count;
+    }
+    for (i = 0U; i < next.network_count; ++i) {
+        FactoryPowerNetworkInspection *network = &next.networks[i];
+        FactoryPowerTotal ordinary_delivered =
+            network->allocated_power - network->accumulator_discharge;
+        FactoryPowerTotal remaining =
+            network->total_generation - ordinary_delivered;
+        if (emit_transitions) for (
+            j = 0U; j < next.accumulator_count && remaining != 0U; ++j
+        ) {
+            FactoryPowerAccumulatorInspection *inspection =
+                &next.accumulators[j];
+            FactoryAccumulator *a;
+            FactoryElectricalEnergy capacity;
+            FactoryPowerUnits amount;
+            if (inspection->network_id != network->network_id) continue;
+            a = factory_accumulator_store_find_mutable(
+                &simulation->accumulators, inspection->entity_id);
+            if (a == NULL || a->discharged_last_tick != 0U) continue;
+            capacity = FACTORY_ACCUMULATOR_CAPACITY - a->stored_energy;
+            amount = FACTORY_ACCUMULATOR_MAX_CHARGE_RATE;
+            if (capacity < amount) amount = (FactoryPowerUnits)capacity;
+            if (remaining < amount) amount = (FactoryPowerUnits)remaining;
+            a->stored_energy += amount;
+            a->charged_last_tick += amount;
+            remaining -= amount;
+            network->accumulator_charge += amount;
+        }
+        network->unused_generation = remaining;
+    }
+    if (emit_transitions) {
+        for (i = 0U; i < next.accumulator_count; ++i) {
+            FactoryAccumulator *a = factory_accumulator_store_find_mutable(
+                &simulation->accumulators, next.accumulators[i].entity_id);
+            if (a->charged_last_tick != 0U)
+                factory_simulation_emit_event(simulation, (FactoryEvent){
+                    .type = FACTORY_EVENT_ACCUMULATOR_CHARGED,
+                    .entity_id = a->entity_id,
+                    .quantity = a->charged_last_tick,
+                    .related_quantity = (uint32_t)a->stored_energy});
+            else if (a->discharged_last_tick != 0U)
+                factory_simulation_emit_event(simulation, (FactoryEvent){
+                    .type = FACTORY_EVENT_ACCUMULATOR_DISCHARGED,
+                    .entity_id = a->entity_id,
+                    .quantity = a->discharged_last_tick,
+                    .related_quantity = (uint32_t)a->stored_energy});
+        }
+    }
     if (emit_transitions) {
         for (i = 0U; i < next.consumer_count; ++i) {
             const FactoryPowerConsumerInspection *current =

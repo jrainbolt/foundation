@@ -106,6 +106,7 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     factory_boiler_store_destroy(&simulation->boilers);
     factory_steam_engine_store_destroy(&simulation->steam_engines);
     factory_solar_generator_store_destroy(&simulation->solar_generators);
+    factory_accumulator_store_destroy(&simulation->accumulators);
     factory_burner_store_destroy(&simulation->burners);
     factory_power_state_destroy(&simulation->power);
     factory_power_generator_store_destroy(&simulation->power_generators);
@@ -506,6 +507,22 @@ static FactoryResult place_solar_generator(
     return FACTORY_RESULT_OK;
 }
 
+static FactoryResult place_accumulator(
+    FactorySimulation *s, const FactoryCommand *command, FactoryEntityId *out_id
+)
+{
+    int32_t x = command->data.place_accumulator.x;
+    int32_t y = command->data.place_accumulator.y;
+    FactoryResult result = validate_empty_tile(s, x, y);
+    if (result != FACTORY_RESULT_OK) return result;
+    if (!factory_accumulator_store_reserve_one(&s->accumulators))
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    result = occupy_with_entity(s, x, y, out_id);
+    if (result != FACTORY_RESULT_OK) return result;
+    factory_accumulator_store_add(&s->accumulators, *out_id, x, y);
+    return FACTORY_RESULT_OK;
+}
+
 static FactoryResult place_refinery(
     FactorySimulation *simulation,
     const FactoryCommand *command,
@@ -702,6 +719,8 @@ static FactoryResult validate_demolition(
         factory_steam_engine_store_find(&simulation->steam_engines, id);
     const FactorySolarGenerator *solar_generator =
         factory_solar_generator_store_find(&simulation->solar_generators, id);
+    const FactoryAccumulator *accumulator =
+        factory_accumulator_store_find(&simulation->accumulators, id);
     const FactoryTile *tile;
 
     if (id == 0U) {
@@ -786,6 +805,10 @@ static FactoryResult validate_demolition(
         *out_type = FACTORY_ENTITY_TYPE_POWER_POLE;
         *out_x = power_pole->x;
         *out_y = power_pole->y;
+    } else if (accumulator != NULL) {
+        *out_type = FACTORY_ENTITY_TYPE_ACCUMULATOR;
+        *out_x = accumulator->x;
+        *out_y = accumulator->y;
     } else if (solar_generator != NULL) {
         if (power_generator == NULL)
             return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
@@ -946,6 +969,9 @@ static bool remove_subsystem_record(
                 return false;
             return factory_solar_generator_store_remove(
                 &simulation->solar_generators, id);
+        case FACTORY_ENTITY_TYPE_ACCUMULATOR:
+            return factory_accumulator_store_remove(
+                &simulation->accumulators, id);
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;
@@ -1042,6 +1068,9 @@ static bool placement_type(
             return true;
         case FACTORY_COMMAND_PLACE_SOLAR_GENERATOR:
             *out_type = FACTORY_ENTITY_TYPE_SOLAR_GENERATOR;
+            return true;
+        case FACTORY_COMMAND_PLACE_ACCUMULATOR:
+            *out_type = FACTORY_ENTITY_TYPE_ACCUMULATOR;
             return true;
         default:
             return false;
@@ -1370,6 +1399,10 @@ static void apply_commands(FactorySimulation *simulation)
                 break;
             case FACTORY_COMMAND_PLACE_SOLAR_GENERATOR:
                 result->result = place_solar_generator(
+                    simulation, &result->command, &result->entity_id);
+                break;
+            case FACTORY_COMMAND_PLACE_ACCUMULATOR:
+                result->result = place_accumulator(
                     simulation, &result->command, &result->entity_id);
                 break;
             case FACTORY_COMMAND_FLUID_INSERT:
@@ -2290,6 +2323,7 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     factory_fluid_machines_update(simulation);
     factory_steam_engine_begin_tick(simulation);
     factory_solar_generator_begin_tick(simulation);
+    factory_accumulator_begin_tick(simulation);
     (void)factory_power_rebuild(simulation, true);
     factory_power_consume_generation(simulation);
     factory_burner_store_finish_tick(&simulation->burners, simulation);

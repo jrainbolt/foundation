@@ -161,6 +161,18 @@ typedef struct {
 } FactoryPresentationSolarGenerator;
 
 typedef struct {
+    FactoryElectricalEnergy stored_energy;
+    FactoryElectricalEnergy capacity;
+    FactoryPowerUnits maximum_charge_rate;
+    FactoryPowerUnits maximum_discharge_rate;
+    FactoryPowerUnits charged_last_tick;
+    FactoryPowerUnits discharged_last_tick;
+    FactoryAccumulatorActivity activity;
+    FactoryPowerNetworkId power_network_id;
+    bool connected;
+} FactoryPresentationAccumulator;
+
+typedef struct {
     FactoryEntityId entity_id;
     FactoryEntityType entity_type;
     int32_t x;
@@ -184,6 +196,7 @@ typedef struct {
         FactoryPresentationBoiler boiler;
         FactoryPresentationSteamEngine steam_engine;
         FactoryPresentationSolarGenerator solar_generator;
+        FactoryPresentationAccumulator accumulator;
     } data;
 } FactoryPresentationEntity;
 
