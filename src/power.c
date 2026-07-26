@@ -255,7 +255,9 @@ FactoryResult factory_power_rebuild(FactorySimulation *simulation)
             p->entity_id, 0U
         };
     }
-    qsort(next.poles, next.pole_count, sizeof(*next.poles), compare_poles);
+    if (next.pole_count > 1U) {
+        qsort(next.poles, next.pole_count, sizeof(*next.poles), compare_poles);
+    }
     if (next.pole_count > 1U) {
         size_t maximum;
         if (next.pole_count > SIZE_MAX / (next.pole_count - 1U)) {
@@ -336,10 +338,12 @@ FactoryResult factory_power_rebuild(FactorySimulation *simulation)
             0U, FACTORY_POWER_NETWORK_NONE, false
         };
     }
-    qsort(
-        next.generators, next.generator_count,
-        sizeof(*next.generators), compare_generators
-    );
+    if (next.generator_count > 1U) {
+        qsort(
+            next.generators, next.generator_count,
+            sizeof(*next.generators), compare_generators
+        );
+    }
     for (i = 0U; i < next.generator_count; ++i) {
         FactoryPowerGeneratorInspection *g = &next.generators[i];
         FactoryPowerNetworkInspection *network;
@@ -378,7 +382,12 @@ FactoryResult factory_power_rebuild(FactorySimulation *simulation)
         add_consumer(&next.consumers[i++],
             simulation->inserters.items[j].entity_id,
             FACTORY_POWER_DEMAND_INSERTER);
-    qsort(next.consumers, consumers, sizeof(*next.consumers), compare_consumers);
+    if (consumers > 1U) {
+        qsort(
+            next.consumers, consumers,
+            sizeof(*next.consumers), compare_consumers
+        );
+    }
     for (i = 0U; i < consumers; ++i) {
         FactoryPowerConsumerInspection *c = &next.consumers[i];
         FactoryPowerNetworkInspection *network;
