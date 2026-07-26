@@ -62,3 +62,8 @@ Counted assembler output still transfers one item per successful commit.
 Storage inventory is not a logistics source. Its subsystem moves one configured
 item into a bounded output endpoint, after which inserters use the ordinary
 transactional transfer and contention rules. Belts cannot extract from storage.
+
+All persistent ownership locations and fairness state are serialized:
+machine buffers, belt progress, splitter next-output choice, inserter state and
+held item, storage inventory, and storage output. Transfer intents are
+tick-local and are rebuilt because none survive a completed update.

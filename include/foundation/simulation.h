@@ -44,6 +44,10 @@ FactoryResult factory_simulation_submit_command(
 /* Applies queued commands FIFO, updates extractors, then increments the tick. */
 void factory_simulation_tick(FactorySimulation *simulation);
 uint64_t factory_simulation_get_tick(const FactorySimulation *simulation);
+/* Returns the borrowed, read-only world used by the simulation. */
+const FactoryWorld *factory_simulation_get_world(
+    const FactorySimulation *simulation
+);
 size_t factory_simulation_get_pending_command_count(
     const FactorySimulation *simulation
 );

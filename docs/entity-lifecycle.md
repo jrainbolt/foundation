@@ -23,3 +23,8 @@ copy records to caller-owned values.
 Changing or clearing an assembler recipe leaves its entity ID, orientation,
 tile occupancy, and construction accounting unchanged. It is permitted only
 when empty and idle, preventing existing material from being reinterpreted.
+
+Snapshots preserve live IDs, their internal order, tombstone effects through
+the monotonic next ID, subsystem membership, and tile occupancy. Loading never
+renumbers entities; the next placement receives the same ID as uninterrupted
+execution.

@@ -1,14 +1,8 @@
 #include "foundation/entity.h"
+#include "entity_internal.h"
 
 #include <stddef.h>
 #include <stdlib.h>
-
-struct FactoryEntityManager {
-    FactoryEntityId next_id;
-    FactoryEntityId *live_ids;
-    size_t count;
-    size_t capacity;
-};
 
 FactoryEntityManager *factory_entity_manager_create(void)
 {

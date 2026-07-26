@@ -59,6 +59,7 @@ add_library(factory_engine
     src/recipe.c
     src/refinery.c
     src/simulation.c
+    src/snapshot.c
     src/splitter.c
     src/storage.c
     src/world.c
@@ -196,4 +197,13 @@ if(BUILD_TESTING)
     add_executable(factory_simulation_tests tests/test_simulation.c)
     target_link_libraries(factory_simulation_tests PRIVATE factory_engine)
     add_test(NAME factory_simulation_tests COMMAND factory_simulation_tests)
+
+    add_executable(factory_snapshot_tests tests/test_snapshot.c)
+    target_include_directories(
+        factory_snapshot_tests
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(factory_snapshot_tests PRIVATE factory_engine)
+    add_test(NAME factory_snapshot_tests COMMAND factory_snapshot_tests)
 endif()

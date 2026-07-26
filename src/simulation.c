@@ -87,6 +87,7 @@ FactorySimulation *factory_simulation_create_with_construction_units(
         return NULL;
     }
     simulation->world = world;
+    simulation->owns_world = false;
     simulation->construction_inventory.units = construction_units;
     return simulation;
 }
@@ -104,6 +105,9 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     factory_refinery_store_destroy(&simulation->refineries);
     factory_extractor_store_destroy(&simulation->extractors);
     factory_entity_manager_destroy(simulation->entities);
+    if (simulation->owns_world) {
+        factory_world_destroy(simulation->world);
+    }
     free(simulation);
 }
 
@@ -1700,6 +1704,13 @@ void factory_simulation_tick(FactorySimulation *simulation)
 uint64_t factory_simulation_get_tick(const FactorySimulation *simulation)
 {
     return simulation == NULL ? 0U : simulation->tick;
+}
+
+const FactoryWorld *factory_simulation_get_world(
+    const FactorySimulation *simulation
+)
+{
+    return simulation == NULL ? NULL : simulation->world;
 }
 
 size_t factory_simulation_get_pending_command_count(

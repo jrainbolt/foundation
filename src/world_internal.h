@@ -3,6 +3,12 @@
 
 #include <foundation/world.h>
 
+struct FactoryWorld {
+    uint32_t width;
+    uint32_t height;
+    FactoryTile *tiles;
+};
+
 FactoryResult factory_world_set_occupying_entity(
     FactoryWorld *world,
     int32_t x,

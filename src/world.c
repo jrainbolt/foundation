@@ -1,13 +1,8 @@
 #include <foundation/world.h>
+#include "world_internal.h"
 
 #include <stdint.h>
 #include <stdlib.h>
-
-struct FactoryWorld {
-    uint32_t width;
-    uint32_t height;
-    FactoryTile *tiles;
-};
 
 static size_t factory_world_index(
     const FactoryWorld *world,

@@ -60,3 +60,8 @@ generic logical slots whose item and capacity derive from the selected recipe.
 Storage keeps inventory ownership separate from its one-item output buffer.
 The storage subsystem performs the inventory-to-buffer transition; the endpoint
 layer exposes only that buffer to inserters.
+
+The snapshot module depends on simulation internals but subsystems do not depend
+on serialization. Its central explicit encoder/decoder rebuilds pointer-backed
+arrays in a temporary simulation, then runs cross-subsystem validation before
+publishing the result.

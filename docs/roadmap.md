@@ -16,6 +16,8 @@
 - [x] Fixed assembler recipes and safe FIFO recipe selection
 - [x] Counted generic assembler inputs and multi-item output
 - [x] Configurable one-item storage output for inserters
+- [x] Canonical versioned binary snapshots and deterministic continuation
 - [ ] Inserter variants, filters, and longer arms
 
-The recommended next milestone is versioned deterministic save/load snapshots.
+The next milestone can build on snapshots with explicit replay or tooling
+features without changing simulation determinism.

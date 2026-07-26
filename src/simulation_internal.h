@@ -11,10 +11,13 @@
 #include "splitter_internal.h"
 #include "storage_internal.h"
 #include "construction_inventory_internal.h"
+#include "entity_internal.h"
+#include "world_internal.h"
 
 struct FactorySimulation {
     uint64_t tick;
     FactoryWorld *world;
+    bool owns_world;
     FactoryEntityManager *entities;
     FactoryExtractorStore extractors;
     FactoryRefineryStore refineries;

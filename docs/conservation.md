@@ -23,3 +23,8 @@ and these item helpers, preventing a second recipe-accounting table.
 Storage inventory and its output buffer are separate ownership locations. When
 storage fills the buffer it decrements exactly one inventory count, preserving
 the scaled total before any later inserter pickup.
+
+Snapshot loading validates every count and canonical ownership state before the
+simulation is returned. The format does not store separate authoritative
+conservation totals; totals remain derived from the restored world and item
+ownership using the existing integer-scaled helpers.

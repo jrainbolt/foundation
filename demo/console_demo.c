@@ -1,4 +1,5 @@
 #include "foundation/simulation.h"
+#include "foundation/snapshot.h"
 
 #include <inttypes.h>
 #include <stdio.h>
@@ -133,6 +134,82 @@ static void storage_output_demo(void)
     );
 
     factory_simulation_destroy(simulation);
+    factory_world_destroy(world);
+}
+
+static void snapshot_demo(void)
+{
+    FactoryWorld *world = factory_world_create(2U, 1U);
+    FactorySimulation *original;
+    FactorySimulation *loaded = NULL;
+    FactorySimulation *rejected = NULL;
+    FactorySnapshotBuffer snapshot = {0};
+    uint8_t saved_magic;
+    FactoryResult corrupt_result;
+
+    if (world == NULL) {
+        return;
+    }
+    original = factory_simulation_create_with_construction_units(world, 50U);
+    if (original == NULL) {
+        factory_world_destroy(world);
+        return;
+    }
+    submit(original, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_BELT,
+        {.place_belt = {0, 0, FACTORY_DIRECTION_EAST}}
+    });
+    factory_simulation_tick(original);
+    for (uint32_t tick = 0U; tick < 4U; ++tick) {
+        factory_simulation_tick(original);
+    }
+    if (factory_simulation_create_snapshot(original, &snapshot)
+            != FACTORY_RESULT_OK
+        || factory_simulation_load_snapshot(
+            snapshot.data, snapshot.size, &loaded
+        ) != FACTORY_RESULT_OK) {
+        factory_snapshot_buffer_destroy(&snapshot);
+        factory_simulation_destroy(original);
+        factory_world_destroy(world);
+        return;
+    }
+    (void)printf(
+        "\nSnapshot v%u: %zu bytes at tick %" PRIu64
+        ", loaded entities=%zu\n",
+        FACTORY_SNAPSHOT_VERSION,
+        snapshot.size,
+        factory_simulation_get_tick(loaded),
+        factory_simulation_get_entity_count(loaded)
+    );
+    for (uint32_t tick = 0U; tick < 10U; ++tick) {
+        factory_simulation_tick(original);
+        factory_simulation_tick(loaded);
+    }
+    (void)printf(
+        "Continuation ticks: original=%" PRIu64 ", loaded=%" PRIu64
+        " (%s)\n",
+        factory_simulation_get_tick(original),
+        factory_simulation_get_tick(loaded),
+        factory_simulation_get_tick(original)
+                == factory_simulation_get_tick(loaded)
+            ? "identical" : "different"
+    );
+    saved_magic = snapshot.data[0];
+    snapshot.data[0] ^= 0xffU;
+    corrupt_result = factory_simulation_load_snapshot(
+        snapshot.data, snapshot.size, &rejected
+    );
+    snapshot.data[0] = saved_magic;
+    (void)printf(
+        "Corrupted magic rejected=%s (result %u)\n",
+        corrupt_result == FACTORY_RESULT_SNAPSHOT_INVALID_MAGIC
+            && rejected == NULL ? "yes" : "no",
+        (unsigned)corrupt_result
+    );
+
+    factory_snapshot_buffer_destroy(&snapshot);
+    factory_simulation_destroy(loaded);
+    factory_simulation_destroy(original);
     factory_world_destroy(world);
 }
 
@@ -275,5 +352,6 @@ int main(void)
     factory_simulation_destroy(simulation);
     factory_world_destroy(world);
     storage_output_demo();
+    snapshot_demo();
     return succeeded ? 0 : 1;
 }

@@ -49,3 +49,8 @@ Storage output generation occurs after assembler processing and before inserter
 updates. A newly filled buffer may make an idle inserter enter `PICKING_UP`, but
 ownership transfers only on a later pickup commit. Pickup occurs after storage
 generation, so an emptied buffer refills no earlier than the next tick.
+
+Snapshots may be taken between ticks, including after commands are queued.
+They preserve the tick, FIFO queue, last command results, subsystem iteration
+order, and next entity ID, allowing the loaded simulation to resume at the same
+next command phase.

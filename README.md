@@ -64,3 +64,8 @@ outputs are bounded counted buffers, including the two-wire output. See
 Storage can export one configured item through a deterministic one-item buffer
 for inserter pickup. Inventory remains private and backpressure stops further
 extraction while the buffer is occupied. See `docs/storage-output.md`.
+
+Versioned snapshots preserve the complete world, entity manager, subsystem
+state, queued commands, command results, and future entity allocation in a
+canonical portable binary format. See `docs/save-load.md` and
+`docs/snapshot-format.md`.
