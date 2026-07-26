@@ -1,4 +1,4 @@
-# Snapshot format version 4
+# Snapshot format version 6
 
 Foundation snapshots are canonical little-endian binary files. Every value is
 written field-by-field; no C structure, pointer, enum representation, padding,
@@ -9,12 +9,12 @@ timestamp, or process-specific value enters the format.
 | Offset | Width | Field |
 |---:|---:|---|
 | 0 | 8 | Magic bytes `FOUNDATN` |
-| 8 | 4 | Version (`4`) |
+| 8 | 4 | Version (`6`) |
 | 12 | 4 | Header size (`48`) |
 | 16 | 8 | Total snapshot size |
 | 24 | 8 | Payload size |
 | 32 | 8 | Simulation tick |
-| 40 | 4 | Section count (`14`) |
+| 40 | 4 | Section count (`16`) |
 | 44 | 4 | Reserved zero |
 
 Unsigned and signed integers use 32-bit or 64-bit two's-complement
@@ -32,7 +32,7 @@ Each section starts with four 32-bit fields:
 | Record count | Number of fixed-width records |
 | Payload size | Bytes following the section header |
 
-Version 4 requires each section exactly once in this order:
+Version 6 requires each section exactly once in this order:
 
 | Type | Section | Record width |
 |---:|---|---:|
@@ -48,8 +48,10 @@ Version 4 requires each section exactly once in this order:
 | 10 | Storage | 60 |
 | 11 | Power poles | 12 |
 | 12 | Basic generators and burners | 44 |
-| 13 | Pending commands | 24 |
-| 14 | Command results | 68 |
+| 13 | Fluid storages | 28 |
+| 14 | Pipes | 12 |
+| 15 | Pending commands | 24 |
+| 16 | Command results | 68 |
 
 Unknown, reordered, duplicated, missing, incorrectly sized, or unsupported
 sections are rejected. Exact full-buffer consumption is required.
@@ -72,6 +74,13 @@ release position. Power edges, network membership,
 attachments, and allocation are not serialized;
 they are rebuilt from pole and generator positions after loading.
 
-Version 4 has no compression, encryption, checksum, optional sections, or
+Fluid-storage records contain owner, grid position, accepted class mask, fluid
+type, quantity, and capacity. Empty storage is canonically `NONE` with zero
+quantity; non-empty storage must reference a valid compatible definition.
+
+Pipe records contain authoritative entity ID and grid position. Connection
+masks, ports, networks, and network IDs are deterministically reconstructed.
+
+Version 6 has no compression, encryption, checksum, optional sections, or
 migration decoder. A future incompatible change must introduce a deliberate
 new-version decoder or compatibility policy.

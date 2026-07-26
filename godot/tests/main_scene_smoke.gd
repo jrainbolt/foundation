@@ -22,8 +22,33 @@ func _run() -> void:
 		return
 	var initial_tick := int(main.simulation.get_tick())
 	var canvas: Node = main.canvas
-	if initial_tick != 2 or canvas.entity_nodes.size() != 26:
+	if initial_tick != 2 or canvas.entity_nodes.size() != 28:
 		_fail("deterministic demo or entity visuals are incorrect")
+		return
+	var tank_count := 0
+	for entity_id: int in canvas.entity_nodes:
+		var visual: FoundationEntityVisual = canvas.entity_nodes[entity_id]
+		if int(visual.state.get("type", 0)) == 10:
+			tank_count += 1
+			if int(visual.state.get("fluid_type", 0)) != 1 \
+					or int(visual.state.get("fluid_quantity", 0)) != 2500 \
+					or int(visual.state.get("fluid_capacity", 0)) != 10000:
+				_fail("fluid tank visual has incorrect presentation fields")
+				return
+	if tank_count != 1:
+		_fail("main scene did not receive exactly one fluid tank")
+		return
+	var pipe_count := 0
+	for entity_id: int in canvas.entity_nodes:
+		var visual: FoundationEntityVisual = canvas.entity_nodes[entity_id]
+		if int(visual.state.get("type", 0)) == 11:
+			pipe_count += 1
+			if int(visual.state.get("connection_mask", 0)) != 2 \
+					or int(visual.state.get("network_id", 0)) == 0:
+				_fail("pipe visual has incorrect network fields")
+				return
+	if pipe_count != 1:
+		_fail("main scene did not receive exactly one pipe")
 		return
 	if canvas.resources.size() != 2 or canvas.edges.is_empty():
 		_fail("resource or power-edge visuals are missing")
@@ -57,7 +82,7 @@ func _run() -> void:
 	if int(main.simulation.get_tick()) != initial_tick:
 		_fail("reset did not restore initial tick")
 		return
-	if canvas.entity_nodes.size() != 26 or canvas.resources.size() != 2:
+	if canvas.entity_nodes.size() != 28 or canvas.resources.size() != 2:
 		_fail("reset did not restore deterministic visuals")
 		return
 

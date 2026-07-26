@@ -48,6 +48,12 @@ FactoryCommand place(
     case FACTORY_COMMAND_PLACE_POWER_GENERATOR:
         command.data.place_power_generator = {x, y};
         break;
+    case FACTORY_COMMAND_PLACE_FLUID_TANK:
+        command.data.place_fluid_tank = {x, y};
+        break;
+    case FACTORY_COMMAND_PLACE_PIPE:
+        command.data.place_pipe = {x, y};
+        break;
     default:
         break;
     }
@@ -103,6 +109,13 @@ const char *result_name_c(FactoryResult result)
     case FACTORY_RESULT_POWER_NETWORK_NOT_FOUND:
         return "power network not found";
     case FACTORY_RESULT_POWER_OVERFLOW: return "power overflow";
+    case FACTORY_RESULT_FLUID_INCOMPATIBLE: return "fluid incompatible";
+    case FACTORY_RESULT_FLUID_MISMATCH: return "fluid mismatch";
+    case FACTORY_RESULT_FLUID_CAPACITY_EXCEEDED:
+        return "fluid capacity exceeded";
+    case FACTORY_RESULT_INSUFFICIENT_FLUID: return "insufficient fluid";
+    case FACTORY_RESULT_FLUID_NETWORK_NOT_FOUND:
+        return "fluid network not found";
     }
     return "unknown result";
 }
@@ -115,6 +128,24 @@ void FoundationSimulation::_bind_methods()
     ClassDB::bind_method(D_METHOD("step"), &FoundationSimulation::step);
     ClassDB::bind_method(
         D_METHOD("step_many", "count"), &FoundationSimulation::step_many
+    );
+    ClassDB::bind_method(
+        D_METHOD("place_fluid_tank", "x", "y"),
+        &FoundationSimulation::place_fluid_tank
+    );
+    ClassDB::bind_method(
+        D_METHOD("insert_fluid", "destination_entity_id", "fluid_type",
+            "quantity"),
+        &FoundationSimulation::insert_fluid
+    );
+    ClassDB::bind_method(
+        D_METHOD("remove_fluid", "source_entity_id", "quantity"),
+        &FoundationSimulation::remove_fluid
+    );
+    ClassDB::bind_method(
+        D_METHOD("transfer_fluid", "source_entity_id",
+            "destination_entity_id", "quantity"),
+        &FoundationSimulation::transfer_fluid
     );
     ClassDB::bind_method(D_METHOD("get_tick"), &FoundationSimulation::get_tick);
     ClassDB::bind_method(
@@ -233,6 +264,15 @@ FactoryResult FoundationSimulation::build_demo()
     result = factory_simulation_tick(simulation_);
     if (result != FACTORY_RESULT_OK)
         return result;
+    for (size_t index = 0;
+         index < sizeof(placements) / sizeof(placements[0]); ++index) {
+        const FactoryCommandResult *placement =
+            factory_simulation_get_command_result(simulation_, index);
+        if (placement == nullptr)
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        if (placement->result != FACTORY_RESULT_OK)
+            return placement->result;
+    }
 
     const FactoryCommandResult *iron =
         factory_simulation_get_command_result(simulation_, 2U);
@@ -243,7 +283,8 @@ FactoryResult FoundationSimulation::build_demo()
     const FactoryCommandResult *storage =
         factory_simulation_get_command_result(simulation_, 17U);
     if (iron == nullptr || copper == nullptr || assembler == nullptr
-        || storage == nullptr || iron->result != FACTORY_RESULT_OK
+        || storage == nullptr
+        || iron->result != FACTORY_RESULT_OK
         || copper->result != FACTORY_RESULT_OK
         || assembler->result != FACTORY_RESULT_OK
         || storage->result != FACTORY_RESULT_OK)
@@ -272,7 +313,30 @@ FactoryResult FoundationSimulation::build_demo()
         if (result != FACTORY_RESULT_OK)
             return result;
     }
+    result = submit(place(FACTORY_COMMAND_PLACE_FLUID_TANK, 11, 7));
+    if (result != FACTORY_RESULT_OK)
+        return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_PIPE, 10, 7));
+    if (result != FACTORY_RESULT_OK)
+        return result;
+    result = factory_simulation_submit_fluid_insert(
+        simulation_, 27U, FACTORY_FLUID_WATER, 2500U);
+    if (result != FACTORY_RESULT_OK)
+        return result;
     result = factory_simulation_tick(simulation_);
+    if (result != FACTORY_RESULT_OK)
+        return result;
+    const FactoryCommandResult *tank_result =
+        factory_simulation_get_command_result(simulation_, 4U);
+    if (tank_result == nullptr)
+        return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+    if (tank_result->result != FACTORY_RESULT_OK)
+        return tank_result->result;
+    if (tank_result->entity_id != 27U)
+        return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+    FactoryFluidStorageInspection tank_storage = {};
+    result = factory_simulation_get_fluid_storage(
+        simulation_, tank_result->entity_id, &tank_storage);
     if (result != FACTORY_RESULT_OK)
         return result;
     return factory_presentation_snapshot_rebuild(presentation_, simulation_);
@@ -308,6 +372,63 @@ int64_t FoundationSimulation::step_many(int64_t count)
             return result;
     }
     return FACTORY_RESULT_OK;
+}
+
+int64_t FoundationSimulation::place_fluid_tank(int64_t x, int64_t y)
+{
+    if (simulation_ == nullptr || x < INT32_MIN || x > INT32_MAX
+        || y < INT32_MIN || y > INT32_MAX)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command = place(
+        FACTORY_COMMAND_PLACE_FLUID_TANK, (int32_t)x, (int32_t)y);
+    FactoryResult result =
+        factory_simulation_submit_command(simulation_, &command);
+    return result == FACTORY_RESULT_OK ? step() : (int64_t)result;
+}
+
+int64_t FoundationSimulation::insert_fluid(
+    int64_t destination_entity_id, int64_t fluid_type, int64_t quantity
+)
+{
+    if (simulation_ == nullptr || destination_entity_id <= 0
+        || destination_entity_id > UINT32_MAX || fluid_type <= 0
+        || fluid_type > UINT32_MAX || quantity <= 0
+        || quantity > UINT32_MAX)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryResult result = factory_simulation_submit_fluid_insert(
+        simulation_, (FactoryEntityId)destination_entity_id,
+        (FactoryFluidType)fluid_type, (FactoryFluidQuantity)quantity);
+    return result == FACTORY_RESULT_OK ? step() : (int64_t)result;
+}
+
+int64_t FoundationSimulation::remove_fluid(
+    int64_t source_entity_id, int64_t quantity
+)
+{
+    if (simulation_ == nullptr || source_entity_id <= 0
+        || source_entity_id > UINT32_MAX || quantity <= 0
+        || quantity > UINT32_MAX)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryResult result = factory_simulation_submit_fluid_remove(
+        simulation_, (FactoryEntityId)source_entity_id,
+        (FactoryFluidQuantity)quantity);
+    return result == FACTORY_RESULT_OK ? step() : (int64_t)result;
+}
+
+int64_t FoundationSimulation::transfer_fluid(
+    int64_t source_entity_id, int64_t destination_entity_id, int64_t quantity
+)
+{
+    if (simulation_ == nullptr || source_entity_id <= 0
+        || source_entity_id > UINT32_MAX || destination_entity_id <= 0
+        || destination_entity_id > UINT32_MAX || quantity <= 0
+        || quantity > UINT32_MAX)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryResult result = factory_simulation_submit_fluid_transfer(
+        simulation_, (FactoryEntityId)source_entity_id,
+        (FactoryEntityId)destination_entity_id,
+        (FactoryFluidQuantity)quantity);
+    return result == FACTORY_RESULT_OK ? step() : (int64_t)result;
 }
 
 int64_t FoundationSimulation::get_tick() const
@@ -474,6 +595,21 @@ bool FoundationSimulation::entity_to_dictionary(
             ))
             return false;
         break;
+    case FACTORY_ENTITY_TYPE_FLUID_TANK:
+        value["fluid_type"] =
+            (int64_t)entity.data.fluid_storage.fluid_type;
+        value["fluid_quantity"] =
+            (int64_t)entity.data.fluid_storage.quantity;
+        value["fluid_capacity"] =
+            (int64_t)entity.data.fluid_storage.capacity;
+        value["network_id"] =
+            (int64_t)entity.data.fluid_storage.network_id;
+        break;
+    case FACTORY_ENTITY_TYPE_PIPE:
+        value["connection_mask"] =
+            (int64_t)entity.data.pipe.connection_mask;
+        value["network_id"] = (int64_t)entity.data.pipe.network_id;
+        break;
     default:
         break;
     }
@@ -581,6 +717,7 @@ Array FoundationSimulation::get_events() const
             return Array();
         value["entity_type"] = (int64_t)event->entity_type;
         value["item_type"] = (int64_t)event->item_type;
+        value["fluid_type"] = (int64_t)event->fluid_type;
         value["quantity"] = (int64_t)event->quantity;
         values.append(value);
     }

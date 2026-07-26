@@ -98,6 +98,10 @@ void factory_simulation_destroy(FactorySimulation *simulation)
         return;
     }
     factory_event_batch_destroy(&simulation->events);
+    factory_fluid_storage_store_destroy(&simulation->fluid_storages);
+    factory_pipe_store_destroy(&simulation->pipes);
+    factory_fluid_port_store_destroy(&simulation->fluid_ports);
+    factory_fluid_network_state_destroy(&simulation->fluid_networks);
     factory_burner_store_destroy(&simulation->burners);
     factory_power_state_destroy(&simulation->power);
     factory_power_generator_store_destroy(&simulation->power_generators);
@@ -325,6 +329,50 @@ static FactoryResult place_storage(
     return FACTORY_RESULT_OK;
 }
 
+static FactoryResult place_fluid_tank(
+    FactorySimulation *simulation,
+    const FactoryCommand *command,
+    FactoryEntityId *out_id
+)
+{
+    int32_t x = command->data.place_fluid_tank.x;
+    int32_t y = command->data.place_fluid_tank.y;
+    FactoryResult result = validate_empty_tile(simulation, x, y);
+    if (result != FACTORY_RESULT_OK) return result;
+    if (!factory_fluid_storage_store_reserve_one(
+            &simulation->fluid_storages)
+        || !factory_fluid_port_store_reserve_one(&simulation->fluid_ports))
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    result = occupy_with_entity(simulation, x, y, out_id);
+    if (result != FACTORY_RESULT_OK) return result;
+    factory_fluid_storage_store_add(
+        &simulation->fluid_storages, *out_id, x, y,
+        FACTORY_FLUID_CLASS_AQUEOUS, FACTORY_FLUID_TANK_CAPACITY);
+    factory_fluid_port_store_add(
+        &simulation->fluid_ports, *out_id, x, y,
+        FACTORY_FLUID_CLASS_AQUEOUS);
+    simulation->fluid_networks.dirty = true;
+    return FACTORY_RESULT_OK;
+}
+
+static FactoryResult place_pipe(
+    FactorySimulation *simulation, const FactoryCommand *command,
+    FactoryEntityId *out_id
+)
+{
+    int32_t x = command->data.place_pipe.x;
+    int32_t y = command->data.place_pipe.y;
+    FactoryResult result = validate_empty_tile(simulation, x, y);
+    if (result != FACTORY_RESULT_OK) return result;
+    if (!factory_pipe_store_reserve_one(&simulation->pipes))
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    result = occupy_with_entity(simulation, x, y, out_id);
+    if (result != FACTORY_RESULT_OK) return result;
+    factory_pipe_store_add(&simulation->pipes, *out_id, x, y);
+    simulation->fluid_networks.dirty = true;
+    return FACTORY_RESULT_OK;
+}
+
 static FactoryResult place_refinery(
     FactorySimulation *simulation,
     const FactoryCommand *command,
@@ -509,6 +557,10 @@ static FactoryResult validate_demolition(
         factory_power_pole_store_find(&simulation->power_poles, id);
     const FactoryPowerGenerator *power_generator =
         factory_power_generator_store_find(&simulation->power_generators, id);
+    const FactoryFluidStorage *fluid_storage =
+        factory_fluid_storage_store_find(&simulation->fluid_storages, id);
+    const FactoryPipe *pipe =
+        factory_pipe_store_find(&simulation->pipes, id);
     const FactoryTile *tile;
 
     if (id == 0U) {
@@ -605,6 +657,16 @@ static FactoryResult validate_demolition(
         *out_type = FACTORY_ENTITY_TYPE_POWER_GENERATOR;
         *out_x = power_generator->x;
         *out_y = power_generator->y;
+    } else if (fluid_storage != NULL) {
+        if (fluid_storage->quantity != 0U)
+            return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
+        *out_type = FACTORY_ENTITY_TYPE_FLUID_TANK;
+        *out_x = fluid_storage->x;
+        *out_y = fluid_storage->y;
+    } else if (pipe != NULL) {
+        *out_type = FACTORY_ENTITY_TYPE_PIPE;
+        *out_x = pipe->x;
+        *out_y = pipe->y;
     } else {
         return FACTORY_RESULT_UNSUPPORTED_ENTITY;
     }
@@ -645,6 +707,15 @@ static bool remove_subsystem_record(
                 return false;
             return factory_power_generator_store_remove(
                 &simulation->power_generators, id);
+        case FACTORY_ENTITY_TYPE_FLUID_TANK:
+            if (!factory_fluid_port_store_remove(
+                    &simulation->fluid_ports, id)) return false;
+            simulation->fluid_networks.dirty = true;
+            return factory_fluid_storage_store_remove(
+                &simulation->fluid_storages, id);
+        case FACTORY_ENTITY_TYPE_PIPE:
+            simulation->fluid_networks.dirty = true;
+            return factory_pipe_store_remove(&simulation->pipes, id);
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;
@@ -724,6 +795,12 @@ static bool placement_type(
         case FACTORY_COMMAND_PLACE_POWER_GENERATOR:
             *out_type = FACTORY_ENTITY_TYPE_POWER_GENERATOR;
             return true;
+        case FACTORY_COMMAND_PLACE_FLUID_TANK:
+            *out_type = FACTORY_ENTITY_TYPE_FLUID_TANK;
+            return true;
+        case FACTORY_COMMAND_PLACE_PIPE:
+            *out_type = FACTORY_ENTITY_TYPE_PIPE;
+            return true;
         default:
             return false;
     }
@@ -790,6 +867,76 @@ static FactoryResult set_assembler_recipe(
     }
     return factory_assembler_configure_recipe(assembler, recipe_id)
         ? FACTORY_RESULT_OK : FACTORY_RESULT_INVALID_ARGUMENT;
+}
+
+static FactoryResult apply_fluid_command(
+    FactorySimulation *simulation,
+    const FactoryCommand *command,
+    FactoryEntityId *out_entity_id
+)
+{
+    FactoryFluidStorage *source;
+    FactoryFluidStorage *destination;
+    FactoryFluidType fluid_type = FACTORY_FLUID_NONE;
+    FactoryFluidQuantity quantity;
+    FactoryResult result;
+    if (command->type == FACTORY_COMMAND_FLUID_INSERT) {
+        destination = factory_fluid_storage_store_find_mutable(
+            &simulation->fluid_storages,
+            command->data.fluid_insert.destination_entity_id);
+        if (destination == NULL) return FACTORY_RESULT_ENTITY_NOT_FOUND;
+        result = factory_fluid_storage_insert(
+            destination, command->data.fluid_insert.fluid_type,
+            command->data.fluid_insert.quantity);
+        if (result != FACTORY_RESULT_OK) return result;
+        *out_entity_id = destination->owner_entity_id;
+        factory_simulation_emit_event(simulation, (FactoryEvent){
+            .type = FACTORY_EVENT_FLUID_INSERTED,
+            .entity_id = destination->owner_entity_id,
+            .fluid_type = command->data.fluid_insert.fluid_type,
+            .quantity = command->data.fluid_insert.quantity
+        });
+        return FACTORY_RESULT_OK;
+    }
+    if (command->type == FACTORY_COMMAND_FLUID_REMOVE) {
+        source = factory_fluid_storage_store_find_mutable(
+            &simulation->fluid_storages,
+            command->data.fluid_remove.source_entity_id);
+        if (source == NULL) return FACTORY_RESULT_ENTITY_NOT_FOUND;
+        quantity = command->data.fluid_remove.quantity;
+        result = factory_fluid_storage_remove(
+            source, quantity, &fluid_type);
+        if (result != FACTORY_RESULT_OK) return result;
+        *out_entity_id = source->owner_entity_id;
+        factory_simulation_emit_event(simulation, (FactoryEvent){
+            .type = FACTORY_EVENT_FLUID_REMOVED,
+            .entity_id = source->owner_entity_id,
+            .fluid_type = fluid_type,
+            .quantity = quantity
+        });
+        return FACTORY_RESULT_OK;
+    }
+    source = factory_fluid_storage_store_find_mutable(
+        &simulation->fluid_storages,
+        command->data.fluid_transfer.source_entity_id);
+    destination = factory_fluid_storage_store_find_mutable(
+        &simulation->fluid_storages,
+        command->data.fluid_transfer.destination_entity_id);
+    if (source == NULL || destination == NULL)
+        return FACTORY_RESULT_ENTITY_NOT_FOUND;
+    quantity = command->data.fluid_transfer.quantity;
+    result = factory_fluid_storage_transfer(
+        source, destination, quantity, &fluid_type);
+    if (result != FACTORY_RESULT_OK) return result;
+    *out_entity_id = source->owner_entity_id;
+    factory_simulation_emit_event(simulation, (FactoryEvent){
+        .type = FACTORY_EVENT_FLUID_TRANSFERRED,
+        .entity_id = source->owner_entity_id,
+        .related_entity_id = destination->owner_entity_id,
+        .fluid_type = fluid_type,
+        .quantity = quantity
+    });
+    return FACTORY_RESULT_OK;
 }
 
 static FactoryResult set_storage_output(
@@ -958,6 +1105,20 @@ static void apply_commands(FactorySimulation *simulation)
                     true,
                     &result->entity_id
                 );
+                break;
+            case FACTORY_COMMAND_PLACE_FLUID_TANK:
+                result->result = place_fluid_tank(
+                    simulation, &result->command, &result->entity_id);
+                break;
+            case FACTORY_COMMAND_PLACE_PIPE:
+                result->result = place_pipe(
+                    simulation, &result->command, &result->entity_id);
+                break;
+            case FACTORY_COMMAND_FLUID_INSERT:
+            case FACTORY_COMMAND_FLUID_REMOVE:
+            case FACTORY_COMMAND_FLUID_TRANSFER:
+                result->result = apply_fluid_command(
+                    simulation, &result->command, &result->entity_id);
                 break;
         }
         if (result->result == FACTORY_RESULT_OK) {
@@ -1857,6 +2018,8 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     simulation->events.count = 0U;
     simulation->events.recording = true;
     apply_commands(simulation);
+    (void)factory_fluid_network_rebuild(simulation, true);
+    factory_fluid_network_transfer(simulation);
     factory_burner_store_begin_tick(&simulation->burners, simulation);
     (void)factory_power_rebuild(simulation, true);
     factory_power_consume_generation(simulation);

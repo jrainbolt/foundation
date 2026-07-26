@@ -55,7 +55,23 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
                     <= FACTORY_ITEM_BIOMASS_PELLET;
         case FACTORY_COMMAND_PLACE_POWER_POLE:
         case FACTORY_COMMAND_PLACE_POWER_GENERATOR:
+        case FACTORY_COMMAND_PLACE_FLUID_TANK:
+        case FACTORY_COMMAND_PLACE_PIPE:
             return true;
+        case FACTORY_COMMAND_FLUID_INSERT:
+            return command->data.fluid_insert.destination_entity_id != 0U
+                && factory_fluid_definition_get(
+                    command->data.fluid_insert.fluid_type) != NULL
+                && command->data.fluid_insert.quantity != 0U;
+        case FACTORY_COMMAND_FLUID_REMOVE:
+            return command->data.fluid_remove.source_entity_id != 0U
+                && command->data.fluid_remove.quantity != 0U;
+        case FACTORY_COMMAND_FLUID_TRANSFER:
+            return command->data.fluid_transfer.source_entity_id != 0U
+                && command->data.fluid_transfer.destination_entity_id != 0U
+                && command->data.fluid_transfer.source_entity_id
+                    != command->data.fluid_transfer.destination_entity_id
+                && command->data.fluid_transfer.quantity != 0U;
         default:
             return false;
     }

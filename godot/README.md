@@ -89,6 +89,12 @@ c++ -std=c++17 native/tests/integer_conversion_test.cpp \
 - `get_tick()`
 - `get_entities()`, `get_resources()`, and `get_power_edges()`
 - `get_events()` and `clear_events()`
+- `place_fluid_tank()`, `insert_fluid()`, `remove_fluid()`, and
+  `transfer_fluid()`
+
+A successful `get_entities()` export contains exactly one dictionary for every
+valid native presentation entity. Conversion failure sets the adapter error
+and returns an empty array; it never returns a successful partial batch.
 - `has_error()`, `get_last_error()`, and `clear_error()`
 - `rebuild_presentation()`
 - `result_name(result)`

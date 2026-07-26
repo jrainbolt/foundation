@@ -157,6 +157,17 @@ static bool entity_equal(
                     == b->data.power_source.burner.released_energy
                 && a->data.power_source.burner.active
                     == b->data.power_source.burner.active;
+        case FACTORY_ENTITY_TYPE_FLUID_TANK:
+            return a->data.fluid_storage.fluid_type
+                    == b->data.fluid_storage.fluid_type
+                && a->data.fluid_storage.quantity
+                    == b->data.fluid_storage.quantity
+                && a->data.fluid_storage.capacity
+                    == b->data.fluid_storage.capacity;
+        case FACTORY_ENTITY_TYPE_PIPE:
+            return a->data.pipe.connection_mask
+                    == b->data.pipe.connection_mask
+                && a->data.pipe.network_id == b->data.pipe.network_id;
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;

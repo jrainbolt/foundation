@@ -5,10 +5,13 @@ const COLORS := {
 	1: Color("#57a773"), 2: Color("#d6a84b"), 3: Color("#d46a6a"),
 	4: Color("#8974c9"), 5: Color("#5f8fca"), 6: Color("#e1903f"),
 	7: Color("#cc79a7"), 8: Color("#8a9ba8"), 9: Color("#e5c84d"),
+	10: Color("#4da6c8"),
+	11: Color("#7fc8d8"),
 }
 const NAMES := {
 	1: "EX", 2: "BELT", 3: "REF", 4: "ASM", 5: "BOX",
-	6: "SPLIT", 7: "INS", 8: "POLE", 9: "GEN",
+	6: "SPLIT", 7: "INS", 8: "POLE", 9: "GEN", 10: "TANK",
+	11: "PIPE",
 }
 
 var state: Dictionary = {}
@@ -41,6 +44,28 @@ func _draw() -> void:
 				int(state.get("energy_available", 0)),
 				"ON" if bool(state.get("fuel_active", false)) else "OFF"
 			],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9
+		)
+	if entity_type == 10:
+		draw_string(
+			ThemeDB.fallback_font, Vector2(7, 39),
+			"F%d %d/%d" % [
+				int(state.get("fluid_type", 0)),
+				int(state.get("fluid_quantity", 0)),
+				int(state.get("fluid_capacity", 0))
+			],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9
+		)
+	if entity_type == 11:
+		var mask := int(state.get("connection_mask", 0))
+		var center := Vector2(32, 32)
+		var vectors := [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]
+		for index in 4:
+			if mask & (1 << index):
+				draw_line(center, center + vectors[index] * 28.0, Color.WHITE, 8.0)
+		draw_string(
+			ThemeDB.fallback_font, Vector2(7, 39),
+			"N%d" % int(state.get("network_id", 0)),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 9
 		)
 	var duration := int(state.get("duration", 0))

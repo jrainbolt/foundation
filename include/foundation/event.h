@@ -6,6 +6,7 @@
 
 #include "foundation/entity.h"
 #include "foundation/item.h"
+#include "foundation/fluid.h"
 
 typedef struct FactorySimulation FactorySimulation;
 
@@ -17,7 +18,15 @@ typedef enum {
     FACTORY_EVENT_POWER_GAINED,
     FACTORY_EVENT_POWER_LOST,
     FACTORY_EVENT_FUEL_IGNITED,
-    FACTORY_EVENT_FUEL_EXHAUSTED
+    FACTORY_EVENT_FUEL_EXHAUSTED,
+    FACTORY_EVENT_FLUID_INSERTED,
+    FACTORY_EVENT_FLUID_REMOVED,
+    FACTORY_EVENT_FLUID_TRANSFERRED,
+    FACTORY_EVENT_FLUID_NETWORK_CREATED,
+    FACTORY_EVENT_FLUID_NETWORK_SPLIT,
+    FACTORY_EVENT_FLUID_NETWORK_MERGED,
+    FACTORY_EVENT_PIPE_CONNECTED,
+    FACTORY_EVENT_PIPE_DISCONNECTED
 } FactoryEventType;
 
 /*
@@ -29,9 +38,13 @@ typedef enum {
  * transfer: entity_id is the source and related_entity_id the destination.
  * power gained/lost: entity_id identifies the consumer.
  * fuel ignited/exhausted: entity_id owns the burner and item_type is fuel.
+ * fluid inserted/removed: entity_id owns the affected storage, fluid_type and
+ * quantity identify the committed fluid change.
+ * fluid transferred: entity_id is the source, related_entity_id is the
+ * destination, and fluid_type and quantity identify the committed transfer.
  *
  * tick is the simulation tick at the start of the step that emitted the
- * event. quantity is currently one for every item transfer.
+ * event. Item-transfer quantity is currently one.
  */
 typedef struct {
     FactoryEventType type;
@@ -40,6 +53,7 @@ typedef struct {
     FactoryEntityId related_entity_id;
     FactoryEntityType entity_type;
     FactoryItemType item_type;
+    FactoryFluidType fluid_type;
     uint32_t quantity;
 } FactoryEvent;
 

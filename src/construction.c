@@ -38,6 +38,12 @@ bool factory_entity_construction_cost(
         case FACTORY_ENTITY_TYPE_POWER_GENERATOR:
             cost = FACTORY_CONSTRUCTION_COST_POWER_GENERATOR;
             break;
+        case FACTORY_ENTITY_TYPE_FLUID_TANK:
+            cost = FACTORY_CONSTRUCTION_COST_FLUID_TANK;
+            break;
+        case FACTORY_ENTITY_TYPE_PIPE:
+            cost = FACTORY_CONSTRUCTION_COST_PIPE;
+            break;
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;

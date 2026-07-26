@@ -111,6 +111,18 @@ typedef struct {
 } FactoryPresentationPowerSource;
 
 typedef struct {
+    FactoryFluidType fluid_type;
+    FactoryFluidQuantity quantity;
+    FactoryFluidQuantity capacity;
+    FactoryFluidNetworkId network_id;
+} FactoryPresentationFluidStorage;
+
+typedef struct {
+    uint32_t connection_mask;
+    FactoryFluidNetworkId network_id;
+} FactoryPresentationPipe;
+
+typedef struct {
     FactoryEntityId entity_id;
     FactoryEntityType entity_type;
     int32_t x;
@@ -128,6 +140,8 @@ typedef struct {
         FactoryPresentationInserter inserter;
         FactoryPresentationPowerPole power_pole;
         FactoryPresentationPowerSource power_source;
+        FactoryPresentationFluidStorage fluid_storage;
+        FactoryPresentationPipe pipe;
     } data;
 } FactoryPresentationEntity;
 

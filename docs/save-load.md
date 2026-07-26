@@ -53,8 +53,9 @@ without advancing it produces the original bytes.
 There are currently no file wrappers, compression, encryption, save slots,
 autosaving, background I/O, partial loads, or migration from other versions.
 
-Snapshot version 4 includes authoritative power-pole, basic-generator, burner,
-and biomass-storage records, plus queued placement commands and results. Pole
+Snapshot version 6 includes authoritative power-pole, basic-generator, burner,
+biomass-storage, and fluid-storage records, plus queued placement and fluid
+commands, pipe positions, and results. Pole
 edges, network IDs, attachments, allocation, and inspection summaries are
 derived and rebuilt immediately after load. Earlier snapshots are deliberately
 unsupported.

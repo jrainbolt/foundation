@@ -172,6 +172,9 @@ static FactoryResult populate_entity(
         factory_splitter_store_find(&simulation->splitters, id);
     const FactoryInserter *inserter =
         factory_inserter_store_find(&simulation->inserters, id);
+    const FactoryFluidStorage *fluid_storage =
+        factory_fluid_storage_store_find(&simulation->fluid_storages, id);
+    FactoryPipeInspection pipe;
     FactoryPowerPoleInspection pole;
     FactoryPowerGeneratorInspection generator;
 
@@ -278,6 +281,27 @@ static FactoryResult populate_entity(
             inserter->source_x, inserter->source_y,
             inserter->destination_x, inserter->destination_y
         };
+    } else if (fluid_storage != NULL) {
+        out->entity_type = FACTORY_ENTITY_TYPE_FLUID_TANK;
+        out->x = fluid_storage->x;
+        out->y = fluid_storage->y;
+        out->data.fluid_storage = (FactoryPresentationFluidStorage){
+            fluid_storage->fluid_type,
+            fluid_storage->quantity,
+            fluid_storage->capacity,
+            FACTORY_FLUID_NETWORK_NONE
+        };
+        for (size_t i = 0U;
+            i < simulation->fluid_networks.port_count; ++i)
+            if (simulation->fluid_networks.ports[i].owner_entity_id == id)
+                out->data.fluid_storage.network_id =
+                    simulation->fluid_networks.ports[i].network_id;
+    } else if (factory_simulation_get_pipe(
+            simulation, id, &pipe) == FACTORY_RESULT_OK) {
+        out->entity_type = FACTORY_ENTITY_TYPE_PIPE;
+        out->x = pipe.x; out->y = pipe.y;
+        out->data.pipe = (FactoryPresentationPipe){
+            pipe.connection_mask, pipe.network_id};
     } else if (factory_simulation_get_power_pole(
             simulation, id, &pole) == FACTORY_RESULT_OK) {
         out->entity_type = FACTORY_ENTITY_TYPE_POWER_POLE;

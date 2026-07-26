@@ -18,6 +18,7 @@
 #include "foundation/power.h"
 #include "foundation/event.h"
 #include "foundation/burner.h"
+#include "foundation/fluid.h"
 
 typedef struct FactorySimulation FactorySimulation;
 

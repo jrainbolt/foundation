@@ -42,6 +42,15 @@ public:
     int64_t reset_demo();
     int64_t step();
     int64_t step_many(int64_t count);
+    int64_t place_fluid_tank(int64_t x, int64_t y);
+    int64_t insert_fluid(
+        int64_t destination_entity_id, int64_t fluid_type, int64_t quantity
+    );
+    int64_t remove_fluid(int64_t source_entity_id, int64_t quantity);
+    int64_t transfer_fluid(
+        int64_t source_entity_id, int64_t destination_entity_id,
+        int64_t quantity
+    );
     int64_t get_tick() const;
     Array get_entities() const;
     Array get_resources() const;

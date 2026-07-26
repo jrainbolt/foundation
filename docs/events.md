@@ -23,16 +23,24 @@ step from tick 4 to tick 5 carry tick 4.
 Every `FactoryEvent` is fully initialized. Unused fields are zero or their
 `FACTORY_*_NONE` value.
 
-| Type | `entity_id` | `related_entity_id` | `entity_type` | `item_type` / `quantity` |
+| Type | `entity_id` | `related_entity_id` | Payload |
 |---|---|---|---|---|
-| `ENTITY_CONSTRUCTED` | constructed entity | unused | constructed type | unused |
-| `ENTITY_DEMOLISHED` | demolished entity | unused | demolished type | unused |
-| `PRODUCTION_COMPLETED` | producer | unused | unused | committed output stack |
-| `ITEM_TRANSFERRED` | source owner | destination owner | unused | transferred item and count |
-| `POWER_GAINED` | consumer | unused | unused | unused |
-| `POWER_LOST` | consumer | unused | unused | unused |
-| `FUEL_IGNITED` | burner owner | unused | unused | one consumed fuel item |
-| `FUEL_EXHAUSTED` | burner owner | unused | unused | exhausted fuel item |
+| `ENTITY_CONSTRUCTED` | constructed entity | unused | `entity_type` |
+| `ENTITY_DEMOLISHED` | demolished entity | unused | `entity_type` |
+| `PRODUCTION_COMPLETED` | producer | unused | `item_type`, `quantity` |
+| `ITEM_TRANSFERRED` | source owner | destination owner | `item_type`, `quantity` |
+| `POWER_GAINED` | consumer | unused | none |
+| `POWER_LOST` | consumer | unused | none |
+| `FUEL_IGNITED` | burner owner | unused | `item_type`, quantity one |
+| `FUEL_EXHAUSTED` | burner owner | unused | `item_type` |
+| `FLUID_INSERTED` | destination | unused | `fluid_type`, `quantity` |
+| `FLUID_REMOVED` | source | unused | `fluid_type`, `quantity` |
+| `FLUID_TRANSFERRED` | source | destination | `fluid_type`, `quantity` |
+| `FLUID_NETWORK_CREATED` | deterministic network ID | unused | none |
+| `FLUID_NETWORK_SPLIT` | first resulting network ID | unused | none |
+| `FLUID_NETWORK_MERGED` | resulting network ID | unused | none |
+| `PIPE_CONNECTED` | unused | unused | number of new connections |
+| `PIPE_DISCONNECTED` | unused | unused | number of removed connections |
 
 Construction and demolition events appear only after successful transactional
 commands. Production events appear only when output is committed. Transfer
@@ -46,9 +54,10 @@ Within a step, command events follow command FIFO order. Burner ignition events
 follow next, then power transitions, then fuel-completion events. Extractor
 production and producer transfers, belt transfers, refinery completion,
 assembler completion, and inserter drop/pickup transfers follow according to
-the normal authoritative update phases. There is no event sorting pass.
+the normal authoritative update phases. Fluid command events occupy their FIFO
+command positions. There is no event sorting pass.
 
 Events and their allocation capacity are observer state. They are not encoded
-in version 4 snapshots and do not affect canonical bytes. A loaded simulation
+in version 6 snapshots and do not affect canonical bytes. A loaded simulation
 starts with an empty batch. Failed loads create no simulation and cannot alter
 an existing simulation or its visible batch.

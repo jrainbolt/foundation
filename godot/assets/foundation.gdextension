@@ -6,10 +6,8 @@ reloadable = true
 
 [libraries]
 
-macos.debug = "res://assets/bin/macos/libfoundation.macos.template_debug.framework"
-macos.release = "res://assets/bin/macos/libfoundation.macos.template_release.framework"
-macos.debug.arm64 = "res://assets/bin/macos/libfoundation.macos.template_debug.arm64.dylib"
-macos.release.arm64 = "res://assets/bin/macos/libfoundation.macos.template_release.arm64.dylib"
+macos.debug = "res://assets/bin/macos/libfoundation.macos.template_debug.dylib"
+macos.release = "res://assets/bin/macos/libfoundation.macos.template_release.dylib"
 linux.debug.x86_64 = "res://assets/bin/linux/libfoundation.linux.template_debug.x86_64.so"
 linux.release.x86_64 = "res://assets/bin/linux/libfoundation.linux.template_release.x86_64.so"
 linux.debug.arm64 = "res://assets/bin/linux/libfoundation.linux.template_debug.arm64.so"

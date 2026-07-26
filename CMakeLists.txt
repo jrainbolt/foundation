@@ -55,6 +55,7 @@ add_library(factory_engine
     src/entity.c
     src/event.c
     src/extractor.c
+    src/fluid.c
     src/item.c
     src/inserter.c
     src/logistics_endpoint.c
@@ -247,4 +248,17 @@ if(BUILD_TESTING)
     )
     target_link_libraries(factory_burner_tests PRIVATE factory_engine)
     add_test(NAME factory_burner_tests COMMAND factory_burner_tests)
+
+    add_executable(factory_fluid_tests tests/test_fluid.c)
+    target_include_directories(
+        factory_fluid_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(factory_fluid_tests PRIVATE factory_engine)
+    add_test(NAME factory_fluid_tests COMMAND factory_fluid_tests)
+
+    add_executable(factory_fluid_network_tests tests/test_fluid_network.c)
+    target_link_libraries(factory_fluid_network_tests PRIVATE factory_engine)
+    add_test(
+        NAME factory_fluid_network_tests COMMAND factory_fluid_network_tests
+    )
 endif()

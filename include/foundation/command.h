@@ -6,6 +6,7 @@
 
 #include "foundation/entity.h"
 #include "foundation/assembler_recipe.h"
+#include "foundation/fluid.h"
 #include <foundation/world.h>
 #include "foundation/recipe.h"
 
@@ -32,7 +33,12 @@ typedef enum {
     FACTORY_COMMAND_SET_ASSEMBLER_RECIPE,
     FACTORY_COMMAND_SET_STORAGE_OUTPUT,
     FACTORY_COMMAND_PLACE_POWER_POLE,
-    FACTORY_COMMAND_PLACE_POWER_GENERATOR
+    FACTORY_COMMAND_PLACE_POWER_GENERATOR,
+    FACTORY_COMMAND_PLACE_FLUID_TANK,
+    FACTORY_COMMAND_FLUID_INSERT,
+    FACTORY_COMMAND_FLUID_REMOVE,
+    FACTORY_COMMAND_FLUID_TRANSFER,
+    FACTORY_COMMAND_PLACE_PIPE
 } FactoryCommandType;
 
 typedef struct {
@@ -99,6 +105,28 @@ typedef struct {
             int32_t x;
             int32_t y;
         } place_power_generator;
+        struct {
+            int32_t x;
+            int32_t y;
+        } place_fluid_tank;
+        struct {
+            FactoryEntityId destination_entity_id;
+            FactoryFluidType fluid_type;
+            FactoryFluidQuantity quantity;
+        } fluid_insert;
+        struct {
+            FactoryEntityId source_entity_id;
+            FactoryFluidQuantity quantity;
+        } fluid_remove;
+        struct {
+            FactoryEntityId source_entity_id;
+            FactoryEntityId destination_entity_id;
+            FactoryFluidQuantity quantity;
+        } fluid_transfer;
+        struct {
+            int32_t x;
+            int32_t y;
+        } place_pipe;
     } data;
 } FactoryCommand;
 

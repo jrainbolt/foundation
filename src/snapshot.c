@@ -9,7 +9,7 @@
 
 #define SNAPSHOT_HEADER_SIZE 48U
 #define SNAPSHOT_SECTION_HEADER_SIZE 16U
-#define SNAPSHOT_SECTION_COUNT 14U
+#define SNAPSHOT_SECTION_COUNT 16U
 
 static const uint8_t snapshot_magic[8] = {
     'F', 'O', 'U', 'N', 'D', 'A', 'T', 'N'
@@ -28,6 +28,8 @@ typedef enum {
     SNAPSHOT_SECTION_STORAGES,
     SNAPSHOT_SECTION_POWER_POLES,
     SNAPSHOT_SECTION_POWER_GENERATORS,
+    SNAPSHOT_SECTION_FLUID_STORAGES,
+    SNAPSHOT_SECTION_PIPES,
     SNAPSHOT_SECTION_COMMANDS,
     SNAPSHOT_SECTION_RESULTS
 } SnapshotSection;
@@ -258,6 +260,8 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_records(&size, simulation->storages.count, 60U)
         || !checked_records(&size, simulation->power_poles.count, 12U)
         || !checked_records(&size, simulation->power_generators.count, 44U)
+        || !checked_records(&size, simulation->fluid_storages.count, 28U)
+        || !checked_records(&size, simulation->pipes.count, 12U)
         || !checked_records(&size, simulation->command_count, 24U)
         || !checked_records(&size, simulation->result_count, 68U)
         || !size_to_u32(simulation->entities->count)
@@ -271,6 +275,8 @@ static FactoryResult snapshot_size_unvalidated(
         || !size_to_u32(simulation->storages.count)
         || !size_to_u32(simulation->power_poles.count)
         || !size_to_u32(simulation->power_generators.count)
+        || !size_to_u32(simulation->fluid_storages.count)
+        || !size_to_u32(simulation->pipes.count)
         || !section_size_valid(
             simulation->entities->count, 4U, 8U)
         || !section_size_valid(tiles, 16U, 8U)
@@ -283,6 +289,8 @@ static FactoryResult snapshot_size_unvalidated(
         || !section_size_valid(simulation->storages.count, 60U, 0U)
         || !section_size_valid(simulation->power_poles.count, 12U, 0U)
         || !section_size_valid(simulation->power_generators.count, 44U, 0U)
+        || !section_size_valid(simulation->fluid_storages.count, 28U, 0U)
+        || !section_size_valid(simulation->pipes.count, 12U, 0U)
         || size > UINT64_MAX) {
         return FACTORY_RESULT_SNAPSHOT_SIZE_OVERFLOW;
     }
@@ -315,10 +323,15 @@ static bool entity_has_subsystem(
         factory_power_pole_store_find(&simulation->power_poles, id);
     const FactoryPowerGenerator *generator =
         factory_power_generator_store_find(&simulation->power_generators, id);
+    const FactoryFluidStorage *fluid_storage =
+        factory_fluid_storage_store_find(&simulation->fluid_storages, id);
+    const FactoryPipe *pipe =
+        factory_pipe_store_find(&simulation->pipes, id);
     size_t found = (extractor != NULL) + (belt != NULL)
         + (splitter != NULL) + (refinery != NULL) + (assembler != NULL)
         + (inserter != NULL) + (storage != NULL)
-        + (pole != NULL) + (generator != NULL);
+        + (pole != NULL) + (generator != NULL) + (fluid_storage != NULL)
+        + (pipe != NULL);
 
     if (found != 1U) {
         return false;
@@ -339,8 +352,12 @@ static bool entity_has_subsystem(
         *out_x = storage->x; *out_y = storage->y;
     } else if (pole != NULL) {
         *out_x = pole->x; *out_y = pole->y;
-    } else {
+    } else if (generator != NULL) {
         *out_x = generator->x; *out_y = generator->y;
+    } else if (fluid_storage != NULL) {
+        *out_x = fluid_storage->x; *out_y = fluid_storage->y;
+    } else {
+        *out_x = pipe->x; *out_y = pipe->y;
     }
     return true;
 }
@@ -417,7 +434,8 @@ static FactoryResult validate_simulation(
         + simulation->refineries.count + simulation->assemblers.count
         + simulation->inserters.count + simulation->storages.count
         + simulation->power_poles.count
-        + simulation->power_generators.count;
+        + simulation->power_generators.count
+        + simulation->fluid_storages.count + simulation->pipes.count;
     if (subsystem_count != simulation->entities->count) {
         return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
@@ -642,6 +660,23 @@ static FactoryResult validate_simulation(
     if (simulation->burners.count
         != simulation->power_generators.count)
         return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    for (index = 0U; index < simulation->fluid_storages.count; ++index) {
+        const FactoryFluidStorage *storage =
+            &simulation->fluid_storages.items[index];
+        const FactoryFluidDefinition *definition =
+            factory_fluid_definition_get(storage->fluid_type);
+        if (storage->capacity != FACTORY_FLUID_TANK_CAPACITY
+            || storage->accepted_fluid_classes
+                != FACTORY_FLUID_CLASS_AQUEOUS
+            || storage->quantity > storage->capacity
+            || (storage->quantity == 0U)
+                != (storage->fluid_type == FACTORY_FLUID_NONE)
+            || (storage->quantity != 0U
+                && (definition == NULL
+                    || (definition->fluid_class
+                        & storage->accepted_fluid_classes) == 0U)))
+            return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
     for (index = 0U; index < simulation->command_count; ++index) {
         if (!snapshot_command_valid(&simulation->commands[index])) {
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
@@ -650,8 +685,8 @@ static FactoryResult validate_simulation(
     for (index = 0U; index < simulation->result_count; ++index) {
         const FactoryCommandResult *value = &simulation->results[index];
         if (!snapshot_command_valid(&value->command)
-            || value->result > FACTORY_RESULT_SNAPSHOT_IO_ERROR
-            || value->entity_type > FACTORY_ENTITY_TYPE_POWER_GENERATOR
+            || value->result > FACTORY_RESULT_FLUID_NETWORK_NOT_FOUND
+            || value->entity_type > FACTORY_ENTITY_TYPE_PIPE
             || value->previous_assembler_recipe
                 >= FACTORY_ASSEMBLER_RECIPE_COUNT
             || value->new_assembler_recipe
@@ -734,6 +769,30 @@ static void write_command(
             fields[0] = (uint32_t)command->data.place_power_generator.x;
             fields[1] = (uint32_t)command->data.place_power_generator.y;
             break;
+        case FACTORY_COMMAND_PLACE_FLUID_TANK:
+            fields[0] = (uint32_t)command->data.place_fluid_tank.x;
+            fields[1] = (uint32_t)command->data.place_fluid_tank.y;
+            break;
+        case FACTORY_COMMAND_PLACE_PIPE:
+            fields[0] = (uint32_t)command->data.place_pipe.x;
+            fields[1] = (uint32_t)command->data.place_pipe.y;
+            break;
+        case FACTORY_COMMAND_FLUID_INSERT:
+            fields[0] =
+                command->data.fluid_insert.destination_entity_id;
+            fields[1] = command->data.fluid_insert.fluid_type;
+            fields[2] = command->data.fluid_insert.quantity;
+            break;
+        case FACTORY_COMMAND_FLUID_REMOVE:
+            fields[0] = command->data.fluid_remove.source_entity_id;
+            fields[1] = command->data.fluid_remove.quantity;
+            break;
+        case FACTORY_COMMAND_FLUID_TRANSFER:
+            fields[0] = command->data.fluid_transfer.source_entity_id;
+            fields[1] =
+                command->data.fluid_transfer.destination_entity_id;
+            fields[2] = command->data.fluid_transfer.quantity;
+            break;
     }
     write_u32(writer, (uint32_t)command->type);
     for (index = 0U; index < 5U; ++index) {
@@ -756,7 +815,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             return false;
         }
     }
-    if (type > FACTORY_COMMAND_PLACE_POWER_GENERATOR) {
+    if (type > FACTORY_COMMAND_PLACE_PIPE) {
         return false;
     }
     command->type = (FactoryCommandType)type;
@@ -771,6 +830,8 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             case FACTORY_COMMAND_PLACE_ASSEMBLER:
             case FACTORY_COMMAND_PLACE_SPLITTER:
             case FACTORY_COMMAND_PLACE_INSERTER:
+            case FACTORY_COMMAND_FLUID_INSERT:
+            case FACTORY_COMMAND_FLUID_TRANSFER:
                 used = 3U;
                 break;
             case FACTORY_COMMAND_PLACE_STORAGE:
@@ -779,6 +840,9 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             case FACTORY_COMMAND_SET_STORAGE_OUTPUT:
             case FACTORY_COMMAND_PLACE_POWER_POLE:
             case FACTORY_COMMAND_PLACE_POWER_GENERATOR:
+            case FACTORY_COMMAND_PLACE_FLUID_TANK:
+            case FACTORY_COMMAND_PLACE_PIPE:
+            case FACTORY_COMMAND_FLUID_REMOVE:
                 used = 2U;
                 break;
             case FACTORY_COMMAND_DEMOLISH_ENTITY:
@@ -863,6 +927,29 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
         case FACTORY_COMMAND_PLACE_POWER_GENERATOR:
             command->data.place_power_generator.x = (int32_t)fields[0];
             command->data.place_power_generator.y = (int32_t)fields[1];
+            break;
+        case FACTORY_COMMAND_PLACE_FLUID_TANK:
+            command->data.place_fluid_tank.x = (int32_t)fields[0];
+            command->data.place_fluid_tank.y = (int32_t)fields[1];
+            break;
+        case FACTORY_COMMAND_PLACE_PIPE:
+            command->data.place_pipe.x = (int32_t)fields[0];
+            command->data.place_pipe.y = (int32_t)fields[1];
+            break;
+        case FACTORY_COMMAND_FLUID_INSERT:
+            command->data.fluid_insert.destination_entity_id = fields[0];
+            command->data.fluid_insert.fluid_type =
+                (FactoryFluidType)fields[1];
+            command->data.fluid_insert.quantity = fields[2];
+            break;
+        case FACTORY_COMMAND_FLUID_REMOVE:
+            command->data.fluid_remove.source_entity_id = fields[0];
+            command->data.fluid_remove.quantity = fields[1];
+            break;
+        case FACTORY_COMMAND_FLUID_TRANSFER:
+            command->data.fluid_transfer.source_entity_id = fields[0];
+            command->data.fluid_transfer.destination_entity_id = fields[1];
+            command->data.fluid_transfer.quantity = fields[2];
             break;
     }
     return snapshot_command_valid(command);
@@ -1106,6 +1193,34 @@ static void write_snapshot(
             write_u32(writer, burner->remaining_burn_ticks);
             write_u64(writer, burner->released_energy);
         }
+    }
+
+    write_section_header(
+        writer, SNAPSHOT_SECTION_FLUID_STORAGES,
+        simulation->fluid_storages.count,
+        simulation->fluid_storages.count * 28U
+    );
+    for (index = 0U; index < simulation->fluid_storages.count; ++index) {
+        const FactoryFluidStorage *value =
+            &simulation->fluid_storages.items[index];
+        write_u32(writer, value->owner_entity_id);
+        write_i32(writer, value->x);
+        write_i32(writer, value->y);
+        write_u32(writer, value->accepted_fluid_classes);
+        write_u32(writer, value->fluid_type);
+        write_u32(writer, value->quantity);
+        write_u32(writer, value->capacity);
+    }
+
+    write_section_header(
+        writer, SNAPSHOT_SECTION_PIPES,
+        simulation->pipes.count, simulation->pipes.count * 12U
+    );
+    for (index = 0U; index < simulation->pipes.count; ++index) {
+        const FactoryPipe *value = &simulation->pipes.items[index];
+        write_u32(writer, value->entity_id);
+        write_i32(writer, value->x);
+        write_i32(writer, value->y);
     }
 
     write_section_header(
@@ -1542,6 +1657,43 @@ static bool load_sections(
     }
 
     if (!read_section_header(
+            reader, SNAPSHOT_SECTION_FLUID_STORAGES, 28U, 0U, &count)
+        || !allocate_records(
+            (void **)&simulation->fluid_storages.items,
+            count, sizeof(FactoryFluidStorage))) {
+        return false;
+    }
+    simulation->fluid_storages.count = count;
+    simulation->fluid_storages.capacity = count;
+    for (index = 0U; index < count; ++index) {
+        FactoryFluidStorage *v = &simulation->fluid_storages.items[index];
+        if (!read_u32(reader, &v->owner_entity_id)
+            || !read_i32(reader, &v->x)
+            || !read_i32(reader, &v->y)
+            || !read_u32(reader, &v->accepted_fluid_classes)
+            || !read_u32(reader, &value)) return false;
+        v->fluid_type = (FactoryFluidType)value;
+        if (!read_u32(reader, &v->quantity)
+            || !read_u32(reader, &v->capacity)) return false;
+    }
+
+    if (!read_section_header(
+            reader, SNAPSHOT_SECTION_PIPES, 12U, 0U, &count)
+        || !allocate_records(
+            (void **)&simulation->pipes.items,
+            count, sizeof(FactoryPipe))) {
+        return false;
+    }
+    simulation->pipes.count = count;
+    simulation->pipes.capacity = count;
+    for (index = 0U; index < count; ++index) {
+        FactoryPipe *v = &simulation->pipes.items[index];
+        if (!read_u32(reader, &v->entity_id)
+            || !read_i32(reader, &v->x)
+            || !read_i32(reader, &v->y)) return false;
+    }
+
+    if (!read_section_header(
             reader, SNAPSHOT_SECTION_COMMANDS, 24U, 0U, &count)
         || count > FACTORY_COMMAND_QUEUE_CAPACITY) {
         return false;
@@ -1660,12 +1812,29 @@ FactoryResult factory_simulation_load_snapshot(
         factory_simulation_destroy(simulation);
         return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
+    for (size_t i = 0U; i < simulation->fluid_storages.count; ++i) {
+        const FactoryFluidStorage *storage =
+            &simulation->fluid_storages.items[i];
+        if (!factory_fluid_port_store_reserve_one(&simulation->fluid_ports)) {
+            factory_simulation_destroy(simulation);
+            return FACTORY_RESULT_OUT_OF_MEMORY;
+        }
+        factory_fluid_port_store_add(
+            &simulation->fluid_ports, storage->owner_entity_id,
+            storage->x, storage->y, storage->accepted_fluid_classes);
+    }
     result = validate_simulation(simulation);
     if (result != FACTORY_RESULT_OK) {
         factory_simulation_destroy(simulation);
         return result;
     }
     result = factory_power_rebuild(simulation, false);
+    if (result != FACTORY_RESULT_OK) {
+        factory_simulation_destroy(simulation);
+        return result;
+    }
+    simulation->fluid_networks.dirty = true;
+    result = factory_fluid_network_rebuild(simulation, false);
     if (result != FACTORY_RESULT_OK) {
         factory_simulation_destroy(simulation);
         return result;

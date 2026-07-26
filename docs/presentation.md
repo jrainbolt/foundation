@@ -33,6 +33,8 @@ entity type's integer-only state. Storage uses eight fixed item quantities in
 `FactoryItemType` order from iron ore through biomass pellets. Generator
 presentation includes burner inventory, current fuel, total and remaining
 ticks, unreleased fuel energy, released available energy, and activity.
+Fluid-tank presentation contains fluid type, current integer quantity, and
+capacity.
 Progress is always a tick numerator and duration denominator; no percentage
 or interpolation value is calculated.
 
@@ -70,7 +72,7 @@ Presentation rebuild does not clear or copy events. Event clearing does not
 alter an existing presentation snapshot. If a tick or rebuild fails, a caller
 may continue displaying its previous presentation snapshot.
 
-Presentation data is excluded from canonical version 4 simulation snapshots.
+Presentation data is excluded from canonical version 6 simulation snapshots.
 After simulation load, callers rebuild a new presentation snapshot. Equivalent
 authoritative simulations produce field-wise equivalent presentation records.
 
