@@ -1,5 +1,6 @@
 #include "extractor_internal.h"
 #include "power_internal.h"
+#include "event_internal.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -115,7 +116,7 @@ bool factory_extractor_store_remove(
 void factory_extractor_store_update(
     FactoryExtractorStore *store,
     FactoryWorld *world,
-    const FactorySimulation *simulation
+    FactorySimulation *simulation
 )
 {
     size_t index = 0U;
@@ -143,6 +144,12 @@ void factory_extractor_store_update(
                 extractor->output_item = extractor->produced_item;
                 extractor->output_amount = 1U;
                 extractor->production_progress = 0U;
+                factory_simulation_emit_event(simulation, (FactoryEvent){
+                    .type = FACTORY_EVENT_PRODUCTION_COMPLETED,
+                    .entity_id = extractor->entity_id,
+                    .item_type = extractor->produced_item,
+                    .quantity = 1U
+                });
             }
         }
     }

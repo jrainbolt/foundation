@@ -36,7 +36,7 @@ bool factory_assembler_store_remove(
 );
 void factory_assembler_store_update(
     FactoryAssemblerStore *store,
-    const FactorySimulation *simulation
+    FactorySimulation *simulation
 );
 bool factory_assembler_configure_recipe(
     FactoryAssembler *assembler,

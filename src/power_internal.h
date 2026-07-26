@@ -57,7 +57,9 @@ void factory_power_state_destroy(FactoryPowerState *state);
 FactoryPowerUnits factory_power_source_available_generation(
     const FactorySimulation *simulation, FactoryEntityId entity_id
 );
-FactoryResult factory_power_rebuild(FactorySimulation *simulation);
+FactoryResult factory_power_rebuild(
+    FactorySimulation *simulation, bool emit_transitions
+);
 bool factory_power_is_entity_powered(
     const FactorySimulation *simulation, FactoryEntityId entity_id
 );

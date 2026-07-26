@@ -222,7 +222,9 @@ FactoryPowerUnits factory_power_source_available_generation(
     return generator == NULL ? 0U : generator->generation_capacity;
 }
 
-FactoryResult factory_power_rebuild(FactorySimulation *simulation)
+FactoryResult factory_power_rebuild(
+    FactorySimulation *simulation, bool emit_transitions
+)
 {
     FactoryPowerState next = {0};
     size_t i;
@@ -425,6 +427,31 @@ FactoryResult factory_power_rebuild(FactorySimulation *simulation)
         next.networks[i].unused_generation =
             next.networks[i].total_generation
             - next.networks[i].allocated_power;
+    if (emit_transitions) {
+        for (i = 0U; i < next.consumer_count; ++i) {
+            const FactoryPowerConsumerInspection *current =
+                &next.consumers[i];
+            size_t previous_index;
+            for (previous_index = 0U;
+                previous_index < simulation->power.consumer_count;
+                ++previous_index) {
+                const FactoryPowerConsumerInspection *previous =
+                    &simulation->power.consumers[previous_index];
+                if (previous->entity_id != current->entity_id) continue;
+                if (previous->powered != current->powered) {
+                    factory_simulation_emit_event(
+                        simulation, (FactoryEvent){
+                            .type = current->powered
+                                ? FACTORY_EVENT_POWER_GAINED
+                                : FACTORY_EVENT_POWER_LOST,
+                            .entity_id = current->entity_id
+                        }
+                    );
+                }
+                break;
+            }
+        }
+    }
     factory_power_state_destroy(&simulation->power);
     simulation->power = next;
     return FACTORY_RESULT_OK;

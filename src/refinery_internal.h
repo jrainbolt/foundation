@@ -37,7 +37,7 @@ bool factory_refinery_store_remove(
 );
 void factory_refinery_store_update(
     FactoryRefineryStore *store,
-    const FactorySimulation *simulation
+    FactorySimulation *simulation
 );
 
 #endif

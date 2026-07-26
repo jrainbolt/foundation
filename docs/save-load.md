@@ -31,6 +31,10 @@ durable state. Allocation capacities and pointers are rebuilt because they do
 not affect successful deterministic behavior; live ID and subsystem record
 orders are preserved.
 
+The simulation event batch is transient observer state. It is excluded from
+canonical snapshot bytes, and a successfully loaded simulation begins with an
+empty batch. Failed loads do not mutate an existing simulation or its events.
+
 The continuation invariant is:
 
 ```text

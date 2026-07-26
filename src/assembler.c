@@ -1,6 +1,7 @@
 #include "assembler_internal.h"
 #include "assembler_recipe_internal.h"
 #include "power_internal.h"
+#include "event_internal.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -163,7 +164,7 @@ bool factory_assembler_store_remove(
 
 void factory_assembler_store_update(
     FactoryAssemblerStore *store,
-    const FactorySimulation *simulation
+    FactorySimulation *simulation
 )
 {
     size_t index;
@@ -211,6 +212,12 @@ void factory_assembler_store_update(
             assembler->processing_progress = 0U;
             assembler->output_item = recipe->output_item;
             assembler->output_amount = recipe->output_amount;
+            factory_simulation_emit_event(simulation, (FactoryEvent){
+                .type = FACTORY_EVENT_PRODUCTION_COMPLETED,
+                .entity_id = assembler->entity_id,
+                .item_type = recipe->output_item,
+                .quantity = recipe->output_amount
+            });
         }
     }
 }

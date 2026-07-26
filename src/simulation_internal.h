@@ -14,6 +14,7 @@
 #include "entity_internal.h"
 #include "world_internal.h"
 #include "power_internal.h"
+#include "event_internal.h"
 
 struct FactorySimulation {
     uint64_t tick;
@@ -30,6 +31,7 @@ struct FactorySimulation {
     FactoryPowerPoleStore power_poles;
     FactoryPowerGeneratorStore power_generators;
     FactoryPowerState power;
+    FactoryEventBatch events;
     FactoryConstructionInventory construction_inventory;
     FactoryCommand commands[FACTORY_COMMAND_QUEUE_CAPACITY];
     size_t command_count;

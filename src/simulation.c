@@ -97,6 +97,7 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     if (simulation == NULL) {
         return;
     }
+    factory_event_batch_destroy(&simulation->events);
     factory_power_state_destroy(&simulation->power);
     factory_power_generator_store_destroy(&simulation->power_generators);
     factory_power_pole_store_destroy(&simulation->power_poles);
@@ -948,6 +949,11 @@ static void apply_commands(FactorySimulation *simulation)
                     &simulation->construction_inventory, amount
                 );
                 result->construction_units_changed = amount;
+                factory_simulation_emit_event(simulation, (FactoryEvent){
+                    .type = FACTORY_EVENT_ENTITY_CONSTRUCTED,
+                    .entity_id = result->entity_id,
+                    .entity_type = result->entity_type
+                });
             } else if (result->command.type
                 == FACTORY_COMMAND_GRANT_CONSTRUCTION_UNITS) {
                 result->construction_units_changed =
@@ -957,6 +963,11 @@ static void apply_commands(FactorySimulation *simulation)
                 && factory_entity_construction_cost(
                     result->entity_type, &amount)) {
                 result->construction_units_changed = amount;
+                factory_simulation_emit_event(simulation, (FactoryEvent){
+                    .type = FACTORY_EVENT_ENTITY_DEMOLISHED,
+                    .entity_id = result->entity_id,
+                    .entity_type = result->entity_type
+                });
             }
         }
         result->construction_units_remaining =
@@ -1782,13 +1793,30 @@ static void update_inserters(FactorySimulation *simulation)
     update_inserter_pickups(simulation);
 }
 
-void factory_simulation_tick(FactorySimulation *simulation)
+FactoryResult factory_simulation_tick(FactorySimulation *simulation)
 {
+    size_t possible_entities;
+    size_t event_limit;
     if (simulation == NULL) {
-        return;
+        return FACTORY_RESULT_INVALID_ARGUMENT;
     }
+    if (simulation->entities->count
+            > SIZE_MAX - simulation->command_count) {
+        return FACTORY_RESULT_POWER_OVERFLOW;
+    }
+    possible_entities =
+        simulation->entities->count + simulation->command_count;
+    if (possible_entities > (SIZE_MAX - 1U) / 6U) {
+        return FACTORY_RESULT_POWER_OVERFLOW;
+    }
+    event_limit = possible_entities * 6U + 1U;
+    if (!factory_event_batch_reserve(&simulation->events, event_limit)) {
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    }
+    simulation->events.count = 0U;
+    simulation->events.recording = true;
     apply_commands(simulation);
-    (void)factory_power_rebuild(simulation);
+    (void)factory_power_rebuild(simulation, true);
     factory_extractor_store_update(
         &simulation->extractors, simulation->world, simulation
     );
@@ -1799,7 +1827,9 @@ void factory_simulation_tick(FactorySimulation *simulation)
     factory_assembler_store_update(&simulation->assemblers, simulation);
     factory_storage_store_update(&simulation->storages);
     update_inserters(simulation);
+    simulation->events.recording = false;
     ++simulation->tick;
+    return FACTORY_RESULT_OK;
 }
 
 uint64_t factory_simulation_get_tick(const FactorySimulation *simulation)

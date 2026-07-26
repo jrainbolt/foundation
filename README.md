@@ -72,3 +72,7 @@ canonical portable binary format. See `docs/save-load.md` and
 
 Factorio-style power poles form automatic deterministic networks and allocate
 whole-machine power by ascending entity ID. See `docs/power.md`.
+
+Each successful simulation step exposes a transient deterministic event batch
+covering committed construction, demolition, production, item transfer, and
+power-state transitions. See `docs/events.md`.

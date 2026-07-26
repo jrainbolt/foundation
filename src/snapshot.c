@@ -1601,7 +1601,7 @@ FactoryResult factory_simulation_load_snapshot(
         factory_simulation_destroy(simulation);
         return result;
     }
-    result = factory_power_rebuild(simulation);
+    result = factory_power_rebuild(simulation, false);
     if (result != FACTORY_RESULT_OK) {
         factory_simulation_destroy(simulation);
         return result;

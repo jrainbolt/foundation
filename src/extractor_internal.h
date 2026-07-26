@@ -40,7 +40,7 @@ bool factory_extractor_store_remove(
 void factory_extractor_store_update(
     FactoryExtractorStore *store,
     FactoryWorld *world,
-    const FactorySimulation *simulation
+    FactorySimulation *simulation
 );
 
 #endif

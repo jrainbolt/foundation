@@ -16,6 +16,7 @@
 #include "foundation/inserter.h"
 #include "foundation/construction.h"
 #include "foundation/power.h"
+#include "foundation/event.h"
 
 typedef struct FactorySimulation FactorySimulation;
 
@@ -42,8 +43,13 @@ FactoryResult factory_simulation_submit_command(
     const FactoryCommand *command
 );
 
-/* Applies queued commands FIFO, updates extractors, then increments the tick. */
-void factory_simulation_tick(FactorySimulation *simulation);
+/*
+ * Advances one deterministic step. Event capacity is reserved before the
+ * visible batch is cleared or authoritative state changes. Allocation failure
+ * returns OUT_OF_MEMORY and leaves the tick, commands, state, and prior event
+ * batch unchanged.
+ */
+FactoryResult factory_simulation_tick(FactorySimulation *simulation);
 uint64_t factory_simulation_get_tick(const FactorySimulation *simulation);
 /* Returns the borrowed, read-only world used by the simulation. */
 const FactoryWorld *factory_simulation_get_world(

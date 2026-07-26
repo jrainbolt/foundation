@@ -3,16 +3,23 @@
 `factory_simulation_tick()` executes this fixed order:
 
 ```text
-1. Apply queued placement and recipe-selection commands FIFO
-2. Update extractor production
-3. Plan and commit existing extractor/refinery/assembler outputs into belts
-4. Advance belt progress
-5. Plan and commit belt-to-belt/refinery/assembler/storage transfers
-6. Update refinery processing
-7. Update assembler processing
-8. Plan and commit inserter drops, then pickups
-9. Increment the tick
+1. Reserve event capacity and clear the previous successful batch
+2. Apply queued commands FIFO
+3. Rebuild power and emit changed existing-consumer allocations
+4. Update extractor production
+5. Plan and commit existing producer outputs
+6. Advance belts and commit belt transfers
+7. Update refinery processing
+8. Update assembler processing
+9. Fill storage outputs
+10. Plan and commit inserter drops, then pickups
+11. Increment the tick
 ```
+
+Events append at these authoritative commits without controlling them. A
+failed event-capacity reservation returns before step 1 changes any observable
+state; successful batches remain inspectable until the next successful tick or
+explicit clear.
 
 Producer conflicts and belt conflicts use lowest source entity ID. A newly
 extractor- or refinery-loaded belt gains progress 1 in that tick. A belt-loaded

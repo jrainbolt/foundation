@@ -18,7 +18,8 @@
 - [x] Configurable one-item storage output for inserters
 - [x] Canonical versioned binary snapshots and deterministic continuation
 - [x] Deterministic Factorio-style power networks
+- [x] Deterministic transient simulation event stream
 - [ ] Inserter variants, filters, and longer arms
 
-The recommended next milestone is a deterministic simulation event stream for
-renderer and UI synchronization.
+Renderer synchronization and other consumers of the event stream remain
+separate future milestones.

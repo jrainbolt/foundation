@@ -467,5 +467,12 @@ FactoryLogisticsResult factory_logistics_endpoint_transfer(
      */
     remove_unchecked(simulation, source);
     insert_unchecked(simulation, destination, expected_item);
+    factory_simulation_emit_event(simulation, (FactoryEvent){
+        .type = FACTORY_EVENT_ITEM_TRANSFERRED,
+        .entity_id = source.entity_id,
+        .related_entity_id = destination.entity_id,
+        .item_type = expected_item,
+        .quantity = 1U
+    });
     return FACTORY_LOGISTICS_RESULT_OK;
 }

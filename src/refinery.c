@@ -1,5 +1,6 @@
 #include "refinery_internal.h"
 #include "power_internal.h"
+#include "event_internal.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -113,7 +114,7 @@ bool factory_refinery_store_remove(
 
 void factory_refinery_store_update(
     FactoryRefineryStore *store,
-    const FactorySimulation *simulation
+    FactorySimulation *simulation
 )
 {
     size_t index;
@@ -145,6 +146,12 @@ void factory_refinery_store_update(
             refinery->output_amount = recipe->output_amount;
             refinery->processing = false;
             refinery->processing_progress = 0U;
+            factory_simulation_emit_event(simulation, (FactoryEvent){
+                .type = FACTORY_EVENT_PRODUCTION_COMPLETED,
+                .entity_id = refinery->entity_id,
+                .item_type = recipe->output_item,
+                .quantity = recipe->output_amount
+            });
         }
     }
 }
