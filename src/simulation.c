@@ -102,6 +102,9 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     factory_pipe_store_destroy(&simulation->pipes);
     factory_fluid_port_store_destroy(&simulation->fluid_ports);
     factory_fluid_network_state_destroy(&simulation->fluid_networks);
+    factory_water_extractor_store_destroy(&simulation->water_extractors);
+    factory_boiler_store_destroy(&simulation->boilers);
+    factory_steam_engine_store_destroy(&simulation->steam_engines);
     factory_burner_store_destroy(&simulation->burners);
     factory_power_state_destroy(&simulation->power);
     factory_power_generator_store_destroy(&simulation->power_generators);
@@ -346,11 +349,15 @@ static FactoryResult place_fluid_tank(
     result = occupy_with_entity(simulation, x, y, out_id);
     if (result != FACTORY_RESULT_OK) return result;
     factory_fluid_storage_store_add(
-        &simulation->fluid_storages, *out_id, x, y,
-        FACTORY_FLUID_CLASS_AQUEOUS, FACTORY_FLUID_TANK_CAPACITY);
+        &simulation->fluid_storages, *out_id,
+        FACTORY_FLUID_STORAGE_DEFAULT, x, y,
+        FACTORY_FLUID_CLASS_AQUEOUS | FACTORY_FLUID_CLASS_VAPOR,
+        FACTORY_FLUID_TANK_CAPACITY);
     factory_fluid_port_store_add(
-        &simulation->fluid_ports, *out_id, x, y,
-        FACTORY_FLUID_CLASS_AQUEOUS);
+        &simulation->fluid_ports, *out_id,
+        FACTORY_FLUID_STORAGE_DEFAULT, x, y,
+        FACTORY_FLUID_CONNECTION_ALL,
+        FACTORY_FLUID_CLASS_AQUEOUS | FACTORY_FLUID_CLASS_VAPOR);
     simulation->fluid_networks.dirty = true;
     return FACTORY_RESULT_OK;
 }
@@ -370,6 +377,113 @@ static FactoryResult place_pipe(
     if (result != FACTORY_RESULT_OK) return result;
     factory_pipe_store_add(&simulation->pipes, *out_id, x, y);
     simulation->fluid_networks.dirty = true;
+    return FACTORY_RESULT_OK;
+}
+
+static bool reserve_two_fluid_storages(FactoryFluidStorageStore *store)
+{
+    if (!factory_fluid_storage_store_reserve_one(store)) return false;
+    if (store->capacity - store->count >= 2U) return true;
+    ++store->count;
+    bool ok = factory_fluid_storage_store_reserve_one(store);
+    --store->count;
+    return ok;
+}
+
+static bool reserve_two_fluid_ports(FactoryFluidPortStore *store)
+{
+    if (!factory_fluid_port_store_reserve_one(store)) return false;
+    if (store->capacity - store->count >= 2U) return true;
+    ++store->count;
+    bool ok = factory_fluid_port_store_reserve_one(store);
+    --store->count;
+    return ok;
+}
+
+static FactoryResult place_water_extractor(
+    FactorySimulation *s, const FactoryCommand *command, FactoryEntityId *out_id
+)
+{
+    int32_t x = command->data.place_water_extractor.x;
+    int32_t y = command->data.place_water_extractor.y;
+    FactoryResult result = validate_empty_tile(s, x, y);
+    if (result != FACTORY_RESULT_OK) return result;
+    if (!factory_water_extractor_store_reserve_one(&s->water_extractors)
+        || !factory_fluid_storage_store_reserve_one(&s->fluid_storages)
+        || !factory_fluid_port_store_reserve_one(&s->fluid_ports))
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    result = occupy_with_entity(s, x, y, out_id);
+    if (result != FACTORY_RESULT_OK) return result;
+    factory_water_extractor_store_add(&s->water_extractors, *out_id, x, y);
+    factory_fluid_storage_store_add(
+        &s->fluid_storages, *out_id, FACTORY_FLUID_STORAGE_DEFAULT, x, y,
+        FACTORY_FLUID_CLASS_AQUEOUS, FACTORY_WATER_EXTRACTOR_CAPACITY);
+    factory_fluid_port_store_add(
+        &s->fluid_ports, *out_id, FACTORY_FLUID_STORAGE_DEFAULT, x, y,
+        FACTORY_FLUID_CONNECTION_ALL, FACTORY_FLUID_CLASS_AQUEOUS);
+    s->fluid_networks.dirty = true;
+    return FACTORY_RESULT_OK;
+}
+
+static FactoryResult place_boiler(
+    FactorySimulation *s, const FactoryCommand *command, FactoryEntityId *out_id
+)
+{
+    int32_t x = command->data.place_boiler.x;
+    int32_t y = command->data.place_boiler.y;
+    FactoryResult result = validate_empty_tile(s, x, y);
+    if (result != FACTORY_RESULT_OK) return result;
+    if (!factory_boiler_store_reserve_one(&s->boilers)
+        || !factory_burner_store_reserve_one(&s->burners)
+        || !reserve_two_fluid_storages(&s->fluid_storages)
+        || !reserve_two_fluid_ports(&s->fluid_ports))
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    result = occupy_with_entity(s, x, y, out_id);
+    if (result != FACTORY_RESULT_OK) return result;
+    factory_boiler_store_add(&s->boilers, *out_id, x, y);
+    factory_burner_store_add(&s->burners, *out_id, FACTORY_FUEL_CLASS_SOLID);
+    factory_fluid_storage_store_add(
+        &s->fluid_storages, *out_id, FACTORY_FLUID_STORAGE_BOILER_INPUT, x, y,
+        FACTORY_FLUID_CLASS_AQUEOUS, FACTORY_BOILER_STORAGE_CAPACITY);
+    factory_fluid_storage_store_add(
+        &s->fluid_storages, *out_id, FACTORY_FLUID_STORAGE_BOILER_OUTPUT, x, y,
+        FACTORY_FLUID_CLASS_VAPOR, FACTORY_BOILER_STORAGE_CAPACITY);
+    factory_fluid_port_store_add(
+        &s->fluid_ports, *out_id, FACTORY_FLUID_STORAGE_BOILER_INPUT, x, y,
+        FACTORY_FLUID_CONNECTION_WEST, FACTORY_FLUID_CLASS_AQUEOUS);
+    factory_fluid_port_store_add(
+        &s->fluid_ports, *out_id, FACTORY_FLUID_STORAGE_BOILER_OUTPUT, x, y,
+        FACTORY_FLUID_CONNECTION_EAST, FACTORY_FLUID_CLASS_VAPOR);
+    s->fluid_networks.dirty = true;
+    return FACTORY_RESULT_OK;
+}
+
+static FactoryResult place_steam_engine(
+    FactorySimulation *s, const FactoryCommand *command, FactoryEntityId *out_id
+)
+{
+    int32_t x = command->data.place_steam_engine.x;
+    int32_t y = command->data.place_steam_engine.y;
+    FactoryResult result = validate_empty_tile(s, x, y);
+    if (result != FACTORY_RESULT_OK) return result;
+    if (!factory_steam_engine_store_reserve_one(&s->steam_engines)
+        || !factory_power_generator_store_reserve_one(&s->power_generators)
+        || !factory_fluid_storage_store_reserve_one(&s->fluid_storages)
+        || !factory_fluid_port_store_reserve_one(&s->fluid_ports))
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    result = occupy_with_entity(s, x, y, out_id);
+    if (result != FACTORY_RESULT_OK) return result;
+    factory_steam_engine_store_add(&s->steam_engines, *out_id, x, y);
+    factory_power_generator_store_add(&s->power_generators, *out_id, x, y);
+    factory_fluid_storage_store_add(
+        &s->fluid_storages, *out_id,
+        FACTORY_FLUID_STORAGE_STEAM_ENGINE_INPUT, x, y,
+        FACTORY_FLUID_CLASS_VAPOR, FACTORY_STEAM_ENGINE_STORAGE_CAPACITY);
+    factory_fluid_port_store_add(
+        &s->fluid_ports, *out_id,
+        FACTORY_FLUID_STORAGE_STEAM_ENGINE_INPUT, x, y,
+        FACTORY_FLUID_CONNECTION_WEST, FACTORY_FLUID_CLASS_VAPOR);
+    s->fluid_networks.dirty = true;
     return FACTORY_RESULT_OK;
 }
 
@@ -561,6 +675,12 @@ static FactoryResult validate_demolition(
         factory_fluid_storage_store_find(&simulation->fluid_storages, id);
     const FactoryPipe *pipe =
         factory_pipe_store_find(&simulation->pipes, id);
+    const FactoryWaterExtractor *water_extractor =
+        factory_water_extractor_store_find(&simulation->water_extractors, id);
+    const FactoryBoiler *boiler =
+        factory_boiler_store_find(&simulation->boilers, id);
+    const FactorySteamEngine *steam_engine =
+        factory_steam_engine_store_find(&simulation->steam_engines, id);
     const FactoryTile *tile;
 
     if (id == 0U) {
@@ -645,6 +765,18 @@ static FactoryResult validate_demolition(
         *out_type = FACTORY_ENTITY_TYPE_POWER_POLE;
         *out_x = power_pole->x;
         *out_y = power_pole->y;
+    } else if (steam_engine != NULL) {
+        const FactoryFluidStorage *steam =
+            factory_fluid_storage_store_find_slot(
+                &simulation->fluid_storages, id,
+                FACTORY_FLUID_STORAGE_STEAM_ENGINE_INPUT);
+        if (power_generator == NULL || steam == NULL)
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        if (steam->quantity != 0U)
+            return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
+        *out_type = FACTORY_ENTITY_TYPE_STEAM_ENGINE;
+        *out_x = steam_engine->x;
+        *out_y = steam_engine->y;
     } else if (power_generator != NULL) {
         const FactoryBurner *burner =
             factory_burner_store_find(&simulation->burners, id);
@@ -657,6 +789,39 @@ static FactoryResult validate_demolition(
         *out_type = FACTORY_ENTITY_TYPE_POWER_GENERATOR;
         *out_x = power_generator->x;
         *out_y = power_generator->y;
+    } else if (water_extractor != NULL) {
+        if (fluid_storage == NULL)
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        if (water_extractor->progress != 0U)
+            return FACTORY_RESULT_ENTITY_BUSY;
+        if (fluid_storage->quantity != 0U)
+            return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
+        *out_type = FACTORY_ENTITY_TYPE_WATER_EXTRACTOR;
+        *out_x = water_extractor->x;
+        *out_y = water_extractor->y;
+    } else if (boiler != NULL) {
+        const FactoryBurner *burner =
+            factory_burner_store_find(&simulation->burners, id);
+        const FactoryFluidStorage *input =
+            factory_fluid_storage_store_find_slot(
+                &simulation->fluid_storages, id,
+                FACTORY_FLUID_STORAGE_BOILER_INPUT);
+        const FactoryFluidStorage *output =
+            factory_fluid_storage_store_find_slot(
+                &simulation->fluid_storages, id,
+                FACTORY_FLUID_STORAGE_BOILER_OUTPUT);
+        if (burner == NULL || input == NULL || output == NULL)
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        if (boiler->conversion_active)
+            return FACTORY_RESULT_ENTITY_BUSY;
+        if (burner->inventory_quantity != 0U
+            || burner->remaining_burn_ticks != 0U
+            || burner->released_energy != 0U
+            || input->quantity != 0U || output->quantity != 0U)
+            return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
+        *out_type = FACTORY_ENTITY_TYPE_BOILER;
+        *out_x = boiler->x;
+        *out_y = boiler->y;
     } else if (fluid_storage != NULL) {
         if (fluid_storage->quantity != 0U)
             return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
@@ -716,6 +881,38 @@ static bool remove_subsystem_record(
         case FACTORY_ENTITY_TYPE_PIPE:
             simulation->fluid_networks.dirty = true;
             return factory_pipe_store_remove(&simulation->pipes, id);
+        case FACTORY_ENTITY_TYPE_WATER_EXTRACTOR:
+            if (!factory_fluid_port_store_remove(
+                    &simulation->fluid_ports, id)
+                || !factory_fluid_storage_store_remove(
+                    &simulation->fluid_storages, id)) return false;
+            simulation->fluid_networks.dirty = true;
+            return factory_water_extractor_store_remove(
+                &simulation->water_extractors, id);
+        case FACTORY_ENTITY_TYPE_BOILER:
+            if (!factory_fluid_port_store_remove(
+                    &simulation->fluid_ports, id)
+                || !factory_fluid_port_store_remove(
+                    &simulation->fluid_ports, id)
+                || !factory_fluid_storage_store_remove(
+                    &simulation->fluid_storages, id)
+                || !factory_fluid_storage_store_remove(
+                    &simulation->fluid_storages, id)
+                || !factory_burner_store_remove(&simulation->burners, id))
+                return false;
+            simulation->fluid_networks.dirty = true;
+            return factory_boiler_store_remove(&simulation->boilers, id);
+        case FACTORY_ENTITY_TYPE_STEAM_ENGINE:
+            if (!factory_fluid_port_store_remove(
+                    &simulation->fluid_ports, id)
+                || !factory_fluid_storage_store_remove(
+                    &simulation->fluid_storages, id)
+                || !factory_power_generator_store_remove(
+                    &simulation->power_generators, id))
+                return false;
+            simulation->fluid_networks.dirty = true;
+            return factory_steam_engine_store_remove(
+                &simulation->steam_engines, id);
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;
@@ -800,6 +997,15 @@ static bool placement_type(
             return true;
         case FACTORY_COMMAND_PLACE_PIPE:
             *out_type = FACTORY_ENTITY_TYPE_PIPE;
+            return true;
+        case FACTORY_COMMAND_PLACE_WATER_EXTRACTOR:
+            *out_type = FACTORY_ENTITY_TYPE_WATER_EXTRACTOR;
+            return true;
+        case FACTORY_COMMAND_PLACE_BOILER:
+            *out_type = FACTORY_ENTITY_TYPE_BOILER;
+            return true;
+        case FACTORY_COMMAND_PLACE_STEAM_ENGINE:
+            *out_type = FACTORY_ENTITY_TYPE_STEAM_ENGINE;
             return true;
         default:
             return false;
@@ -1112,6 +1318,18 @@ static void apply_commands(FactorySimulation *simulation)
                 break;
             case FACTORY_COMMAND_PLACE_PIPE:
                 result->result = place_pipe(
+                    simulation, &result->command, &result->entity_id);
+                break;
+            case FACTORY_COMMAND_PLACE_WATER_EXTRACTOR:
+                result->result = place_water_extractor(
+                    simulation, &result->command, &result->entity_id);
+                break;
+            case FACTORY_COMMAND_PLACE_BOILER:
+                result->result = place_boiler(
+                    simulation, &result->command, &result->entity_id);
+                break;
+            case FACTORY_COMMAND_PLACE_STEAM_ENGINE:
+                result->result = place_steam_engine(
                     simulation, &result->command, &result->entity_id);
                 break;
             case FACTORY_COMMAND_FLUID_INSERT:
@@ -2021,6 +2239,8 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     (void)factory_fluid_network_rebuild(simulation, true);
     factory_fluid_network_transfer(simulation);
     factory_burner_store_begin_tick(&simulation->burners, simulation);
+    factory_fluid_machines_update(simulation);
+    factory_steam_engine_begin_tick(simulation);
     (void)factory_power_rebuild(simulation, true);
     factory_power_consume_generation(simulation);
     factory_burner_store_finish_tick(&simulation->burners, simulation);

@@ -12,6 +12,7 @@ typedef uint32_t FactoryFluidQuantity;
 typedef uint32_t FactoryFluidClassMask;
 
 #define FACTORY_FLUID_CLASS_AQUEOUS (1U << 0U)
+#define FACTORY_FLUID_CLASS_VAPOR (1U << 1U)
 #define FACTORY_FLUID_TANK_CAPACITY 10000U
 #define FACTORY_PIPE_TRANSFER_RATE 100U
 #define FACTORY_FLUID_NETWORK_NONE 0U
@@ -29,8 +30,16 @@ typedef enum {
 
 typedef enum {
     FACTORY_FLUID_NONE = 0,
-    FACTORY_FLUID_WATER
+    FACTORY_FLUID_WATER,
+    FACTORY_FLUID_STEAM
 } FactoryFluidType;
+
+typedef enum {
+    FACTORY_FLUID_STORAGE_DEFAULT = 0,
+    FACTORY_FLUID_STORAGE_BOILER_INPUT,
+    FACTORY_FLUID_STORAGE_BOILER_OUTPUT,
+    FACTORY_FLUID_STORAGE_STEAM_ENGINE_INPUT
+} FactoryFluidStorageSlot;
 
 typedef struct {
     FactoryFluidType fluid_type;
@@ -40,6 +49,7 @@ typedef struct {
 
 typedef struct {
     FactoryEntityId owner_entity_id;
+    FactoryFluidStorageSlot slot;
     int32_t x;
     int32_t y;
     FactoryFluidClassMask accepted_fluid_classes;
@@ -61,6 +71,7 @@ typedef struct {
 typedef struct {
     FactoryEntityId owner_entity_id;
     FactoryEntityId storage_owner_entity_id;
+    FactoryFluidStorageSlot storage_slot;
     int32_t x;
     int32_t y;
     uint32_t allowed_directions;
@@ -91,6 +102,12 @@ FactoryResult factory_simulation_get_fluid_storage(
     FactoryEntityId owner_entity_id,
     FactoryFluidStorageInspection *out_storage
 );
+FactoryResult factory_simulation_get_fluid_storage_slot(
+    const FactorySimulation *simulation,
+    FactoryEntityId owner_entity_id,
+    FactoryFluidStorageSlot slot,
+    FactoryFluidStorageInspection *out_storage
+);
 FactoryResult factory_simulation_get_pipe(
     const FactorySimulation *simulation,
     FactoryEntityId entity_id,
@@ -99,6 +116,12 @@ FactoryResult factory_simulation_get_pipe(
 FactoryResult factory_simulation_get_fluid_port(
     const FactorySimulation *simulation,
     FactoryEntityId owner_entity_id,
+    FactoryFluidPortInspection *out_port
+);
+FactoryResult factory_simulation_get_fluid_port_slot(
+    const FactorySimulation *simulation,
+    FactoryEntityId owner_entity_id,
+    FactoryFluidStorageSlot slot,
     FactoryFluidPortInspection *out_port
 );
 size_t factory_simulation_get_fluid_network_count(

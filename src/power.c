@@ -220,8 +220,13 @@ FactoryPowerUnits factory_power_source_available_generation(
     generator = factory_power_generator_store_find(
         &simulation->power_generators, entity_id
     );
+    if (generator == NULL) return 0U;
+    if (factory_steam_engine_store_find(
+            &simulation->steam_engines, entity_id) != NULL)
+        return factory_steam_engine_available_generation(
+            simulation, entity_id);
     burner = factory_burner_store_find(&simulation->burners, entity_id);
-    return generator == NULL || burner == NULL
+    return burner == NULL
         ? 0U
         : burner->released_energy < generator->generation_capacity
             ? (FactoryPowerUnits)burner->released_energy
@@ -244,7 +249,6 @@ void factory_power_consume_generation(FactorySimulation *simulation)
             ++generator_index) {
             const FactoryPowerGeneratorInspection *inspection =
                 &simulation->power.generators[generator_index];
-            FactoryBurner *burner;
             FactoryEnergy amount;
             FactoryPowerUnits available;
             if (inspection->network_id
@@ -254,11 +258,20 @@ void factory_power_consume_generation(FactorySimulation *simulation)
                 simulation, inspection->entity_id);
             if (available == 0U) continue;
             amount = remaining > available ? available : remaining;
-            burner = factory_burner_store_find_mutable(
-                &simulation->burners, inspection->entity_id
-            );
-            if (factory_burner_consume_energy(burner, amount))
-                remaining -= amount;
+            if (factory_steam_engine_store_find(
+                    &simulation->steam_engines,
+                    inspection->entity_id) != NULL) {
+                if (factory_steam_engine_consume_for_generation(
+                        simulation, inspection->entity_id,
+                        (FactoryPowerUnits)amount))
+                    remaining -= amount;
+            } else {
+                FactoryBurner *burner =
+                    factory_burner_store_find_mutable(
+                        &simulation->burners, inspection->entity_id);
+                if (factory_burner_consume_energy(burner, amount))
+                    remaining -= amount;
+            }
         }
     }
 }

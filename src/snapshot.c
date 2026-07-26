@@ -9,7 +9,7 @@
 
 #define SNAPSHOT_HEADER_SIZE 48U
 #define SNAPSHOT_SECTION_HEADER_SIZE 16U
-#define SNAPSHOT_SECTION_COUNT 16U
+#define SNAPSHOT_SECTION_COUNT 19U
 
 static const uint8_t snapshot_magic[8] = {
     'F', 'O', 'U', 'N', 'D', 'A', 'T', 'N'
@@ -30,6 +30,9 @@ typedef enum {
     SNAPSHOT_SECTION_POWER_GENERATORS,
     SNAPSHOT_SECTION_FLUID_STORAGES,
     SNAPSHOT_SECTION_PIPES,
+    SNAPSHOT_SECTION_WATER_EXTRACTORS,
+    SNAPSHOT_SECTION_BOILERS,
+    SNAPSHOT_SECTION_STEAM_ENGINES,
     SNAPSHOT_SECTION_COMMANDS,
     SNAPSHOT_SECTION_RESULTS
 } SnapshotSection;
@@ -260,8 +263,11 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_records(&size, simulation->storages.count, 60U)
         || !checked_records(&size, simulation->power_poles.count, 12U)
         || !checked_records(&size, simulation->power_generators.count, 44U)
-        || !checked_records(&size, simulation->fluid_storages.count, 28U)
+        || !checked_records(&size, simulation->fluid_storages.count, 32U)
         || !checked_records(&size, simulation->pipes.count, 12U)
+        || !checked_records(&size, simulation->water_extractors.count, 16U)
+        || !checked_records(&size, simulation->boilers.count, 48U)
+        || !checked_records(&size, simulation->steam_engines.count, 16U)
         || !checked_records(&size, simulation->command_count, 24U)
         || !checked_records(&size, simulation->result_count, 68U)
         || !size_to_u32(simulation->entities->count)
@@ -277,6 +283,9 @@ static FactoryResult snapshot_size_unvalidated(
         || !size_to_u32(simulation->power_generators.count)
         || !size_to_u32(simulation->fluid_storages.count)
         || !size_to_u32(simulation->pipes.count)
+        || !size_to_u32(simulation->water_extractors.count)
+        || !size_to_u32(simulation->boilers.count)
+        || !size_to_u32(simulation->steam_engines.count)
         || !section_size_valid(
             simulation->entities->count, 4U, 8U)
         || !section_size_valid(tiles, 16U, 8U)
@@ -289,8 +298,11 @@ static FactoryResult snapshot_size_unvalidated(
         || !section_size_valid(simulation->storages.count, 60U, 0U)
         || !section_size_valid(simulation->power_poles.count, 12U, 0U)
         || !section_size_valid(simulation->power_generators.count, 44U, 0U)
-        || !section_size_valid(simulation->fluid_storages.count, 28U, 0U)
+        || !section_size_valid(simulation->fluid_storages.count, 32U, 0U)
         || !section_size_valid(simulation->pipes.count, 12U, 0U)
+        || !section_size_valid(simulation->water_extractors.count, 16U, 0U)
+        || !section_size_valid(simulation->boilers.count, 48U, 0U)
+        || !section_size_valid(simulation->steam_engines.count, 16U, 0U)
         || size > UINT64_MAX) {
         return FACTORY_RESULT_SNAPSHOT_SIZE_OVERFLOW;
     }
@@ -327,11 +339,21 @@ static bool entity_has_subsystem(
         factory_fluid_storage_store_find(&simulation->fluid_storages, id);
     const FactoryPipe *pipe =
         factory_pipe_store_find(&simulation->pipes, id);
+    const FactoryWaterExtractor *water_extractor =
+        factory_water_extractor_store_find(&simulation->water_extractors, id);
+    const FactoryBoiler *boiler =
+        factory_boiler_store_find(&simulation->boilers, id);
+    const FactorySteamEngine *steam_engine =
+        factory_steam_engine_store_find(&simulation->steam_engines, id);
+    bool tank = fluid_storage != NULL && water_extractor == NULL
+        && steam_engine == NULL;
     size_t found = (extractor != NULL) + (belt != NULL)
         + (splitter != NULL) + (refinery != NULL) + (assembler != NULL)
         + (inserter != NULL) + (storage != NULL)
-        + (pole != NULL) + (generator != NULL) + (fluid_storage != NULL)
-        + (pipe != NULL);
+        + (pole != NULL) + (generator != NULL) + tank
+        + (pipe != NULL) + (water_extractor != NULL) + (boiler != NULL)
+        + (steam_engine != NULL);
+    if (steam_engine != NULL && generator != NULL) --found;
 
     if (found != 1U) {
         return false;
@@ -354,7 +376,13 @@ static bool entity_has_subsystem(
         *out_x = pole->x; *out_y = pole->y;
     } else if (generator != NULL) {
         *out_x = generator->x; *out_y = generator->y;
-    } else if (fluid_storage != NULL) {
+    } else if (water_extractor != NULL) {
+        *out_x = water_extractor->x; *out_y = water_extractor->y;
+    } else if (boiler != NULL) {
+        *out_x = boiler->x; *out_y = boiler->y;
+    } else if (steam_engine != NULL) {
+        *out_x = steam_engine->x; *out_y = steam_engine->y;
+    } else if (tank) {
         *out_x = fluid_storage->x; *out_y = fluid_storage->y;
     } else {
         *out_x = pipe->x; *out_y = pipe->y;
@@ -429,13 +457,24 @@ static FactoryResult validate_simulation(
         || simulation->result_count > FACTORY_COMMAND_QUEUE_CAPACITY) {
         return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
+    if (simulation->fluid_storages.count
+        < simulation->water_extractors.count + simulation->boilers.count * 2U
+            + simulation->steam_engines.count)
+        return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    if (simulation->power_generators.count < simulation->steam_engines.count)
+        return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     subsystem_count = simulation->extractors.count
         + simulation->belts.count + simulation->splitters.count
         + simulation->refineries.count + simulation->assemblers.count
         + simulation->inserters.count + simulation->storages.count
         + simulation->power_poles.count
-        + simulation->power_generators.count
-        + simulation->fluid_storages.count + simulation->pipes.count;
+        + simulation->power_generators.count + simulation->pipes.count
+        + simulation->water_extractors.count + simulation->boilers.count
+        + simulation->steam_engines.count
+        + simulation->fluid_storages.count
+        - simulation->water_extractors.count - simulation->boilers.count * 2U
+        - simulation->steam_engines.count
+        - simulation->steam_engines.count;
     if (subsystem_count != simulation->entities->count) {
         return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
@@ -621,13 +660,24 @@ static FactoryResult validate_simulation(
     for (index = 0U; index < simulation->power_generators.count; ++index) {
         const FactoryPowerGenerator *generator =
             &simulation->power_generators.items[index];
+        const FactorySteamEngine *steam_engine =
+            factory_steam_engine_store_find(
+                &simulation->steam_engines, generator->entity_id);
         const FactoryBurner *burner = factory_burner_store_find(
             &simulation->burners, generator->entity_id);
         const FactoryFuelDefinition *inventory_definition;
         const FactoryFuelDefinition *current_definition;
         if (generator->generation_capacity
-                != FACTORY_BASIC_GENERATOR_CAPACITY
-            || burner == NULL
+                != FACTORY_BASIC_GENERATOR_CAPACITY)
+            return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+        if (steam_engine != NULL) {
+            if (burner != NULL
+                || steam_engine->recipe_id
+                    != FACTORY_STEAM_GENERATION_RECIPE_BASIC)
+                return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+            continue;
+        }
+        if (burner == NULL
             || burner->accepted_fuel_classes != FACTORY_FUEL_CLASS_SOLID) {
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
         }
@@ -658,16 +708,129 @@ static FactoryResult validate_simulation(
         }
     }
     if (simulation->burners.count
-        != simulation->power_generators.count)
+        != simulation->power_generators.count - simulation->steam_engines.count
+            + simulation->boilers.count)
         return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    for (index = 0U; index < simulation->steam_engines.count; ++index) {
+        const FactorySteamEngine *engine =
+            &simulation->steam_engines.items[index];
+        const FactoryFluidStorage *storage =
+            factory_fluid_storage_store_find_slot(
+                &simulation->fluid_storages, engine->entity_id,
+                FACTORY_FLUID_STORAGE_STEAM_ENGINE_INPUT);
+        const FactoryPowerGenerator *generator =
+            factory_power_generator_store_find(
+                &simulation->power_generators, engine->entity_id);
+        if (engine->recipe_id != FACTORY_STEAM_GENERATION_RECIPE_BASIC
+            || engine->generated_last_tick > FACTORY_STEAM_ENGINE_MAX_OUTPUT
+            || storage == NULL || generator == NULL
+            || storage->capacity != FACTORY_STEAM_ENGINE_STORAGE_CAPACITY
+            || storage->accepted_fluid_classes != FACTORY_FLUID_CLASS_VAPOR)
+            return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
+    for (index = 0U; index < simulation->water_extractors.count; ++index) {
+        const FactoryWaterExtractor *machine =
+            &simulation->water_extractors.items[index];
+        const FactoryFluidStorage *storage =
+            factory_fluid_storage_store_find_slot(
+                &simulation->fluid_storages, machine->entity_id,
+                FACTORY_FLUID_STORAGE_DEFAULT);
+        if (machine->progress >= FACTORY_WATER_EXTRACTOR_CYCLE_TICKS
+            || storage == NULL
+            || storage->capacity != FACTORY_WATER_EXTRACTOR_CAPACITY
+            || storage->accepted_fluid_classes != FACTORY_FLUID_CLASS_AQUEOUS)
+            return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
+    for (index = 0U; index < simulation->boilers.count; ++index) {
+        const FactoryBoiler *machine = &simulation->boilers.items[index];
+        const FactoryFluidStorage *input =
+            factory_fluid_storage_store_find_slot(
+                &simulation->fluid_storages, machine->entity_id,
+                FACTORY_FLUID_STORAGE_BOILER_INPUT);
+        const FactoryFluidStorage *output =
+            factory_fluid_storage_store_find_slot(
+                &simulation->fluid_storages, machine->entity_id,
+                FACTORY_FLUID_STORAGE_BOILER_OUTPUT);
+        const FactoryBurner *burner =
+            factory_burner_store_find(&simulation->burners,
+                                      machine->entity_id);
+        const FactoryFuelDefinition *inventory_definition =
+            burner == NULL ? NULL
+                : factory_fuel_definition_get(burner->inventory_item);
+        const FactoryFuelDefinition *current_definition =
+            burner == NULL ? NULL
+                : factory_fuel_definition_get(burner->current_fuel_item);
+        if (machine->recipe_id != FACTORY_FLUID_RECIPE_BOIL_WATER
+            || input == NULL || output == NULL || burner == NULL
+            || input->capacity != FACTORY_BOILER_STORAGE_CAPACITY
+            || output->capacity != FACTORY_BOILER_STORAGE_CAPACITY
+            || input->accepted_fluid_classes != FACTORY_FLUID_CLASS_AQUEOUS
+            || output->accepted_fluid_classes != FACTORY_FLUID_CLASS_VAPOR
+            || burner->accepted_fuel_classes != FACTORY_FUEL_CLASS_SOLID
+            || (burner->inventory_quantity == 0U)
+                != (burner->inventory_item == FACTORY_ITEM_NONE)
+            || (burner->remaining_burn_ticks == 0U)
+                != (burner->current_fuel_item == FACTORY_ITEM_NONE)
+            || (burner->inventory_quantity != 0U
+                && (inventory_definition == NULL
+                    || (inventory_definition->fuel_class
+                        & burner->accepted_fuel_classes) == 0U))
+            || (burner->remaining_burn_ticks != 0U
+                && (current_definition == NULL
+                    || burner->remaining_burn_ticks
+                        >= current_definition->burn_duration_ticks))
+            || burner->released_energy
+                > FACTORY_BURNER_RELEASED_ENERGY_CAPACITY
+            || (burner->remaining_burn_ticks != 0U
+                && factory_burner_unreleased_energy(burner)
+                    > FACTORY_BURNER_RELEASED_ENERGY_CAPACITY
+                        - burner->released_energy))
+            return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
     for (index = 0U; index < simulation->fluid_storages.count; ++index) {
         const FactoryFluidStorage *storage =
             &simulation->fluid_storages.items[index];
         const FactoryFluidDefinition *definition =
             factory_fluid_definition_get(storage->fluid_type);
-        if (storage->capacity != FACTORY_FLUID_TANK_CAPACITY
-            || storage->accepted_fluid_classes
-                != FACTORY_FLUID_CLASS_AQUEOUS
+        const FactoryWaterExtractor *water_extractor =
+            factory_water_extractor_store_find(
+                &simulation->water_extractors, storage->owner_entity_id);
+        const FactoryBoiler *boiler = factory_boiler_store_find(
+            &simulation->boilers, storage->owner_entity_id);
+        const FactorySteamEngine *steam_engine =
+            factory_steam_engine_store_find(
+                &simulation->steam_engines, storage->owner_entity_id);
+        bool storage_shape_valid =
+            (water_extractor != NULL
+                && storage->slot == FACTORY_FLUID_STORAGE_DEFAULT
+                && storage->capacity == FACTORY_WATER_EXTRACTOR_CAPACITY
+                && storage->accepted_fluid_classes
+                    == FACTORY_FLUID_CLASS_AQUEOUS)
+            || (boiler != NULL
+                && storage->slot == FACTORY_FLUID_STORAGE_BOILER_INPUT
+                && storage->capacity == FACTORY_BOILER_STORAGE_CAPACITY
+                && storage->accepted_fluid_classes
+                    == FACTORY_FLUID_CLASS_AQUEOUS)
+            || (boiler != NULL
+                && storage->slot == FACTORY_FLUID_STORAGE_BOILER_OUTPUT
+                && storage->capacity == FACTORY_BOILER_STORAGE_CAPACITY
+                && storage->accepted_fluid_classes
+                    == FACTORY_FLUID_CLASS_VAPOR)
+            || (water_extractor == NULL && boiler == NULL
+                && steam_engine != NULL
+                && storage->slot
+                    == FACTORY_FLUID_STORAGE_STEAM_ENGINE_INPUT
+                && storage->capacity == FACTORY_STEAM_ENGINE_STORAGE_CAPACITY
+                && storage->accepted_fluid_classes
+                    == FACTORY_FLUID_CLASS_VAPOR)
+            || (water_extractor == NULL && boiler == NULL
+                && steam_engine == NULL
+                && storage->slot == FACTORY_FLUID_STORAGE_DEFAULT
+                && storage->capacity == FACTORY_FLUID_TANK_CAPACITY
+                && storage->accepted_fluid_classes
+                    == (FACTORY_FLUID_CLASS_AQUEOUS
+                        | FACTORY_FLUID_CLASS_VAPOR));
+        if (!storage_shape_valid
             || storage->quantity > storage->capacity
             || (storage->quantity == 0U)
                 != (storage->fluid_type == FACTORY_FLUID_NONE)
@@ -676,6 +839,13 @@ static FactoryResult validate_simulation(
                     || (definition->fluid_class
                         & storage->accepted_fluid_classes) == 0U)))
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+        for (size_t other = index + 1U;
+             other < simulation->fluid_storages.count; ++other)
+            if (storage->owner_entity_id
+                    == simulation->fluid_storages.items[other].owner_entity_id
+                && storage->slot
+                    == simulation->fluid_storages.items[other].slot)
+                return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
     for (index = 0U; index < simulation->command_count; ++index) {
         if (!snapshot_command_valid(&simulation->commands[index])) {
@@ -686,7 +856,7 @@ static FactoryResult validate_simulation(
         const FactoryCommandResult *value = &simulation->results[index];
         if (!snapshot_command_valid(&value->command)
             || value->result > FACTORY_RESULT_FLUID_NETWORK_NOT_FOUND
-            || value->entity_type > FACTORY_ENTITY_TYPE_PIPE
+            || value->entity_type > FACTORY_ENTITY_TYPE_STEAM_ENGINE
             || value->previous_assembler_recipe
                 >= FACTORY_ASSEMBLER_RECIPE_COUNT
             || value->new_assembler_recipe
@@ -793,6 +963,18 @@ static void write_command(
                 command->data.fluid_transfer.destination_entity_id;
             fields[2] = command->data.fluid_transfer.quantity;
             break;
+        case FACTORY_COMMAND_PLACE_WATER_EXTRACTOR:
+            fields[0] = (uint32_t)command->data.place_water_extractor.x;
+            fields[1] = (uint32_t)command->data.place_water_extractor.y;
+            break;
+        case FACTORY_COMMAND_PLACE_BOILER:
+            fields[0] = (uint32_t)command->data.place_boiler.x;
+            fields[1] = (uint32_t)command->data.place_boiler.y;
+            break;
+        case FACTORY_COMMAND_PLACE_STEAM_ENGINE:
+            fields[0] = (uint32_t)command->data.place_steam_engine.x;
+            fields[1] = (uint32_t)command->data.place_steam_engine.y;
+            break;
     }
     write_u32(writer, (uint32_t)command->type);
     for (index = 0U; index < 5U; ++index) {
@@ -815,7 +997,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             return false;
         }
     }
-    if (type > FACTORY_COMMAND_PLACE_PIPE) {
+    if (type > FACTORY_COMMAND_PLACE_STEAM_ENGINE) {
         return false;
     }
     command->type = (FactoryCommandType)type;
@@ -843,6 +1025,9 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             case FACTORY_COMMAND_PLACE_FLUID_TANK:
             case FACTORY_COMMAND_PLACE_PIPE:
             case FACTORY_COMMAND_FLUID_REMOVE:
+            case FACTORY_COMMAND_PLACE_WATER_EXTRACTOR:
+            case FACTORY_COMMAND_PLACE_BOILER:
+            case FACTORY_COMMAND_PLACE_STEAM_ENGINE:
                 used = 2U;
                 break;
             case FACTORY_COMMAND_DEMOLISH_ENTITY:
@@ -950,6 +1135,18 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             command->data.fluid_transfer.source_entity_id = fields[0];
             command->data.fluid_transfer.destination_entity_id = fields[1];
             command->data.fluid_transfer.quantity = fields[2];
+            break;
+        case FACTORY_COMMAND_PLACE_WATER_EXTRACTOR:
+            command->data.place_water_extractor.x = (int32_t)fields[0];
+            command->data.place_water_extractor.y = (int32_t)fields[1];
+            break;
+        case FACTORY_COMMAND_PLACE_BOILER:
+            command->data.place_boiler.x = (int32_t)fields[0];
+            command->data.place_boiler.y = (int32_t)fields[1];
+            break;
+        case FACTORY_COMMAND_PLACE_STEAM_ENGINE:
+            command->data.place_steam_engine.x = (int32_t)fields[0];
+            command->data.place_steam_engine.y = (int32_t)fields[1];
             break;
     }
     return snapshot_command_valid(command);
@@ -1186,24 +1383,31 @@ static void write_snapshot(
             const FactoryBurner *burner =
                 factory_burner_store_find(&simulation->burners,
                                           value->entity_id);
-            write_u32(writer, burner->accepted_fuel_classes);
-            write_u32(writer, burner->inventory_item);
-            write_u32(writer, burner->inventory_quantity);
-            write_u32(writer, burner->current_fuel_item);
-            write_u32(writer, burner->remaining_burn_ticks);
-            write_u64(writer, burner->released_energy);
+            write_u32(writer,
+                burner == NULL ? 0U : burner->accepted_fuel_classes);
+            write_u32(writer,
+                burner == NULL ? 0U : burner->inventory_item);
+            write_u32(writer,
+                burner == NULL ? 0U : burner->inventory_quantity);
+            write_u32(writer,
+                burner == NULL ? 0U : burner->current_fuel_item);
+            write_u32(writer,
+                burner == NULL ? 0U : burner->remaining_burn_ticks);
+            write_u64(writer,
+                burner == NULL ? 0U : burner->released_energy);
         }
     }
 
     write_section_header(
         writer, SNAPSHOT_SECTION_FLUID_STORAGES,
         simulation->fluid_storages.count,
-        simulation->fluid_storages.count * 28U
+        simulation->fluid_storages.count * 32U
     );
     for (index = 0U; index < simulation->fluid_storages.count; ++index) {
         const FactoryFluidStorage *value =
             &simulation->fluid_storages.items[index];
         write_u32(writer, value->owner_entity_id);
+        write_u32(writer, value->slot);
         write_i32(writer, value->x);
         write_i32(writer, value->y);
         write_u32(writer, value->accepted_fluid_classes);
@@ -1221,6 +1425,55 @@ static void write_snapshot(
         write_u32(writer, value->entity_id);
         write_i32(writer, value->x);
         write_i32(writer, value->y);
+    }
+
+    write_section_header(
+        writer, SNAPSHOT_SECTION_WATER_EXTRACTORS,
+        simulation->water_extractors.count,
+        simulation->water_extractors.count * 16U
+    );
+    for (index = 0U; index < simulation->water_extractors.count; ++index) {
+        const FactoryWaterExtractor *value =
+            &simulation->water_extractors.items[index];
+        write_u32(writer, value->entity_id);
+        write_i32(writer, value->x);
+        write_i32(writer, value->y);
+        write_u32(writer, value->progress);
+    }
+
+    write_section_header(
+        writer, SNAPSHOT_SECTION_BOILERS,
+        simulation->boilers.count, simulation->boilers.count * 48U
+    );
+    for (index = 0U; index < simulation->boilers.count; ++index) {
+        const FactoryBoiler *value = &simulation->boilers.items[index];
+        const FactoryBurner *burner = factory_burner_store_find(
+            &simulation->burners, value->entity_id);
+        write_u32(writer, value->entity_id);
+        write_i32(writer, value->x);
+        write_i32(writer, value->y);
+        write_u32(writer, value->recipe_id);
+        write_u32(writer, value->conversion_active ? 1U : 0U);
+        write_u32(writer, burner->accepted_fuel_classes);
+        write_u32(writer, burner->inventory_item);
+        write_u32(writer, burner->inventory_quantity);
+        write_u32(writer, burner->current_fuel_item);
+        write_u32(writer, burner->remaining_burn_ticks);
+        write_u64(writer, burner->released_energy);
+    }
+
+    write_section_header(
+        writer, SNAPSHOT_SECTION_STEAM_ENGINES,
+        simulation->steam_engines.count,
+        simulation->steam_engines.count * 16U
+    );
+    for (index = 0U; index < simulation->steam_engines.count; ++index) {
+        const FactorySteamEngine *value =
+            &simulation->steam_engines.items[index];
+        write_u32(writer, value->entity_id);
+        write_i32(writer, value->x);
+        write_i32(writer, value->y);
+        write_u32(writer, value->recipe_id);
     }
 
     write_section_header(
@@ -1635,12 +1888,13 @@ static bool load_sections(
     if (!allocate_records(
             (void **)&simulation->burners.items,
             count, sizeof(FactoryBurner))) return false;
-    simulation->burners.count = count;
+    simulation->burners.count = 0U;
     simulation->burners.capacity = count;
     for (index = 0U; index < count; ++index) {
         FactoryPowerGenerator *v =
             &simulation->power_generators.items[index];
-        FactoryBurner *burner = &simulation->burners.items[index];
+        FactoryBurner burner_value = {0};
+        FactoryBurner *burner = &burner_value;
         if (!read_u32(reader, &v->entity_id)
             || !read_i32(reader, &v->x)
             || !read_i32(reader, &v->y)
@@ -1654,10 +1908,12 @@ static bool load_sections(
         burner->current_fuel_item = (FactoryItemType)value;
         if (!read_u32(reader, &burner->remaining_burn_ticks)
             || !read_u64(reader, &burner->released_energy)) return false;
+        if (burner->accepted_fuel_classes != 0U)
+            simulation->burners.items[simulation->burners.count++] = *burner;
     }
 
     if (!read_section_header(
-            reader, SNAPSHOT_SECTION_FLUID_STORAGES, 28U, 0U, &count)
+            reader, SNAPSHOT_SECTION_FLUID_STORAGES, 32U, 0U, &count)
         || !allocate_records(
             (void **)&simulation->fluid_storages.items,
             count, sizeof(FactoryFluidStorage))) {
@@ -1668,10 +1924,12 @@ static bool load_sections(
     for (index = 0U; index < count; ++index) {
         FactoryFluidStorage *v = &simulation->fluid_storages.items[index];
         if (!read_u32(reader, &v->owner_entity_id)
+            || !read_u32(reader, &value)
             || !read_i32(reader, &v->x)
             || !read_i32(reader, &v->y)
-            || !read_u32(reader, &v->accepted_fluid_classes)
-            || !read_u32(reader, &value)) return false;
+            || !read_u32(reader, &v->accepted_fluid_classes)) return false;
+        v->slot = (FactoryFluidStorageSlot)value;
+        if (!read_u32(reader, &value)) return false;
         v->fluid_type = (FactoryFluidType)value;
         if (!read_u32(reader, &v->quantity)
             || !read_u32(reader, &v->capacity)) return false;
@@ -1691,6 +1949,78 @@ static bool load_sections(
         if (!read_u32(reader, &v->entity_id)
             || !read_i32(reader, &v->x)
             || !read_i32(reader, &v->y)) return false;
+    }
+
+    if (!read_section_header(
+            reader, SNAPSHOT_SECTION_WATER_EXTRACTORS, 16U, 0U, &count)
+        || !allocate_records(
+            (void **)&simulation->water_extractors.items,
+            count, sizeof(FactoryWaterExtractor))) return false;
+    simulation->water_extractors.count = count;
+    simulation->water_extractors.capacity = count;
+    for (index = 0U; index < count; ++index) {
+        FactoryWaterExtractor *v = &simulation->water_extractors.items[index];
+        if (!read_u32(reader, &v->entity_id)
+            || !read_i32(reader, &v->x)
+            || !read_i32(reader, &v->y)
+            || !read_u32(reader, &v->progress)) return false;
+    }
+
+    if (!read_section_header(
+            reader, SNAPSHOT_SECTION_BOILERS, 48U, 0U, &count)
+        || !allocate_records(
+            (void **)&simulation->boilers.items,
+            count, sizeof(FactoryBoiler))) return false;
+    simulation->boilers.count = count;
+    simulation->boilers.capacity = count;
+    if (count != 0U) {
+        size_t burner_count = simulation->burners.count + count;
+        FactoryBurner *resized;
+        if (burner_count < count
+            || burner_count > SIZE_MAX / sizeof(*resized)) return false;
+        resized = realloc(simulation->burners.items,
+                          burner_count * sizeof(*resized));
+        if (resized == NULL) return false;
+        simulation->burners.items = resized;
+        simulation->burners.capacity = burner_count;
+    }
+    for (index = 0U; index < count; ++index) {
+        FactoryBoiler *v = &simulation->boilers.items[index];
+        FactoryBurner *burner =
+            &simulation->burners.items[simulation->burners.count + index];
+        if (!read_u32(reader, &v->entity_id)
+            || !read_i32(reader, &v->x)
+            || !read_i32(reader, &v->y)
+            || !read_u32(reader, &value)) return false;
+        v->recipe_id = (FactoryFluidRecipeId)value;
+        if (!read_bool32(reader, &v->conversion_active)
+            || !read_u32(reader, &burner->accepted_fuel_classes)
+            || !read_u32(reader, &value)) return false;
+        burner->owner_entity_id = v->entity_id;
+        burner->inventory_item = (FactoryItemType)value;
+        if (!read_u32(reader, &burner->inventory_quantity)
+            || !read_u32(reader, &value)) return false;
+        burner->current_fuel_item = (FactoryItemType)value;
+        if (!read_u32(reader, &burner->remaining_burn_ticks)
+            || !read_u64(reader, &burner->released_energy)) return false;
+    }
+    simulation->burners.count += count;
+
+    if (!read_section_header(
+            reader, SNAPSHOT_SECTION_STEAM_ENGINES, 16U, 0U, &count)
+        || !allocate_records(
+            (void **)&simulation->steam_engines.items,
+            count, sizeof(FactorySteamEngine))) return false;
+    simulation->steam_engines.count = count;
+    simulation->steam_engines.capacity = count;
+    for (index = 0U; index < count; ++index) {
+        FactorySteamEngine *v = &simulation->steam_engines.items[index];
+        if (!read_u32(reader, &v->entity_id)
+            || !read_i32(reader, &v->x)
+            || !read_i32(reader, &v->y)
+            || !read_u32(reader, &value)) return false;
+        v->recipe_id = (FactorySteamGenerationRecipeId)value;
+        v->generated_last_tick = 0U;
     }
 
     if (!read_section_header(
@@ -1821,7 +2151,16 @@ FactoryResult factory_simulation_load_snapshot(
         }
         factory_fluid_port_store_add(
             &simulation->fluid_ports, storage->owner_entity_id,
-            storage->x, storage->y, storage->accepted_fluid_classes);
+            storage->slot, storage->x, storage->y,
+            storage->slot == FACTORY_FLUID_STORAGE_BOILER_INPUT
+                ? FACTORY_FLUID_CONNECTION_WEST
+                : storage->slot
+                    == FACTORY_FLUID_STORAGE_STEAM_ENGINE_INPUT
+                    ? FACTORY_FLUID_CONNECTION_WEST
+                : storage->slot == FACTORY_FLUID_STORAGE_BOILER_OUTPUT
+                    ? FACTORY_FLUID_CONNECTION_EAST
+                    : FACTORY_FLUID_CONNECTION_ALL,
+            storage->accepted_fluid_classes);
     }
     result = validate_simulation(simulation);
     if (result != FACTORY_RESULT_OK) {

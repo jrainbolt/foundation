@@ -54,6 +54,15 @@ FactoryCommand place(
     case FACTORY_COMMAND_PLACE_PIPE:
         command.data.place_pipe = {x, y};
         break;
+    case FACTORY_COMMAND_PLACE_WATER_EXTRACTOR:
+        command.data.place_water_extractor = {x, y};
+        break;
+    case FACTORY_COMMAND_PLACE_BOILER:
+        command.data.place_boiler = {x, y};
+        break;
+    case FACTORY_COMMAND_PLACE_STEAM_ENGINE:
+        command.data.place_steam_engine = {x, y};
+        break;
     default:
         break;
     }
@@ -317,6 +326,21 @@ FactoryResult FoundationSimulation::build_demo()
     if (result != FACTORY_RESULT_OK)
         return result;
     result = submit(place(FACTORY_COMMAND_PLACE_PIPE, 10, 7));
+    if (result != FACTORY_RESULT_OK)
+        return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_WATER_EXTRACTOR, 7, 6));
+    if (result != FACTORY_RESULT_OK)
+        return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_PIPE, 8, 6));
+    if (result != FACTORY_RESULT_OK)
+        return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_BOILER, 9, 6));
+    if (result != FACTORY_RESULT_OK)
+        return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_PIPE, 10, 6));
+    if (result != FACTORY_RESULT_OK)
+        return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_STEAM_ENGINE, 11, 6));
     if (result != FACTORY_RESULT_OK)
         return result;
     result = factory_simulation_submit_fluid_insert(
@@ -610,6 +634,59 @@ bool FoundationSimulation::entity_to_dictionary(
             (int64_t)entity.data.pipe.connection_mask;
         value["network_id"] = (int64_t)entity.data.pipe.network_id;
         break;
+    case FACTORY_ENTITY_TYPE_WATER_EXTRACTOR:
+        value["stored_water"] =
+            (int64_t)entity.data.water_extractor.stored_water;
+        value["output_capacity"] =
+            (int64_t)entity.data.water_extractor.output_capacity;
+        value["progress"] =
+            (int64_t)entity.data.water_extractor.progress;
+        value["duration"] =
+            (int64_t)entity.data.water_extractor.duration;
+        value["output_network_id"] =
+            (int64_t)entity.data.water_extractor.output_network_id;
+        break;
+    case FACTORY_ENTITY_TYPE_BOILER:
+        value["stored_water"] =
+            (int64_t)entity.data.boiler.stored_water;
+        value["water_capacity"] =
+            (int64_t)entity.data.boiler.water_capacity;
+        value["stored_steam"] =
+            (int64_t)entity.data.boiler.stored_steam;
+        value["steam_capacity"] =
+            (int64_t)entity.data.boiler.steam_capacity;
+        value["input_network_id"] =
+            (int64_t)entity.data.boiler.input_network_id;
+        value["output_network_id"] =
+            (int64_t)entity.data.boiler.output_network_id;
+        value["fuel_active"] = entity.data.boiler.burner.active;
+        value["fuel_ticks"] =
+            (int64_t)entity.data.boiler.burner.remaining_burn_ticks;
+        if (!set_unsigned(
+                &value, "energy_available",
+                entity.data.boiler.burner.released_energy,
+                "entity.boiler.burner.released_energy"))
+            return false;
+        value["conversion_active"] =
+            entity.data.boiler.conversion_active;
+        break;
+    case FACTORY_ENTITY_TYPE_STEAM_ENGINE:
+        value["stored_steam"] =
+            (int64_t)entity.data.steam_engine.stored_steam;
+        value["steam_capacity"] =
+            (int64_t)entity.data.steam_engine.steam_capacity;
+        value["steam_network_id"] =
+            (int64_t)entity.data.steam_engine.steam_network_id;
+        value["power_network_id"] =
+            (int64_t)entity.data.steam_engine.power_network_id;
+        value["maximum_output"] =
+            (int64_t)entity.data.steam_engine.maximum_output_per_tick;
+        value["available_generation"] =
+            (int64_t)entity.data.steam_engine.available_generation;
+        value["generated_last_tick"] =
+            (int64_t)entity.data.steam_engine.generated_last_tick;
+        value["generation_active"] = entity.data.steam_engine.active;
+        break;
     default:
         break;
     }
@@ -718,7 +795,11 @@ Array FoundationSimulation::get_events() const
         value["entity_type"] = (int64_t)event->entity_type;
         value["item_type"] = (int64_t)event->item_type;
         value["fluid_type"] = (int64_t)event->fluid_type;
+        value["related_fluid_type"] =
+            (int64_t)event->related_fluid_type;
         value["quantity"] = (int64_t)event->quantity;
+        value["related_quantity"] =
+            (int64_t)event->related_quantity;
         values.append(value);
     }
     return values;

@@ -17,6 +17,8 @@
 #include "event_internal.h"
 #include "burner_internal.h"
 #include "fluid_internal.h"
+#include "fluid_machine_internal.h"
+#include "steam_engine_internal.h"
 
 struct FactorySimulation {
     uint64_t tick;
@@ -37,6 +39,9 @@ struct FactorySimulation {
     FactoryPipeStore pipes;
     FactoryFluidPortStore fluid_ports;
     FactoryFluidNetworkState fluid_networks;
+    FactoryWaterExtractorStore water_extractors;
+    FactoryBoilerStore boilers;
+    FactorySteamEngineStore steam_engines;
     /* Test-fixture setup only; production simulations leave this zero. */
     uint32_t fixture_initial_generator_fuel;
     FactoryPowerState power;

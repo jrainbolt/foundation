@@ -7,7 +7,8 @@
 #include <string.h>
 
 static const FactoryFluidDefinition fluid_definitions[] = {
-    {FACTORY_FLUID_WATER, "water", FACTORY_FLUID_CLASS_AQUEOUS}
+    {FACTORY_FLUID_WATER, "water", FACTORY_FLUID_CLASS_AQUEOUS},
+    {FACTORY_FLUID_STEAM, "steam", FACTORY_FLUID_CLASS_VAPOR}
 };
 
 size_t factory_fluid_definition_count(void)
@@ -21,7 +22,7 @@ bool factory_fluid_definition_is_valid(
 {
     return definition != NULL
         && definition->fluid_type > FACTORY_FLUID_NONE
-        && definition->fluid_type <= FACTORY_FLUID_WATER
+        && definition->fluid_type <= FACTORY_FLUID_STEAM
         && definition->display_name != NULL
         && definition->display_name[0] != '\0'
         && definition->fluid_class != 0U;
@@ -78,6 +79,7 @@ bool factory_fluid_storage_store_reserve_one(FactoryFluidStorageStore *store)
 void factory_fluid_storage_store_add(
     FactoryFluidStorageStore *store,
     FactoryEntityId owner,
+    FactoryFluidStorageSlot slot,
     int32_t x,
     int32_t y,
     FactoryFluidClassMask accepted_classes,
@@ -85,7 +87,7 @@ void factory_fluid_storage_store_add(
 )
 {
     store->items[store->count++] = (FactoryFluidStorage){
-        owner, x, y, accepted_classes, FACTORY_FLUID_NONE, 0U, capacity
+        owner, slot, x, y, accepted_classes, FACTORY_FLUID_NONE, 0U, capacity
     };
 }
 
@@ -94,11 +96,37 @@ const FactoryFluidStorage *factory_fluid_storage_store_find(
 )
 {
     size_t index;
+    const FactoryFluidStorage *only = NULL;
     if (store == NULL || owner == 0U) return NULL;
     for (index = 0U; index < store->count; ++index)
-        if (store->items[index].owner_entity_id == owner)
-            return &store->items[index];
+        if (store->items[index].owner_entity_id == owner) {
+            if (store->items[index].slot == FACTORY_FLUID_STORAGE_DEFAULT)
+                return &store->items[index];
+            if (only != NULL) return NULL;
+            only = &store->items[index];
+        }
+    return only;
+}
+
+const FactoryFluidStorage *factory_fluid_storage_store_find_slot(
+    const FactoryFluidStorageStore *store, FactoryEntityId owner,
+    FactoryFluidStorageSlot slot
+)
+{
+    if (store == NULL || owner == 0U) return NULL;
+    for (size_t i = 0U; i < store->count; ++i)
+        if (store->items[i].owner_entity_id == owner
+            && store->items[i].slot == slot) return &store->items[i];
     return NULL;
+}
+
+FactoryFluidStorage *factory_fluid_storage_store_find_slot_mutable(
+    FactoryFluidStorageStore *store, FactoryEntityId owner,
+    FactoryFluidStorageSlot slot
+)
+{
+    return (FactoryFluidStorage *)factory_fluid_storage_store_find_slot(
+        store, owner, slot);
 }
 
 FactoryFluidStorage *factory_fluid_storage_store_find_mutable(
@@ -212,14 +240,26 @@ FactoryResult factory_simulation_get_fluid_storage(
     FactoryFluidStorageInspection *out_storage
 )
 {
+    if (simulation == NULL || owner_entity_id == 0U || out_storage == NULL)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    return factory_simulation_get_fluid_storage_slot(
+        simulation, owner_entity_id, FACTORY_FLUID_STORAGE_DEFAULT,
+        out_storage);
+}
+
+FactoryResult factory_simulation_get_fluid_storage_slot(
+    const FactorySimulation *simulation, FactoryEntityId owner_entity_id,
+    FactoryFluidStorageSlot slot, FactoryFluidStorageInspection *out_storage
+)
+{
     const FactoryFluidStorage *storage;
     if (simulation == NULL || owner_entity_id == 0U || out_storage == NULL)
         return FACTORY_RESULT_INVALID_ARGUMENT;
-    storage = factory_fluid_storage_store_find(
-        &simulation->fluid_storages, owner_entity_id);
+    storage = factory_fluid_storage_store_find_slot(
+        &simulation->fluid_storages, owner_entity_id, slot);
     if (storage == NULL) return FACTORY_RESULT_ENTITY_NOT_FOUND;
     *out_storage = (FactoryFluidStorageInspection){
-        storage->owner_entity_id, storage->x, storage->y,
+        storage->owner_entity_id, storage->slot, storage->x, storage->y,
         storage->accepted_fluid_classes, storage->fluid_type,
         storage->quantity, storage->capacity,
         storage->capacity - storage->quantity,
@@ -227,7 +267,8 @@ FactoryResult factory_simulation_get_fluid_storage(
     };
     for (size_t i = 0U; i < simulation->fluid_networks.port_count; ++i)
         if (simulation->fluid_networks.ports[i].owner_entity_id
-            == owner_entity_id) {
+                == owner_entity_id
+            && simulation->fluid_networks.ports[i].storage_slot == slot) {
             out_storage->network_id =
                 simulation->fluid_networks.ports[i].network_id;
             break;
@@ -305,12 +346,13 @@ bool factory_fluid_port_store_reserve_one(FactoryFluidPortStore *store)
 }
 
 void factory_fluid_port_store_add(
-    FactoryFluidPortStore *store, FactoryEntityId owner, int32_t x, int32_t y,
-    FactoryFluidClassMask accepted_classes
+    FactoryFluidPortStore *store, FactoryEntityId owner,
+    FactoryFluidStorageSlot storage_slot, int32_t x, int32_t y,
+    uint32_t allowed_directions, FactoryFluidClassMask accepted_classes
 )
 {
     store->items[store->count++] = (FactoryFluidPort){
-        owner, owner, x, y, FACTORY_FLUID_CONNECTION_ALL, accepted_classes
+        owner, owner, storage_slot, x, y, allowed_directions, accepted_classes
     };
 }
 
@@ -357,8 +399,10 @@ static int compare_pipe(const void *a, const void *b)
 static int compare_port(const void *a, const void *b)
 {
     const FactoryFluidPortInspection *x = a, *y = b;
-    return x->owner_entity_id < y->owner_entity_id
-        ? -1 : x->owner_entity_id > y->owner_entity_id;
+    if (x->owner_entity_id != y->owner_entity_id)
+        return x->owner_entity_id < y->owner_entity_id ? -1 : 1;
+    return x->storage_slot < y->storage_slot
+        ? -1 : x->storage_slot > y->storage_slot;
 }
 
 FactoryResult factory_fluid_network_rebuild(
@@ -393,7 +437,8 @@ FactoryResult factory_fluid_network_rebuild(
         next.pipes[i] = (FactoryPipeInspection){
             p.entity_id, p.x, p.y, 0U, p.entity_id};
     }
-    qsort(next.pipes, next.pipe_count, sizeof(*next.pipes), compare_pipe);
+    if (next.pipe_count > 1U)
+        qsort(next.pipes, next.pipe_count, sizeof(*next.pipes), compare_pipe);
     for (size_t i = 0U; i < next.pipe_count; ++i)
         for (size_t j = i + 1U; j < next.pipe_count; ++j)
             if (adjacent(next.pipes[i].x, next.pipes[i].y,
@@ -425,7 +470,8 @@ FactoryResult factory_fluid_network_rebuild(
     for (size_t i = 0U; i < next.port_count; ++i) {
         FactoryFluidPort p = simulation->fluid_ports.items[i];
         next.ports[i] = (FactoryFluidPortInspection){
-            p.owner_entity_id, p.storage_owner_entity_id, p.x, p.y,
+            p.owner_entity_id, p.storage_owner_entity_id, p.storage_slot,
+            p.x, p.y,
             p.allowed_directions, p.accepted_fluid_classes,
             FACTORY_FLUID_NETWORK_NONE};
         for (size_t j = 0U; j < next.pipe_count; ++j)
@@ -441,7 +487,8 @@ FactoryResult factory_fluid_network_rebuild(
                     next.pipes[j].x, next.pipes[j].y, p.x, p.y);
             }
     }
-    qsort(next.ports, next.port_count, sizeof(*next.ports), compare_port);
+    if (next.port_count > 1U)
+        qsort(next.ports, next.port_count, sizeof(*next.ports), compare_port);
     for (size_t i = 0U; i < next.pipe_count; ++i) {
         FactoryFluidNetworkId id = next.pipes[i].network_id;
         size_t n;
@@ -509,12 +556,14 @@ void factory_fluid_network_transfer(FactorySimulation *simulation)
                 if (a->network_id !=
                         simulation->fluid_networks.networks[n].network_id
                     || b->network_id != a->network_id) continue;
-                source = factory_fluid_storage_store_find_mutable(
+                source = factory_fluid_storage_store_find_slot_mutable(
                     &simulation->fluid_storages,
-                    a->storage_owner_entity_id);
-                destination = factory_fluid_storage_store_find_mutable(
+                    a->storage_owner_entity_id,
+                    a->storage_slot);
+                destination = factory_fluid_storage_store_find_slot_mutable(
                     &simulation->fluid_storages,
-                    b->storage_owner_entity_id);
+                    b->storage_owner_entity_id,
+                    b->storage_slot);
                 if (source == NULL || destination == NULL) continue;
                 if (source->quantity < destination->quantity) {
                     FactoryFluidStorage *swap = source;
@@ -560,6 +609,22 @@ FactoryResult factory_simulation_get_fluid_port(
         return FACTORY_RESULT_INVALID_ARGUMENT;
     for (size_t i = 0U; i < simulation->fluid_networks.port_count; ++i)
         if (simulation->fluid_networks.ports[i].owner_entity_id == id) {
+            *out_port = simulation->fluid_networks.ports[i];
+            return FACTORY_RESULT_OK;
+        }
+    return FACTORY_RESULT_ENTITY_NOT_FOUND;
+}
+
+FactoryResult factory_simulation_get_fluid_port_slot(
+    const FactorySimulation *simulation, FactoryEntityId id,
+    FactoryFluidStorageSlot slot, FactoryFluidPortInspection *out_port
+)
+{
+    if (simulation == NULL || id == 0U || out_port == NULL)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    for (size_t i = 0U; i < simulation->fluid_networks.port_count; ++i)
+        if (simulation->fluid_networks.ports[i].owner_entity_id == id
+            && simulation->fluid_networks.ports[i].storage_slot == slot) {
             *out_port = simulation->fluid_networks.ports[i];
             return FACTORY_RESULT_OK;
         }

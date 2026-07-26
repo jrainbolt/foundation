@@ -238,7 +238,9 @@ static bool events_equal(
             || x->entity_type != y->entity_type
             || x->item_type != y->item_type
             || x->fluid_type != y->fluid_type
-            || x->quantity != y->quantity) return false;
+            || x->related_fluid_type != y->related_fluid_type
+            || x->quantity != y->quantity
+            || x->related_quantity != y->related_quantity) return false;
     }
     return true;
 }

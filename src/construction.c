@@ -44,6 +44,15 @@ bool factory_entity_construction_cost(
         case FACTORY_ENTITY_TYPE_PIPE:
             cost = FACTORY_CONSTRUCTION_COST_PIPE;
             break;
+        case FACTORY_ENTITY_TYPE_WATER_EXTRACTOR:
+            cost = FACTORY_CONSTRUCTION_COST_WATER_EXTRACTOR;
+            break;
+        case FACTORY_ENTITY_TYPE_BOILER:
+            cost = FACTORY_CONSTRUCTION_COST_BOILER;
+            break;
+        case FACTORY_ENTITY_TYPE_STEAM_ENGINE:
+            cost = FACTORY_CONSTRUCTION_COST_STEAM_ENGINE;
+            break;
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;

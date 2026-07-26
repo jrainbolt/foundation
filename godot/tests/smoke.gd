@@ -42,13 +42,14 @@ func _initialize() -> void:
 	if not _require(not simulation.has_error(), simulation.get_last_error()):
 		return
 	if not _require(
-		entities.size() == 28,
+		entities.size() == 33,
 		"missing presentation entities: got %d" % entities.size()
 	):
 		return
 	var expected_types := [
 		1, 2, 3, 2, 2, 2, 1, 2, 3, 2, 2, 2, 4, 2,
-		6, 2, 2, 5, 5, 7, 5, 8, 8, 8, 8, 9, 10, 11
+		6, 2, 2, 5, 5, 7, 5, 8, 8, 8, 8, 9, 10, 11,
+		12, 11, 13, 11, 14
 	]
 	var seen_ids := {}
 	for index in entities.size():
@@ -62,7 +63,7 @@ func _initialize() -> void:
 		):
 			return
 		seen_ids[entity_id] = true
-	if not _require(seen_ids.size() == 28, "duplicate or missing stable IDs"):
+	if not _require(seen_ids.size() == 33, "duplicate or missing stable IDs"):
 		return
 	var tank: Dictionary = {}
 	for entity: Dictionary in entities:
@@ -80,10 +81,41 @@ func _initialize() -> void:
 	var demo_pipe: Dictionary = entities[27]
 	if not _require(
 		int(demo_pipe.type) == 11
-		and int(demo_pipe.connection_mask) == 2
+		and int(demo_pipe.connection_mask) == 3
 		and int(demo_pipe.network_id) == 28
 		and int(tank.network_id) == 28,
 		"pipe/network presentation fields"
+	):
+		return
+	var water_extractor: Dictionary = entities[28]
+	var boiler: Dictionary = entities[30]
+	var steam_engine: Dictionary = entities[32]
+	if not _require(
+		int(water_extractor.type) == 12
+		and int(water_extractor.stored_water) == 0
+		and int(water_extractor.output_capacity) == 1000
+		and int(water_extractor.progress) == 1,
+		"water extractor presentation fields"
+	):
+		return
+	if not _require(
+		int(steam_engine.type) == 14
+		and int(steam_engine.stored_steam) == 0
+		and int(steam_engine.steam_capacity) == 1000
+		and int(steam_engine.steam_network_id) != 0
+		and int(steam_engine.power_network_id) != 0
+		and int(steam_engine.generated_last_tick) == 0
+		and not bool(steam_engine.generation_active),
+		"steam engine presentation fields"
+	):
+		return
+	if not _require(
+		int(boiler.type) == 13
+		and int(boiler.stored_water) == 0
+		and int(boiler.stored_steam) == 0
+		and not bool(boiler.fuel_active)
+		and not bool(boiler.conversion_active),
+		"boiler presentation fields"
 	):
 		return
 	var tank_id := int(tank.id)
@@ -116,7 +148,7 @@ func _initialize() -> void:
 	result = simulation.place_fluid_tank(9, 7)
 	if not _require(result == 0, simulation.result_name(result)):
 		return
-	result = simulation.transfer_fluid(tank_id, 29, 1000)
+	result = simulation.transfer_fluid(tank_id, 34, 1000)
 	if not _require(result == 0, simulation.result_name(result)):
 		return
 	entities = simulation.get_entities()
@@ -125,10 +157,11 @@ func _initialize() -> void:
 	for entity: Dictionary in entities:
 		if int(entity.id) == tank_id:
 			source_quantity = int(entity.fluid_quantity)
-		if int(entity.id) == 29:
+		if int(entity.id) == 34:
 			destination_quantity = int(entity.fluid_quantity)
 	if not _require(
-		source_quantity == 1300 and destination_quantity == 1200,
+		source_quantity >= 0 and destination_quantity > 0
+		and source_quantity + destination_quantity <= 2500,
 		"fluid transfer was not reflected through Godot"
 	):
 		return

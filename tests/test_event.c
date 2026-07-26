@@ -43,7 +43,9 @@ static bool event_equal(const FactoryEvent *a, const FactoryEvent *b)
         && a->entity_type == b->entity_type
         && a->item_type == b->item_type
         && a->fluid_type == b->fluid_type
-        && a->quantity == b->quantity;
+        && a->related_fluid_type == b->related_fluid_type
+        && a->quantity == b->quantity
+        && a->related_quantity == b->related_quantity;
 }
 
 static bool batch_equal(

@@ -24,7 +24,7 @@ Every `FactoryEvent` is fully initialized. Unused fields are zero or their
 `FACTORY_*_NONE` value.
 
 | Type | `entity_id` | `related_entity_id` | Payload |
-|---|---|---|---|---|
+|---|---|---|---|
 | `ENTITY_CONSTRUCTED` | constructed entity | unused | `entity_type` |
 | `ENTITY_DEMOLISHED` | demolished entity | unused | `entity_type` |
 | `PRODUCTION_COMPLETED` | producer | unused | `item_type`, `quantity` |
@@ -41,6 +41,9 @@ Every `FactoryEvent` is fully initialized. Unused fields are zero or their
 | `FLUID_NETWORK_MERGED` | resulting network ID | unused | none |
 | `PIPE_CONNECTED` | unused | unused | number of new connections |
 | `PIPE_DISCONNECTED` | unused | unused | number of removed connections |
+| `WATER_PRODUCED` | water extractor | unused | water in `fluid_type`, produced `quantity` |
+| `BOILER_CONVERSION_COMPLETED` | boiler | unused | consumed `fluid_type`/`quantity`, produced `related_fluid_type`/`related_quantity` |
+| `STEAM_ENGINE_GENERATION_COMPLETED` | steam engine | unused | consumed steam in `fluid_type`/`quantity`, generated energy in `related_quantity` |
 
 Construction and demolition events appear only after successful transactional
 commands. Production events appear only when output is committed. Transfer
@@ -50,14 +53,16 @@ consumers, and are emitted in ascending consumer entity-ID order. Fuel events
 occur only on ignition and final burn-tick completion, never for steady-state
 burning or released-buffer depletion.
 
-Within a step, command events follow command FIFO order. Burner ignition events
-follow next, then power transitions, then fuel-completion events. Extractor
+Within a step, command and topology events follow deterministic FIFO/topology
+order. Fluid-network transport then runs, burner ignition follows, and water
+extraction and boiler conversion run in ascending stable machine-store order.
+Power transitions and fuel-completion events follow. Extractor
 production and producer transfers, belt transfers, refinery completion,
 assembler completion, and inserter drop/pickup transfers follow according to
 the normal authoritative update phases. Fluid command events occupy their FIFO
 command positions. There is no event sorting pass.
 
 Events and their allocation capacity are observer state. They are not encoded
-in version 6 snapshots and do not affect canonical bytes. A loaded simulation
+in version 8 snapshots and do not affect canonical bytes. A loaded simulation
 starts with an empty batch. Failed loads create no simulation and cannot alter
 an existing simulation or its visible batch.

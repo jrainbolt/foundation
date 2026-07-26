@@ -5,6 +5,7 @@
 
 typedef struct {
     FactoryEntityId owner_entity_id;
+    FactoryFluidStorageSlot slot;
     int32_t x;
     int32_t y;
     FactoryFluidClassMask accepted_fluid_classes;
@@ -34,6 +35,7 @@ typedef struct {
 typedef struct {
     FactoryEntityId owner_entity_id;
     FactoryEntityId storage_owner_entity_id;
+    FactoryFluidStorageSlot storage_slot;
     int32_t x;
     int32_t y;
     uint32_t allowed_directions;
@@ -61,6 +63,7 @@ bool factory_fluid_storage_store_reserve_one(FactoryFluidStorageStore *store);
 void factory_fluid_storage_store_add(
     FactoryFluidStorageStore *store,
     FactoryEntityId owner,
+    FactoryFluidStorageSlot slot,
     int32_t x,
     int32_t y,
     FactoryFluidClassMask accepted_classes,
@@ -71,6 +74,14 @@ const FactoryFluidStorage *factory_fluid_storage_store_find(
 );
 FactoryFluidStorage *factory_fluid_storage_store_find_mutable(
     FactoryFluidStorageStore *store, FactoryEntityId owner
+);
+const FactoryFluidStorage *factory_fluid_storage_store_find_slot(
+    const FactoryFluidStorageStore *store, FactoryEntityId owner,
+    FactoryFluidStorageSlot slot
+);
+FactoryFluidStorage *factory_fluid_storage_store_find_slot_mutable(
+    FactoryFluidStorageStore *store, FactoryEntityId owner,
+    FactoryFluidStorageSlot slot
 );
 bool factory_fluid_storage_store_remove(
     FactoryFluidStorageStore *store, FactoryEntityId owner
@@ -104,8 +115,9 @@ bool factory_pipe_store_remove(FactoryPipeStore *store, FactoryEntityId id);
 void factory_fluid_port_store_destroy(FactoryFluidPortStore *store);
 bool factory_fluid_port_store_reserve_one(FactoryFluidPortStore *store);
 void factory_fluid_port_store_add(
-    FactoryFluidPortStore *store, FactoryEntityId owner, int32_t x, int32_t y,
-    FactoryFluidClassMask accepted_classes
+    FactoryFluidPortStore *store, FactoryEntityId owner,
+    FactoryFluidStorageSlot storage_slot, int32_t x, int32_t y,
+    uint32_t allowed_directions, FactoryFluidClassMask accepted_classes
 );
 bool factory_fluid_port_store_remove(
     FactoryFluidPortStore *store, FactoryEntityId owner

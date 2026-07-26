@@ -7,11 +7,16 @@ const COLORS := {
 	7: Color("#cc79a7"), 8: Color("#8a9ba8"), 9: Color("#e5c84d"),
 	10: Color("#4da6c8"),
 	11: Color("#7fc8d8"),
+	12: Color("#3388bb"),
+	13: Color("#b86b3c"),
+	14: Color("#7aa6d8"),
 }
 const NAMES := {
 	1: "EX", 2: "BELT", 3: "REF", 4: "ASM", 5: "BOX",
 	6: "SPLIT", 7: "INS", 8: "POLE", 9: "GEN", 10: "TANK",
 	11: "PIPE",
+	12: "WATER", 13: "BOIL",
+	14: "STEAM",
 }
 
 var state: Dictionary = {}
@@ -66,6 +71,35 @@ func _draw() -> void:
 		draw_string(
 			ThemeDB.fallback_font, Vector2(7, 39),
 			"N%d" % int(state.get("network_id", 0)),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9
+		)
+	if entity_type == 12:
+		draw_string(
+			ThemeDB.fallback_font, Vector2(7, 39),
+			"W %d/%d" % [
+				int(state.get("stored_water", 0)),
+				int(state.get("output_capacity", 0))
+			],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9
+		)
+	if entity_type == 13:
+		draw_string(
+			ThemeDB.fallback_font, Vector2(7, 39),
+			"W%d S%d %s" % [
+				int(state.get("stored_water", 0)),
+				int(state.get("stored_steam", 0)),
+				"ON" if bool(state.get("conversion_active", false)) else "OFF"
+			],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9
+		)
+	if entity_type == 14:
+		draw_string(
+			ThemeDB.fallback_font, Vector2(7, 39),
+			"S%d G%d %s" % [
+				int(state.get("stored_steam", 0)),
+				int(state.get("generated_last_tick", 0)),
+				"ON" if bool(state.get("generation_active", false)) else "OFF"
+			],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 9
 		)
 	var duration := int(state.get("duration", 0))

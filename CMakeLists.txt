@@ -56,6 +56,7 @@ add_library(factory_engine
     src/event.c
     src/extractor.c
     src/fluid.c
+    src/fluid_machine.c
     src/item.c
     src/inserter.c
     src/logistics_endpoint.c
@@ -65,6 +66,7 @@ add_library(factory_engine
     src/refinery.c
     src/simulation.c
     src/snapshot.c
+    src/steam_engine.c
     src/splitter.c
     src/storage.c
     src/world.c
@@ -261,4 +263,20 @@ if(BUILD_TESTING)
     add_test(
         NAME factory_fluid_network_tests COMMAND factory_fluid_network_tests
     )
+
+    add_executable(factory_fluid_machine_tests tests/test_fluid_machine.c)
+    target_include_directories(
+        factory_fluid_machine_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(factory_fluid_machine_tests PRIVATE factory_engine)
+    add_test(
+        NAME factory_fluid_machine_tests COMMAND factory_fluid_machine_tests
+    )
+
+    add_executable(factory_steam_engine_tests tests/test_steam_engine.c)
+    target_include_directories(
+        factory_steam_engine_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(factory_steam_engine_tests PRIVATE factory_engine)
+    add_test(NAME factory_steam_engine_tests COMMAND factory_steam_engine_tests)
 endif()

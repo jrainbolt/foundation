@@ -51,25 +51,32 @@ static void inspect(
 static void test_definitions_and_transactional_primitives(void)
 {
     const FactoryFluidDefinition *water;
+    const FactoryFluidDefinition *definition;
     FactoryFluidDefinition invalid = {
         FACTORY_FLUID_WATER, "", FACTORY_FLUID_CLASS_AQUEOUS
     };
     FactoryFluidStorage source = {
-        1U, 0, 0, FACTORY_FLUID_CLASS_AQUEOUS,
+        1U, FACTORY_FLUID_STORAGE_DEFAULT, 0, 0,
+        FACTORY_FLUID_CLASS_AQUEOUS,
         FACTORY_FLUID_WATER, 8U, 10U
     };
     FactoryFluidStorage destination = {
-        2U, 1, 0, FACTORY_FLUID_CLASS_AQUEOUS,
+        2U, FACTORY_FLUID_STORAGE_DEFAULT, 1, 0,
+        FACTORY_FLUID_CLASS_AQUEOUS,
         FACTORY_FLUID_NONE, 0U, 5U
     };
     FactoryFluidType moved = FACTORY_FLUID_NONE;
 
-    CHECK(factory_fluid_definition_count() == 1U);
+    CHECK(factory_fluid_definition_count() == 2U);
     water = factory_fluid_definition_at(0U);
     CHECK(water != NULL && factory_fluid_definition_is_valid(water));
     CHECK(water != NULL && water->fluid_type == FACTORY_FLUID_WATER);
     CHECK(strcmp(factory_fluid_name(FACTORY_FLUID_WATER), "water") == 0);
-    CHECK(factory_fluid_definition_at(1U) == NULL);
+    definition = factory_fluid_definition_at(1U);
+    CHECK(definition != NULL);
+    CHECK(definition->fluid_type == FACTORY_FLUID_STEAM);
+    CHECK(definition->fluid_class == FACTORY_FLUID_CLASS_VAPOR);
+    CHECK(factory_fluid_definition_at(2U) == NULL);
     CHECK(factory_fluid_definition_get(FACTORY_FLUID_NONE) == NULL);
     CHECK(!factory_fluid_definition_is_valid(&invalid));
 
@@ -173,7 +180,10 @@ static bool event_equal(const FactoryEvent *a, const FactoryEvent *b)
         && a->related_entity_id == b->related_entity_id
         && a->entity_type == b->entity_type
         && a->item_type == b->item_type
-        && a->fluid_type == b->fluid_type && a->quantity == b->quantity;
+        && a->fluid_type == b->fluid_type
+        && a->related_fluid_type == b->related_fluid_type
+        && a->quantity == b->quantity
+        && a->related_quantity == b->related_quantity;
 }
 
 static void test_snapshot_continuation(void)

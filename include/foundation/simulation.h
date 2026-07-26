@@ -19,6 +19,8 @@
 #include "foundation/event.h"
 #include "foundation/burner.h"
 #include "foundation/fluid.h"
+#include "foundation/fluid_machine.h"
+#include "foundation/steam_engine.h"
 
 typedef struct FactorySimulation FactorySimulation;
 

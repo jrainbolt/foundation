@@ -174,6 +174,12 @@ static FactoryResult populate_entity(
         factory_inserter_store_find(&simulation->inserters, id);
     const FactoryFluidStorage *fluid_storage =
         factory_fluid_storage_store_find(&simulation->fluid_storages, id);
+    const FactoryWaterExtractor *water_extractor =
+        factory_water_extractor_store_find(&simulation->water_extractors, id);
+    const FactoryBoiler *boiler =
+        factory_boiler_store_find(&simulation->boilers, id);
+    const FactorySteamEngine *steam_engine =
+        factory_steam_engine_store_find(&simulation->steam_engines, id);
     FactoryPipeInspection pipe;
     FactoryPowerPoleInspection pole;
     FactoryPowerGeneratorInspection generator;
@@ -281,6 +287,91 @@ static FactoryResult populate_entity(
             inserter->source_x, inserter->source_y,
             inserter->destination_x, inserter->destination_y
         };
+    } else if (water_extractor != NULL) {
+        FactoryWaterExtractorInspection machine;
+        out->entity_type = FACTORY_ENTITY_TYPE_WATER_EXTRACTOR;
+        out->x = water_extractor->x; out->y = water_extractor->y;
+        if (factory_simulation_get_water_extractor(
+                simulation, id, &machine) != FACTORY_RESULT_OK)
+            return FACTORY_RESULT_ENTITY_NOT_FOUND;
+        out->status = machine.stored_water
+                + FACTORY_WATER_EXTRACTOR_OUTPUT_QUANTITY
+                > machine.capacity
+            ? FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_OUTPUT
+            : FACTORY_PRESENTATION_MACHINE_STATUS_WORKING;
+        out->data.water_extractor = (FactoryPresentationWaterExtractor){
+            machine.stored_water, machine.capacity,
+            machine.progress, machine.duration, FACTORY_FLUID_NETWORK_NONE};
+        for (size_t i = 0U; i < simulation->fluid_networks.port_count; ++i)
+            if (simulation->fluid_networks.ports[i].owner_entity_id == id
+                && simulation->fluid_networks.ports[i].storage_slot
+                    == FACTORY_FLUID_STORAGE_DEFAULT)
+                out->data.water_extractor.output_network_id =
+                    simulation->fluid_networks.ports[i].network_id;
+    } else if (boiler != NULL) {
+        FactoryBoilerInspection machine;
+        FactoryBurnerInspection burner;
+        out->entity_type = FACTORY_ENTITY_TYPE_BOILER;
+        out->x = boiler->x; out->y = boiler->y;
+        if (factory_simulation_get_boiler(simulation, id, &machine)
+                != FACTORY_RESULT_OK
+            || factory_simulation_get_burner(simulation, id, &burner)
+                != FACTORY_RESULT_OK)
+            return FACTORY_RESULT_ENTITY_NOT_FOUND;
+        out->status = machine.conversion_active
+            ? FACTORY_PRESENTATION_MACHINE_STATUS_WORKING
+            : FACTORY_PRESENTATION_MACHINE_STATUS_IDLE;
+        out->data.boiler = (FactoryPresentationBoiler){
+            machine.stored_water, machine.water_capacity,
+            machine.stored_steam, machine.steam_capacity,
+            FACTORY_FLUID_NETWORK_NONE, FACTORY_FLUID_NETWORK_NONE,
+            {
+                burner.inventory_item, burner.inventory_quantity,
+                burner.current_fuel_item, burner.remaining_burn_ticks,
+                burner.total_burn_duration_ticks,
+                burner.unreleased_fuel_energy,
+                burner.released_energy, burner.active
+            },
+            machine.conversion_active
+        };
+        for (size_t i = 0U; i < simulation->fluid_networks.port_count; ++i)
+            if (simulation->fluid_networks.ports[i].owner_entity_id == id) {
+                if (simulation->fluid_networks.ports[i].storage_slot
+                    == FACTORY_FLUID_STORAGE_BOILER_INPUT)
+                    out->data.boiler.input_network_id =
+                        simulation->fluid_networks.ports[i].network_id;
+                else if (simulation->fluid_networks.ports[i].storage_slot
+                    == FACTORY_FLUID_STORAGE_BOILER_OUTPUT)
+                    out->data.boiler.output_network_id =
+                        simulation->fluid_networks.ports[i].network_id;
+            }
+    } else if (steam_engine != NULL) {
+        FactorySteamEngineInspection machine;
+        FactoryPowerGeneratorInspection generator;
+        out->entity_type = FACTORY_ENTITY_TYPE_STEAM_ENGINE;
+        out->x = steam_engine->x; out->y = steam_engine->y;
+        if (factory_simulation_get_steam_engine(simulation, id, &machine)
+                != FACTORY_RESULT_OK
+            || factory_simulation_get_power_generator(
+                simulation, id, &generator) != FACTORY_RESULT_OK)
+            return FACTORY_RESULT_ENTITY_NOT_FOUND;
+        out->status = machine.active
+            ? FACTORY_PRESENTATION_MACHINE_STATUS_WORKING
+            : machine.stored_steam == 0U
+                ? FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_INPUT
+                : FACTORY_PRESENTATION_MACHINE_STATUS_IDLE;
+        out->data.steam_engine = (FactoryPresentationSteamEngine){
+            machine.stored_steam, machine.steam_capacity,
+            FACTORY_FLUID_NETWORK_NONE, generator.network_id,
+            machine.maximum_output_per_tick,
+            factory_power_source_available_generation(simulation, id),
+            machine.generated_last_tick, machine.active};
+        for (size_t i = 0U; i < simulation->fluid_networks.port_count; ++i)
+            if (simulation->fluid_networks.ports[i].owner_entity_id == id
+                && simulation->fluid_networks.ports[i].storage_slot
+                    == FACTORY_FLUID_STORAGE_STEAM_ENGINE_INPUT)
+                out->data.steam_engine.steam_network_id =
+                    simulation->fluid_networks.ports[i].network_id;
     } else if (fluid_storage != NULL) {
         out->entity_type = FACTORY_ENTITY_TYPE_FLUID_TANK;
         out->x = fluid_storage->x;

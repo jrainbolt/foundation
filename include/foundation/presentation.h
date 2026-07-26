@@ -123,6 +123,36 @@ typedef struct {
 } FactoryPresentationPipe;
 
 typedef struct {
+    FactoryFluidQuantity stored_water;
+    FactoryFluidQuantity output_capacity;
+    uint32_t progress;
+    uint32_t duration;
+    FactoryFluidNetworkId output_network_id;
+} FactoryPresentationWaterExtractor;
+
+typedef struct {
+    FactoryFluidQuantity stored_water;
+    FactoryFluidQuantity water_capacity;
+    FactoryFluidQuantity stored_steam;
+    FactoryFluidQuantity steam_capacity;
+    FactoryFluidNetworkId input_network_id;
+    FactoryFluidNetworkId output_network_id;
+    FactoryPresentationBurner burner;
+    bool conversion_active;
+} FactoryPresentationBoiler;
+
+typedef struct {
+    FactoryFluidQuantity stored_steam;
+    FactoryFluidQuantity steam_capacity;
+    FactoryFluidNetworkId steam_network_id;
+    FactoryPowerNetworkId power_network_id;
+    FactoryPowerUnits maximum_output_per_tick;
+    FactoryPowerUnits available_generation;
+    FactoryPowerUnits generated_last_tick;
+    bool active;
+} FactoryPresentationSteamEngine;
+
+typedef struct {
     FactoryEntityId entity_id;
     FactoryEntityType entity_type;
     int32_t x;
@@ -142,6 +172,9 @@ typedef struct {
         FactoryPresentationPowerSource power_source;
         FactoryPresentationFluidStorage fluid_storage;
         FactoryPresentationPipe pipe;
+        FactoryPresentationWaterExtractor water_extractor;
+        FactoryPresentationBoiler boiler;
+        FactoryPresentationSteamEngine steam_engine;
     } data;
 } FactoryPresentationEntity;
 
