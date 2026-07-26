@@ -1,4 +1,4 @@
-# Snapshot format version 11
+# Snapshot format version 12
 
 Foundation snapshots are canonical little-endian binary files. Every value is
 written field-by-field; no C structure, pointer, enum representation, padding,
@@ -14,7 +14,7 @@ timestamp, or process-specific value enters the format.
 | 16 | 8 | Total snapshot size |
 | 24 | 8 | Payload size |
 | 32 | 8 | Simulation tick |
-| 40 | 4 | Section count (`22`) |
+| 40 | 4 | Section count (`24`) |
 | 44 | 4 | Reserved zero |
 
 Unsigned and signed integers use 32-bit or 64-bit two's-complement
@@ -32,7 +32,7 @@ Each section starts with four 32-bit fields:
 | Record count | Number of fixed-width records |
 | Payload size | Bytes following the section header |
 
-Version 11 requires each section exactly once in this order:
+Version 12 requires each section exactly once in this order:
 
 | Type | Section | Record width |
 |---:|---|---:|
@@ -56,8 +56,10 @@ Version 11 requires each section exactly once in this order:
 | 18 | Solar generators | 12 |
 | 19 | Accumulators | 20 |
 | 20 | Reactor cores | 40 |
-| 21 | Pending commands | 24 |
-| 22 | Command results | 68 |
+| 21 | Heat conductors | 12 |
+| 22 | Heat exchangers | 12 |
+| 23 | Pending commands | 24 |
+| 24 | Command results | 68 |
 
 Unknown, reordered, duplicated, missing, incorrectly sized, or unsupported
 sections are rejected. Exact full-buffer consumption is required.
@@ -111,6 +113,11 @@ quantity, active fuel ID, remaining 64-bit heat yield, and authoritative
 64-bit stored heat. Heat capacity is an immutable reactor definition value.
 Latest generated heat, activity, presentation, and events are transient.
 
-Version 11 has no compression, encryption, checksum, optional sections, or
+Heat-conductor and heat-exchanger records contain entity ID and grid position.
+Exchanger water and steam remain in the generic fluid-storage section.
+Connection masks, heat ports, heat/fluid network IDs, latest conversion
+quantities, and activity are reconstructed or transient.
+
+Version 12 has no compression, encryption, checksum, optional sections, or
 migration decoder. A future incompatible change must introduce a deliberate
 new-version decoder or compatibility policy.

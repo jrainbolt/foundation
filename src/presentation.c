@@ -188,6 +188,10 @@ static FactoryResult populate_entity(
         factory_accumulator_store_find(&simulation->accumulators, id);
     const FactoryReactor *reactor =
         factory_reactor_store_find(&simulation->reactors, id);
+    const FactoryHeatConductor *heat_conductor =
+        factory_heat_conductor_store_find(&simulation->heat_conductors,id);
+    const FactoryHeatExchanger *heat_exchanger =
+        factory_heat_exchanger_store_find(&simulation->heat_exchangers,id);
     FactoryPipeInspection pipe;
     FactoryPowerPoleInspection pole;
     FactoryPowerGeneratorInspection generator;
@@ -373,6 +377,7 @@ static FactoryResult populate_entity(
             inspection.connected};
     } else if (reactor != NULL) {
         FactoryReactorInspection inspection;
+        FactoryHeatPortInspection port={0};
         out->entity_type = FACTORY_ENTITY_TYPE_REACTOR_CORE;
         out->x = reactor->x; out->y = reactor->y;
         if (factory_simulation_get_reactor(
@@ -389,7 +394,40 @@ static FactoryResult populate_entity(
             inspection.inventory_fuel_id, inspection.inventory_quantity,
             inspection.active_fuel_id, inspection.remaining_burn_ticks,
             inspection.remaining_heat_yield,
-            inspection.generated_last_tick, inspection.activity};
+            inspection.generated_last_tick, inspection.activity,
+            FACTORY_HEAT_NETWORK_NONE,false};
+        if (factory_simulation_get_heat_port(simulation,id,
+                FACTORY_HEAT_PORT_REACTOR_OUTPUT,&port)==FACTORY_RESULT_OK) {
+            out->data.reactor.heat_network_id=port.network_id;
+            out->data.reactor.heat_connected=port.connected;
+        }
+    } else if (heat_conductor != NULL) {
+        FactoryHeatConductorInspection inspection;
+        out->entity_type=FACTORY_ENTITY_TYPE_HEAT_CONDUCTOR;
+        out->x=heat_conductor->x; out->y=heat_conductor->y;
+        if (factory_simulation_get_heat_conductor(simulation,id,&inspection)
+                !=FACTORY_RESULT_OK) return FACTORY_RESULT_ENTITY_NOT_FOUND;
+        out->data.heat_conductor=(FactoryPresentationHeatConductor){
+            inspection.connection_mask,inspection.network_id,
+            inspection.connected};
+    } else if (heat_exchanger != NULL) {
+        FactoryHeatExchangerInspection inspection;
+        out->entity_type=FACTORY_ENTITY_TYPE_HEAT_EXCHANGER;
+        out->x=heat_exchanger->x; out->y=heat_exchanger->y;
+        if (factory_simulation_get_heat_exchanger(simulation,id,&inspection)
+                !=FACTORY_RESULT_OK) return FACTORY_RESULT_ENTITY_NOT_FOUND;
+        out->status=inspection.activity==FACTORY_HEAT_EXCHANGER_WORKING
+            ? FACTORY_PRESENTATION_MACHINE_STATUS_WORKING
+            : inspection.activity==FACTORY_HEAT_EXCHANGER_BLOCKED_STEAM_FULL
+                ? FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_OUTPUT
+                : FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_INPUT;
+        out->data.heat_exchanger=(FactoryPresentationHeatExchanger){
+            inspection.heat_network_id,inspection.water_network_id,
+            inspection.steam_network_id,inspection.stored_water,
+            inspection.water_capacity,inspection.stored_steam,
+            inspection.steam_capacity,inspection.consumed_heat_last_tick,
+            inspection.consumed_water_last_tick,
+            inspection.produced_steam_last_tick,inspection.activity};
     } else if (solar_generator != NULL) {
         FactorySolarGeneratorInspection machine;
         FactoryPowerGeneratorInspection power_generator;

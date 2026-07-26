@@ -9,7 +9,7 @@
 
 #define SNAPSHOT_HEADER_SIZE 48U
 #define SNAPSHOT_SECTION_HEADER_SIZE 16U
-#define SNAPSHOT_SECTION_COUNT 22U
+#define SNAPSHOT_SECTION_COUNT 24U
 
 static const uint8_t snapshot_magic[8] = {
     'F', 'O', 'U', 'N', 'D', 'A', 'T', 'N'
@@ -36,6 +36,8 @@ typedef enum {
     SNAPSHOT_SECTION_SOLAR_GENERATORS,
     SNAPSHOT_SECTION_ACCUMULATORS,
     SNAPSHOT_SECTION_REACTORS,
+    SNAPSHOT_SECTION_HEAT_CONDUCTORS,
+    SNAPSHOT_SECTION_HEAT_EXCHANGERS,
     SNAPSHOT_SECTION_COMMANDS,
     SNAPSHOT_SECTION_RESULTS
 } SnapshotSection;
@@ -274,6 +276,8 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_records(&size, simulation->solar_generators.count, 12U)
         || !checked_records(&size, simulation->accumulators.count, 20U)
         || !checked_records(&size, simulation->reactors.count, 40U)
+        || !checked_records(&size, simulation->heat_conductors.count, 12U)
+        || !checked_records(&size, simulation->heat_exchangers.count, 12U)
         || !checked_records(&size, simulation->command_count, 24U)
         || !checked_records(&size, simulation->result_count, 68U)
         || !size_to_u32(simulation->entities->count)
@@ -295,6 +299,8 @@ static FactoryResult snapshot_size_unvalidated(
         || !size_to_u32(simulation->solar_generators.count)
         || !size_to_u32(simulation->accumulators.count)
         || !size_to_u32(simulation->reactors.count)
+        || !size_to_u32(simulation->heat_conductors.count)
+        || !size_to_u32(simulation->heat_exchangers.count)
         || !section_size_valid(
             simulation->entities->count, 4U, 8U)
         || !section_size_valid(tiles, 16U, 8U)
@@ -315,6 +321,8 @@ static FactoryResult snapshot_size_unvalidated(
         || !section_size_valid(simulation->solar_generators.count, 12U, 0U)
         || !section_size_valid(simulation->accumulators.count, 20U, 0U)
         || !section_size_valid(simulation->reactors.count, 40U, 0U)
+        || !section_size_valid(simulation->heat_conductors.count, 12U, 0U)
+        || !section_size_valid(simulation->heat_exchangers.count, 12U, 0U)
         || size > UINT64_MAX) {
         return FACTORY_RESULT_SNAPSHOT_SIZE_OVERFLOW;
     }
@@ -363,6 +371,10 @@ static bool entity_has_subsystem(
         factory_accumulator_store_find(&simulation->accumulators, id);
     const FactoryReactor *reactor =
         factory_reactor_store_find(&simulation->reactors, id);
+    const FactoryHeatConductor *heat_conductor =
+        factory_heat_conductor_store_find(&simulation->heat_conductors,id);
+    const FactoryHeatExchanger *heat_exchanger =
+        factory_heat_exchanger_store_find(&simulation->heat_exchangers,id);
     bool tank = fluid_storage != NULL && water_extractor == NULL
         && steam_engine == NULL;
     size_t found = (extractor != NULL) + (belt != NULL)
@@ -373,6 +385,8 @@ static bool entity_has_subsystem(
         + (steam_engine != NULL) + (solar_generator != NULL)
         + (accumulator != NULL);
     found += reactor != NULL;
+    found += heat_conductor != NULL;
+    found += heat_exchanger != NULL;
     if (steam_engine != NULL && generator != NULL) --found;
     if (solar_generator != NULL && generator != NULL) --found;
 
@@ -409,6 +423,10 @@ static bool entity_has_subsystem(
         *out_x = accumulator->x; *out_y = accumulator->y;
     } else if (reactor != NULL) {
         *out_x = reactor->x; *out_y = reactor->y;
+    } else if (heat_conductor != NULL) {
+        *out_x=heat_conductor->x; *out_y=heat_conductor->y;
+    } else if (heat_exchanger != NULL) {
+        *out_x=heat_exchanger->x; *out_y=heat_exchanger->y;
     } else if (tank) {
         *out_x = fluid_storage->x; *out_y = fluid_storage->y;
     } else {
@@ -490,7 +508,8 @@ static FactoryResult validate_simulation(
     }
     if (simulation->fluid_storages.count
         < simulation->water_extractors.count + simulation->boilers.count * 2U
-            + simulation->steam_engines.count)
+            + simulation->steam_engines.count
+            + simulation->heat_exchangers.count * 2U)
         return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     if (simulation->power_generators.count
         < simulation->steam_engines.count + simulation->solar_generators.count)
@@ -506,9 +525,12 @@ static FactoryResult validate_simulation(
         + simulation->solar_generators.count
         + simulation->accumulators.count
         + simulation->reactors.count
+        + simulation->heat_conductors.count
+        + simulation->heat_exchangers.count
         + simulation->fluid_storages.count
         - simulation->water_extractors.count - simulation->boilers.count * 2U
         - simulation->steam_engines.count
+        - simulation->heat_exchangers.count * 2U
         - simulation->steam_engines.count
         - simulation->solar_generators.count;
     if (subsystem_count != simulation->entities->count) {
@@ -822,6 +844,21 @@ static FactoryResult validate_simulation(
             || reactor->activity > FACTORY_REACTOR_BLOCKED_HEAT_FULL)
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
+    for (index=0U;index<simulation->heat_exchangers.count;++index) {
+        const FactoryHeatExchanger *e=&simulation->heat_exchangers.items[index];
+        const FactoryFluidStorage *water=factory_fluid_storage_store_find_slot(
+            &simulation->fluid_storages,e->entity_id,
+            FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_INPUT);
+        const FactoryFluidStorage *steam=factory_fluid_storage_store_find_slot(
+            &simulation->fluid_storages,e->entity_id,
+            FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_OUTPUT);
+        if (water==NULL || steam==NULL
+            || water->capacity!=FACTORY_HEAT_EXCHANGER_WATER_CAPACITY
+            || steam->capacity!=FACTORY_HEAT_EXCHANGER_STEAM_CAPACITY
+            || water->accepted_fluid_classes!=FACTORY_FLUID_CLASS_AQUEOUS
+            || steam->accepted_fluid_classes!=FACTORY_FLUID_CLASS_VAPOR)
+            return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
     for (index = 0U; index < simulation->water_extractors.count; ++index) {
         const FactoryWaterExtractor *machine =
             &simulation->water_extractors.items[index];
@@ -894,6 +931,9 @@ static FactoryResult validate_simulation(
         const FactorySteamEngine *steam_engine =
             factory_steam_engine_store_find(
                 &simulation->steam_engines, storage->owner_entity_id);
+        const FactoryHeatExchanger *heat_exchanger =
+            factory_heat_exchanger_store_find(
+                &simulation->heat_exchangers,storage->owner_entity_id);
         bool storage_shape_valid =
             (water_extractor != NULL
                 && storage->slot == FACTORY_FLUID_STORAGE_DEFAULT
@@ -917,8 +957,20 @@ static FactoryResult validate_simulation(
                 && storage->capacity == FACTORY_STEAM_ENGINE_STORAGE_CAPACITY
                 && storage->accepted_fluid_classes
                     == FACTORY_FLUID_CLASS_VAPOR)
+            || (heat_exchanger != NULL
+                && storage->slot
+                    == FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_INPUT
+                && storage->capacity==FACTORY_HEAT_EXCHANGER_WATER_CAPACITY
+                && storage->accepted_fluid_classes
+                    ==FACTORY_FLUID_CLASS_AQUEOUS)
+            || (heat_exchanger != NULL
+                && storage->slot
+                    == FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_OUTPUT
+                && storage->capacity==FACTORY_HEAT_EXCHANGER_STEAM_CAPACITY
+                && storage->accepted_fluid_classes
+                    ==FACTORY_FLUID_CLASS_VAPOR)
             || (water_extractor == NULL && boiler == NULL
-                && steam_engine == NULL
+                && steam_engine == NULL && heat_exchanger==NULL
                 && storage->slot == FACTORY_FLUID_STORAGE_DEFAULT
                 && storage->capacity == FACTORY_FLUID_TANK_CAPACITY
                 && storage->accepted_fluid_classes
@@ -949,8 +1001,8 @@ static FactoryResult validate_simulation(
     for (index = 0U; index < simulation->result_count; ++index) {
         const FactoryCommandResult *value = &simulation->results[index];
         if (!snapshot_command_valid(&value->command)
-            || value->result > FACTORY_RESULT_FUEL_INVENTORY_FULL
-            || value->entity_type > FACTORY_ENTITY_TYPE_REACTOR_CORE
+            || value->result > FACTORY_RESULT_HEAT_NETWORK_NOT_FOUND
+            || value->entity_type > FACTORY_ENTITY_TYPE_HEAT_EXCHANGER
             || value->previous_assembler_recipe
                 >= FACTORY_ASSEMBLER_RECIPE_COUNT
             || value->new_assembler_recipe
@@ -1086,6 +1138,14 @@ static void write_command(
                 command->data.insert_reactor_fuel.reactor_entity_id;
             fields[1] = command->data.insert_reactor_fuel.fuel_id;
             break;
+        case FACTORY_COMMAND_PLACE_HEAT_CONDUCTOR:
+            fields[0]=(uint32_t)command->data.place_heat_conductor.x;
+            fields[1]=(uint32_t)command->data.place_heat_conductor.y;
+            break;
+        case FACTORY_COMMAND_PLACE_HEAT_EXCHANGER:
+            fields[0]=(uint32_t)command->data.place_heat_exchanger.x;
+            fields[1]=(uint32_t)command->data.place_heat_exchanger.y;
+            break;
     }
     write_u32(writer, (uint32_t)command->type);
     for (index = 0U; index < 5U; ++index) {
@@ -1108,7 +1168,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             return false;
         }
     }
-    if (type > FACTORY_COMMAND_INSERT_REACTOR_FUEL) {
+    if (type > FACTORY_COMMAND_PLACE_HEAT_EXCHANGER) {
         return false;
     }
     command->type = (FactoryCommandType)type;
@@ -1143,6 +1203,8 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             case FACTORY_COMMAND_PLACE_ACCUMULATOR:
             case FACTORY_COMMAND_PLACE_REACTOR_CORE:
             case FACTORY_COMMAND_INSERT_REACTOR_FUEL:
+            case FACTORY_COMMAND_PLACE_HEAT_CONDUCTOR:
+            case FACTORY_COMMAND_PLACE_HEAT_EXCHANGER:
                 used = 2U;
                 break;
             case FACTORY_COMMAND_DEMOLISH_ENTITY:
@@ -1278,6 +1340,14 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
         case FACTORY_COMMAND_INSERT_REACTOR_FUEL:
             command->data.insert_reactor_fuel.reactor_entity_id = fields[0];
             command->data.insert_reactor_fuel.fuel_id = fields[1];
+            break;
+        case FACTORY_COMMAND_PLACE_HEAT_CONDUCTOR:
+            command->data.place_heat_conductor.x=(int32_t)fields[0];
+            command->data.place_heat_conductor.y=(int32_t)fields[1];
+            break;
+        case FACTORY_COMMAND_PLACE_HEAT_EXCHANGER:
+            command->data.place_heat_exchanger.x=(int32_t)fields[0];
+            command->data.place_heat_exchanger.y=(int32_t)fields[1];
             break;
     }
     return snapshot_command_valid(command);
@@ -1648,6 +1718,23 @@ static void write_snapshot(
         write_u32(writer, value->active_fuel_id);
         write_u64(writer, value->remaining_heat_yield);
         write_u64(writer, value->heat_storage.stored_heat);
+    }
+
+    write_section_header(writer,SNAPSHOT_SECTION_HEAT_CONDUCTORS,
+        simulation->heat_conductors.count,
+        simulation->heat_conductors.count*12U);
+    for (index=0U;index<simulation->heat_conductors.count;++index) {
+        const FactoryHeatConductor *v=&simulation->heat_conductors.items[index];
+        write_u32(writer,v->entity_id); write_i32(writer,v->x);
+        write_i32(writer,v->y);
+    }
+    write_section_header(writer,SNAPSHOT_SECTION_HEAT_EXCHANGERS,
+        simulation->heat_exchangers.count,
+        simulation->heat_exchangers.count*12U);
+    for (index=0U;index<simulation->heat_exchangers.count;++index) {
+        const FactoryHeatExchanger *v=&simulation->heat_exchangers.items[index];
+        write_u32(writer,v->entity_id); write_i32(writer,v->x);
+        write_i32(writer,v->y);
     }
 
     write_section_header(
@@ -2251,6 +2338,30 @@ static bool load_sections(
         v->activity = FACTORY_REACTOR_IDLE;
     }
 
+    if (!read_section_header(reader,SNAPSHOT_SECTION_HEAT_CONDUCTORS,12U,0U,
+            &count)
+        || !allocate_records((void **)&simulation->heat_conductors.items,count,
+            sizeof(FactoryHeatConductor))) return false;
+    simulation->heat_conductors.count=count;
+    simulation->heat_conductors.capacity=count;
+    for (index=0U;index<count;++index) {
+        FactoryHeatConductor *v=&simulation->heat_conductors.items[index];
+        if (!read_u32(reader,&v->entity_id)||!read_i32(reader,&v->x)
+            ||!read_i32(reader,&v->y)) return false;
+    }
+    if (!read_section_header(reader,SNAPSHOT_SECTION_HEAT_EXCHANGERS,12U,0U,
+            &count)
+        || !allocate_records((void **)&simulation->heat_exchangers.items,count,
+            sizeof(FactoryHeatExchanger))) return false;
+    simulation->heat_exchangers.count=count;
+    simulation->heat_exchangers.capacity=count;
+    for (index=0U;index<count;++index) {
+        FactoryHeatExchanger *v=&simulation->heat_exchangers.items[index];
+        if (!read_u32(reader,&v->entity_id)||!read_i32(reader,&v->x)
+            ||!read_i32(reader,&v->y)) return false;
+        v->activity=FACTORY_HEAT_EXCHANGER_IDLE;
+    }
+
     if (!read_section_header(
             reader, SNAPSHOT_SECTION_COMMANDS, 24U, 0U, &count)
         || count > FACTORY_COMMAND_QUEUE_CAPACITY) {
@@ -2381,11 +2492,15 @@ FactoryResult factory_simulation_load_snapshot(
             &simulation->fluid_ports, storage->owner_entity_id,
             storage->slot, storage->x, storage->y,
             storage->slot == FACTORY_FLUID_STORAGE_BOILER_INPUT
+                || storage->slot
+                    == FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_INPUT
                 ? FACTORY_FLUID_CONNECTION_WEST
                 : storage->slot
                     == FACTORY_FLUID_STORAGE_STEAM_ENGINE_INPUT
                     ? FACTORY_FLUID_CONNECTION_WEST
                 : storage->slot == FACTORY_FLUID_STORAGE_BOILER_OUTPUT
+                    || storage->slot
+                        == FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_OUTPUT
                     ? FACTORY_FLUID_CONNECTION_EAST
                     : FACTORY_FLUID_CONNECTION_ALL,
             storage->accepted_fluid_classes);
@@ -2403,6 +2518,30 @@ FactoryResult factory_simulation_load_snapshot(
     simulation->fluid_networks.dirty = true;
     result = factory_fluid_network_rebuild(simulation, false);
     if (result != FACTORY_RESULT_OK) {
+        factory_simulation_destroy(simulation);
+        return result;
+    }
+    for (size_t i=0U;i<simulation->reactors.count;++i) {
+        const FactoryReactor *v=&simulation->reactors.items[i];
+        if (!factory_heat_port_store_reserve_one(&simulation->heat_ports)) {
+            factory_simulation_destroy(simulation);
+            return FACTORY_RESULT_OUT_OF_MEMORY;
+        }
+        factory_heat_port_store_add(&simulation->heat_ports,v->entity_id,
+            FACTORY_HEAT_PORT_REACTOR_OUTPUT,v->x,v->y);
+    }
+    for (size_t i=0U;i<simulation->heat_exchangers.count;++i) {
+        const FactoryHeatExchanger *v=&simulation->heat_exchangers.items[i];
+        if (!factory_heat_port_store_reserve_one(&simulation->heat_ports)) {
+            factory_simulation_destroy(simulation);
+            return FACTORY_RESULT_OUT_OF_MEMORY;
+        }
+        factory_heat_port_store_add(&simulation->heat_ports,v->entity_id,
+            FACTORY_HEAT_PORT_EXCHANGER_INPUT,v->x,v->y);
+    }
+    simulation->heat_networks.dirty=true;
+    result=factory_heat_network_rebuild(simulation,false);
+    if (result!=FACTORY_RESULT_OK) {
         factory_simulation_destroy(simulation);
         return result;
     }

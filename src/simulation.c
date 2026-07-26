@@ -108,6 +108,10 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     factory_solar_generator_store_destroy(&simulation->solar_generators);
     factory_accumulator_store_destroy(&simulation->accumulators);
     factory_reactor_store_destroy(&simulation->reactors);
+    factory_heat_conductor_store_destroy(&simulation->heat_conductors);
+    factory_heat_port_store_destroy(&simulation->heat_ports);
+    factory_heat_exchanger_store_destroy(&simulation->heat_exchangers);
+    factory_heat_network_state_destroy(&simulation->heat_networks);
     factory_burner_store_destroy(&simulation->burners);
     factory_power_state_destroy(&simulation->power);
     factory_power_generator_store_destroy(&simulation->power_generators);
@@ -532,11 +536,64 @@ static FactoryResult place_reactor_core(
     int32_t y = command->data.place_reactor_core.y;
     FactoryResult result = validate_empty_tile(s, x, y);
     if (result != FACTORY_RESULT_OK) return result;
-    if (!factory_reactor_store_reserve_one(&s->reactors))
+    if (!factory_reactor_store_reserve_one(&s->reactors)
+        || !factory_heat_port_store_reserve_one(&s->heat_ports))
         return FACTORY_RESULT_OUT_OF_MEMORY;
     result = occupy_with_entity(s, x, y, out_id);
     if (result != FACTORY_RESULT_OK) return result;
     factory_reactor_store_add(&s->reactors, *out_id, x, y);
+    factory_heat_port_store_add(&s->heat_ports, *out_id,
+        FACTORY_HEAT_PORT_REACTOR_OUTPUT, x, y);
+    s->heat_networks.dirty = true;
+    return FACTORY_RESULT_OK;
+}
+
+static FactoryResult place_heat_conductor(
+    FactorySimulation *s, const FactoryCommand *command, FactoryEntityId *out_id)
+{
+    int32_t x=command->data.place_heat_conductor.x;
+    int32_t y=command->data.place_heat_conductor.y;
+    FactoryResult result=validate_empty_tile(s,x,y);
+    if (result!=FACTORY_RESULT_OK) return result;
+    if (!factory_heat_conductor_store_reserve_one(&s->heat_conductors))
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    result=occupy_with_entity(s,x,y,out_id);
+    if (result!=FACTORY_RESULT_OK) return result;
+    factory_heat_conductor_store_add(&s->heat_conductors,*out_id,x,y);
+    s->heat_networks.dirty=true;
+    return FACTORY_RESULT_OK;
+}
+
+static FactoryResult place_heat_exchanger(
+    FactorySimulation *s, const FactoryCommand *command, FactoryEntityId *out_id)
+{
+    int32_t x=command->data.place_heat_exchanger.x;
+    int32_t y=command->data.place_heat_exchanger.y;
+    FactoryResult result=validate_empty_tile(s,x,y);
+    if (result!=FACTORY_RESULT_OK) return result;
+    if (!factory_heat_exchanger_store_reserve_one(&s->heat_exchangers)
+        || !factory_heat_port_store_reserve_one(&s->heat_ports)
+        || !reserve_two_fluid_storages(&s->fluid_storages)
+        || !reserve_two_fluid_ports(&s->fluid_ports))
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    result=occupy_with_entity(s,x,y,out_id);
+    if (result!=FACTORY_RESULT_OK) return result;
+    factory_heat_exchanger_store_add(&s->heat_exchangers,*out_id,x,y);
+    factory_heat_port_store_add(&s->heat_ports,*out_id,
+        FACTORY_HEAT_PORT_EXCHANGER_INPUT,x,y);
+    factory_fluid_storage_store_add(&s->fluid_storages,*out_id,
+        FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_INPUT,x,y,
+        FACTORY_FLUID_CLASS_AQUEOUS,FACTORY_HEAT_EXCHANGER_WATER_CAPACITY);
+    factory_fluid_storage_store_add(&s->fluid_storages,*out_id,
+        FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_OUTPUT,x,y,
+        FACTORY_FLUID_CLASS_VAPOR,FACTORY_HEAT_EXCHANGER_STEAM_CAPACITY);
+    factory_fluid_port_store_add(&s->fluid_ports,*out_id,
+        FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_INPUT,x,y,
+        FACTORY_FLUID_CONNECTION_WEST,FACTORY_FLUID_CLASS_AQUEOUS);
+    factory_fluid_port_store_add(&s->fluid_ports,*out_id,
+        FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_OUTPUT,x,y,
+        FACTORY_FLUID_CONNECTION_EAST,FACTORY_FLUID_CLASS_VAPOR);
+    s->heat_networks.dirty=true; s->fluid_networks.dirty=true;
     return FACTORY_RESULT_OK;
 }
 
@@ -761,6 +818,10 @@ static FactoryResult validate_demolition(
         factory_accumulator_store_find(&simulation->accumulators, id);
     const FactoryReactor *reactor =
         factory_reactor_store_find(&simulation->reactors, id);
+    const FactoryHeatConductor *heat_conductor =
+        factory_heat_conductor_store_find(&simulation->heat_conductors, id);
+    const FactoryHeatExchanger *heat_exchanger =
+        factory_heat_exchanger_store_find(&simulation->heat_exchangers, id);
     const FactoryTile *tile;
 
     if (id == 0U) {
@@ -853,6 +914,12 @@ static FactoryResult validate_demolition(
         *out_type = FACTORY_ENTITY_TYPE_REACTOR_CORE;
         *out_x = reactor->x;
         *out_y = reactor->y;
+    } else if (heat_conductor != NULL) {
+        *out_type=FACTORY_ENTITY_TYPE_HEAT_CONDUCTOR;
+        *out_x=heat_conductor->x; *out_y=heat_conductor->y;
+    } else if (heat_exchanger != NULL) {
+        *out_type=FACTORY_ENTITY_TYPE_HEAT_EXCHANGER;
+        *out_x=heat_exchanger->x; *out_y=heat_exchanger->y;
     } else if (solar_generator != NULL) {
         if (power_generator == NULL)
             return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
@@ -1017,7 +1084,27 @@ static bool remove_subsystem_record(
             return factory_accumulator_store_remove(
                 &simulation->accumulators, id);
         case FACTORY_ENTITY_TYPE_REACTOR_CORE:
+            if (!factory_heat_port_store_remove(&simulation->heat_ports,id))
+                return false;
+            simulation->heat_networks.dirty=true;
             return factory_reactor_store_remove(&simulation->reactors, id);
+        case FACTORY_ENTITY_TYPE_HEAT_CONDUCTOR:
+            simulation->heat_networks.dirty=true;
+            return factory_heat_conductor_store_remove(
+                &simulation->heat_conductors,id);
+        case FACTORY_ENTITY_TYPE_HEAT_EXCHANGER:
+            if (!factory_heat_port_store_remove(&simulation->heat_ports,id)
+                || !factory_fluid_port_store_remove(&simulation->fluid_ports,id)
+                || !factory_fluid_port_store_remove(&simulation->fluid_ports,id)
+                || !factory_fluid_storage_store_remove(
+                    &simulation->fluid_storages,id)
+                || !factory_fluid_storage_store_remove(
+                    &simulation->fluid_storages,id))
+                return false;
+            simulation->heat_networks.dirty=true;
+            simulation->fluid_networks.dirty=true;
+            return factory_heat_exchanger_store_remove(
+                &simulation->heat_exchangers,id);
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;
@@ -1121,6 +1208,10 @@ static bool placement_type(
         case FACTORY_COMMAND_PLACE_REACTOR_CORE:
             *out_type = FACTORY_ENTITY_TYPE_REACTOR_CORE;
             return true;
+        case FACTORY_COMMAND_PLACE_HEAT_CONDUCTOR:
+            *out_type=FACTORY_ENTITY_TYPE_HEAT_CONDUCTOR; return true;
+        case FACTORY_COMMAND_PLACE_HEAT_EXCHANGER:
+            *out_type=FACTORY_ENTITY_TYPE_HEAT_EXCHANGER; return true;
         default:
             return false;
     }
@@ -1461,6 +1552,14 @@ static void apply_commands(FactorySimulation *simulation)
             case FACTORY_COMMAND_INSERT_REACTOR_FUEL:
                 result->result = insert_reactor_fuel(
                     simulation, &result->command, &result->entity_id);
+                break;
+            case FACTORY_COMMAND_PLACE_HEAT_CONDUCTOR:
+                result->result=place_heat_conductor(
+                    simulation,&result->command,&result->entity_id);
+                break;
+            case FACTORY_COMMAND_PLACE_HEAT_EXCHANGER:
+                result->result=place_heat_exchanger(
+                    simulation,&result->command,&result->entity_id);
                 break;
             case FACTORY_COMMAND_FLUID_INSERT:
             case FACTORY_COMMAND_FLUID_REMOVE:
@@ -2375,6 +2474,7 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
         factory_simulation_emit_event(simulation, (FactoryEvent){
             .type = FACTORY_EVENT_SUNSET});
     (void)factory_fluid_network_rebuild(simulation, true);
+    (void)factory_heat_network_rebuild(simulation, true);
     factory_fluid_network_transfer(simulation);
     factory_burner_store_begin_tick(&simulation->burners, simulation);
     factory_fluid_machines_update(simulation);
@@ -2385,6 +2485,7 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     factory_power_consume_generation(simulation);
     factory_burner_store_finish_tick(&simulation->burners, simulation);
     factory_reactor_store_update(&simulation->reactors, simulation);
+    factory_heat_exchangers_update(simulation);
     factory_extractor_store_update(
         &simulation->extractors, simulation->world, simulation
     );

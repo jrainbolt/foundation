@@ -51,6 +51,13 @@ Every `FactoryEvent` is fully initialized. Unused fields are zero or their
 | `REACTOR_FUELED` | reactor core | unused | `nuclear_fuel_id`, quantity one |
 | `REACTOR_HEAT_GENERATED` | reactor core | unused | generated heat in `quantity`, resulting stored heat in `related_quantity` |
 | `REACTOR_FUEL_EXHAUSTED` | reactor core | unused | `nuclear_fuel_id`, quantity one |
+| `HEAT_NETWORK_CREATED` | unused | unused | network-count change in `quantity` |
+| `HEAT_NETWORK_SPLIT` | unused | unused | network-count change in `quantity` |
+| `HEAT_NETWORK_MERGED` | unused | unused | network-count change in `quantity` |
+| `HEAT_PORT_CONNECTED` | port owner | unused | stable heat-port slot in `quantity` |
+| `HEAT_PORT_DISCONNECTED` | port owner | unused | stable heat-port slot in `quantity` |
+| `HEAT_TRANSFERRED` | reactor source | exchanger destination | transferred heat in `quantity` |
+| `HEAT_EXCHANGER_CYCLE_COMPLETED` | exchanger | unused | heat in `quantity`, water in `related_quantity`, steam in `third_quantity` |
 
 Construction and demolition events appear only after successful transactional
 commands. Production events appear only when output is committed. Transfer
@@ -68,13 +75,15 @@ ascending accumulator entity-ID order, then consumer power transitions are
 emitted in ascending consumer entity-ID order. Fuel-completion events follow.
 Reactor cores then update in deterministic component-store order, emitting one
 aggregate heat event per producing core and an exhaustion event immediately
-after the final heat commit. Extractor
+after the final heat commit. Heat transfers follow ascending exchanger then
+reactor ID, with each cycle event following its contributing transfer events.
+Extractor
 production and producer transfers, belt transfers, refinery completion,
 assembler completion, and inserter drop/pickup transfers follow according to
 the normal authoritative update phases. Fluid command events occupy their FIFO
 command positions. There is no event sorting pass.
 
 Events and their allocation capacity are observer state. They are not encoded
-in version 11 snapshots and do not affect canonical bytes. A loaded simulation
+in version 12 snapshots and do not affect canonical bytes. A loaded simulation
 starts with an empty batch. Failed loads create no simulation and cannot alter
 an existing simulation or its visible batch.

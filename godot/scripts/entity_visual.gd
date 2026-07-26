@@ -13,6 +13,8 @@ const COLORS := {
 	15: Color("#f0b429"),
 	16: Color("#8bd450"),
 	17: Color("#6ee7b7"),
+	18: Color("#e879f9"),
+	19: Color("#67e8f9"),
 }
 const NAMES := {
 	1: "EX", 2: "BELT", 3: "REF", 4: "ASM", 5: "BOX",
@@ -23,6 +25,8 @@ const NAMES := {
 	15: "SOLAR",
 	16: "ACC",
 	17: "CORE",
+	18: "HEAT",
+	19: "HEX",
 }
 
 var state: Dictionary = {}
@@ -137,6 +141,31 @@ func _draw() -> void:
 				int(state.get("heat_capacity", 0)),
 				int(state.get("remaining_burn_ticks", 0)),
 				"ON" if int(state.get("reactor_activity", 0)) == 1 else "OFF"
+			],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 8
+		)
+	if entity_type == 18:
+		var heat_mask := int(state.get("connection_mask", 0))
+		var heat_center := Vector2(32, 32)
+		var heat_vectors := [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]
+		for index in 4:
+			if heat_mask & (1 << index):
+				draw_line(
+					heat_center, heat_center + heat_vectors[index] * 28.0,
+					Color.WHITE, 8.0
+				)
+		draw_string(
+			ThemeDB.fallback_font, Vector2(7, 39),
+			"N%d" % int(state.get("heat_network_id", 0)),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9
+		)
+	if entity_type == 19:
+		draw_string(
+			ThemeDB.fallback_font, Vector2(7, 39),
+			"W%d S%d H%d" % [
+				int(state.get("stored_water", 0)),
+				int(state.get("stored_steam", 0)),
+				int(state.get("consumed_heat_last_tick", 0))
 			],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 8
 		)

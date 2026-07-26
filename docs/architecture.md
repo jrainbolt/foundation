@@ -90,6 +90,12 @@ authoritative remaining-yield state, then add bounded integer heat to a
 reusable `FactoryHeatStorage`. Reactors do not participate in power or fluid
 topology, and full heat storage pauses fuel consumption without loss.
 
+Heat conductors and entity-owned heat ports feed a separate derived cardinal
+topology whose component ID is the minimum conductor entity ID. Networks own
+no heat. Heat exchangers withdraw exact recipe heat directly from connected
+reactor HeatStorage components in ascending source ID, while exchanger
+destinations run in ascending entity ID.
+
 The simulation also owns a transient event batch. Tick preflight reserves its
 worst-case capacity before mutation, after which authoritative commit points
 append fully initialized facts without allocation or callbacks. No subsystem

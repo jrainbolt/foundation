@@ -53,11 +53,11 @@ without advancing it produces the original bytes.
 There are currently no file wrappers, compression, encryption, save slots,
 autosaving, background I/O, partial loads, or migration from other versions.
 
-Snapshot version 11 includes authoritative power-pole, generator, burner,
+Snapshot version 12 includes authoritative power-pole, generator, burner,
 biomass-storage, slotted fluid-storage, water-extractor, and boiler records,
 steam-engine recipe records, solar generators, accumulators, and reactor-core
-heat/fuel records, plus queued placement, fluid, and reactor-fuel commands,
-pipe positions, and results. Pole
+heat/fuel records, heat conductors, heat exchangers, plus queued placement,
+fluid, and reactor-fuel commands, pipe positions, and results. Pole
 edges, network IDs, attachments, allocation, and inspection summaries are
 derived and rebuilt immediately after load. Earlier snapshots are deliberately
 unsupported.

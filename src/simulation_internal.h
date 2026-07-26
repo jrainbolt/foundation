@@ -23,6 +23,7 @@
 #include "solar_internal.h"
 #include "accumulator_internal.h"
 #include "reactor_internal.h"
+#include "heat_network_internal.h"
 
 struct FactorySimulation {
     FactorySimulationClock clock;
@@ -49,6 +50,10 @@ struct FactorySimulation {
     FactorySolarGeneratorStore solar_generators;
     FactoryAccumulatorStore accumulators;
     FactoryReactorStore reactors;
+    FactoryHeatConductorStore heat_conductors;
+    FactoryHeatPortStore heat_ports;
+    FactoryHeatExchangerStore heat_exchangers;
+    FactoryHeatNetworkState heat_networks;
     /* Test-fixture setup only; production simulations leave this zero. */
     uint32_t fixture_initial_generator_fuel;
     FactoryPowerState power;

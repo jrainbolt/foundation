@@ -182,7 +182,29 @@ typedef struct {
     FactoryHeatQuantity remaining_heat_yield;
     FactoryHeatQuantity generated_last_tick;
     FactoryReactorActivity activity;
+    FactoryHeatNetworkId heat_network_id;
+    bool heat_connected;
 } FactoryPresentationReactor;
+
+typedef struct {
+    uint32_t connection_mask;
+    FactoryHeatNetworkId heat_network_id;
+    bool connected;
+} FactoryPresentationHeatConductor;
+
+typedef struct {
+    FactoryHeatNetworkId heat_network_id;
+    FactoryFluidNetworkId water_network_id;
+    FactoryFluidNetworkId steam_network_id;
+    FactoryFluidQuantity stored_water;
+    FactoryFluidQuantity water_capacity;
+    FactoryFluidQuantity stored_steam;
+    FactoryFluidQuantity steam_capacity;
+    FactoryHeatQuantity consumed_heat_last_tick;
+    FactoryFluidQuantity consumed_water_last_tick;
+    FactoryFluidQuantity produced_steam_last_tick;
+    FactoryHeatExchangerActivity activity;
+} FactoryPresentationHeatExchanger;
 
 typedef struct {
     FactoryEntityId entity_id;
@@ -210,6 +232,8 @@ typedef struct {
         FactoryPresentationSolarGenerator solar_generator;
         FactoryPresentationAccumulator accumulator;
         FactoryPresentationReactor reactor;
+        FactoryPresentationHeatConductor heat_conductor;
+        FactoryPresentationHeatExchanger heat_exchanger;
     } data;
 } FactoryPresentationEntity;
 

@@ -46,7 +46,9 @@ typedef enum {
     FACTORY_COMMAND_PLACE_SOLAR_GENERATOR,
     FACTORY_COMMAND_PLACE_ACCUMULATOR,
     FACTORY_COMMAND_PLACE_REACTOR_CORE,
-    FACTORY_COMMAND_INSERT_REACTOR_FUEL
+    FACTORY_COMMAND_INSERT_REACTOR_FUEL,
+    FACTORY_COMMAND_PLACE_HEAT_CONDUCTOR,
+    FACTORY_COMMAND_PLACE_HEAT_EXCHANGER
 } FactoryCommandType;
 
 typedef struct {
@@ -145,6 +147,8 @@ typedef struct {
             FactoryEntityId reactor_entity_id;
             FactoryNuclearFuelId fuel_id;
         } insert_reactor_fuel;
+        struct { int32_t x; int32_t y; } place_heat_conductor;
+        struct { int32_t x; int32_t y; } place_heat_exchanger;
     } data;
 } FactoryCommand;
 

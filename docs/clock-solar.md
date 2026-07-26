@@ -42,7 +42,7 @@ consumption, burner finalization, item production/logistics, event
 finalization, then clock advancement. Sunrise and sunset are emitted once when
 a step begins at ticks 600 and 1800 of each day.
 
-Snapshot version 11 stores the clock tick and solar identity/position. Day,
+Snapshot version 12 stores the clock tick and solar identity/position. Day,
 time-of-day, intensity, network state, available output, actual latest-tick
 output, presentation, and events are derived or transient. Loading reconstructs
 the derived clock fields and power topology before publication.

@@ -36,7 +36,14 @@ typedef enum {
     FACTORY_EVENT_ACCUMULATOR_DISCHARGED,
     FACTORY_EVENT_REACTOR_FUELED,
     FACTORY_EVENT_REACTOR_HEAT_GENERATED,
-    FACTORY_EVENT_REACTOR_FUEL_EXHAUSTED
+    FACTORY_EVENT_REACTOR_FUEL_EXHAUSTED,
+    FACTORY_EVENT_HEAT_NETWORK_CREATED,
+    FACTORY_EVENT_HEAT_NETWORK_SPLIT,
+    FACTORY_EVENT_HEAT_NETWORK_MERGED,
+    FACTORY_EVENT_HEAT_PORT_CONNECTED,
+    FACTORY_EVENT_HEAT_PORT_DISCONNECTED,
+    FACTORY_EVENT_HEAT_TRANSFERRED,
+    FACTORY_EVENT_HEAT_EXCHANGER_CYCLE_COMPLETED
 } FactoryEventType;
 
 /*
@@ -65,6 +72,10 @@ typedef enum {
  * nuclear_fuel_id identifies the rod, and quantity is one.
  * reactor heat generated: entity_id identifies the reactor, quantity is
  * generated heat, and related_quantity is resulting stored heat.
+ * heat transferred: entity_id is the reactor source, related_entity_id is the
+ * exchanger destination, and quantity is heat.
+ * exchanger cycle: quantity is heat consumed, related_quantity is water
+ * consumed, and third_quantity is steam produced.
  *
  * tick is the simulation tick at the start of the step that emitted the
  * event. Item-transfer quantity is currently one.
@@ -81,6 +92,7 @@ typedef struct {
     uint32_t nuclear_fuel_id;
     uint32_t quantity;
     uint32_t related_quantity;
+    uint32_t third_quantity;
 } FactoryEvent;
 
 /*

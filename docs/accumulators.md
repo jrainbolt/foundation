@@ -41,7 +41,7 @@ and related quantity is resulting stored energy.
 Demolition discards stored energy, removes the component, clears its occupied
 tile, and applies the normal construction refund. No energy is transferred.
 
-Snapshot version 11 serializes entity ID, position, and stored energy.
+Snapshot version 12 serializes entity ID, position, and stored energy.
 Attachment, network ID, latest-tick activity, events, and presentation are
 derived or transient. Snapshot topology reconstruction never charges or
 discharges storage.

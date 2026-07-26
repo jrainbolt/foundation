@@ -60,6 +60,7 @@ add_library(factory_engine
     src/fluid.c
     src/fluid_machine.c
     src/heat.c
+    src/heat_network.c
     src/item.c
     src/inserter.c
     src/logistics_endpoint.c
@@ -305,4 +306,11 @@ if(BUILD_TESTING)
     )
     target_link_libraries(factory_reactor_tests PRIVATE factory_engine)
     add_test(NAME factory_reactor_tests COMMAND factory_reactor_tests)
+
+    add_executable(factory_heat_network_tests tests/test_heat_network.c)
+    target_include_directories(
+        factory_heat_network_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(factory_heat_network_tests PRIVATE factory_engine)
+    add_test(NAME factory_heat_network_tests COMMAND factory_heat_network_tests)
 endif()

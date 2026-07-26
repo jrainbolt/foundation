@@ -2,7 +2,8 @@
 
 `FactoryHeatStorage` is a reusable authoritative integer resource containing
 stored heat and capacity. Addition is checked and never exceeds capacity.
-Heat has no consumer in this milestone and does not decay.
+Heat is consumed only through the separate derived heat-network/exchanger
+system and does not decay.
 
 A reactor core owns a stable entity ID, grid position, one-rod input
 inventory, active fuel ID, remaining fuel heat yield, heat storage, and
@@ -40,7 +41,7 @@ emits one fueled event; failure leaves state unchanged. Demolition deliberately
 discards queued fuel, active fuel, remaining yield, and stored heat under the
 milestone's removal policy, then applies the normal construction refund.
 
-Snapshot version 11 serializes reactor identity, position, queued fuel, active
+Snapshot version 12 serializes reactor identity, position, queued fuel, active
 fuel, remaining yield, and stored heat. Capacity comes from the immutable
 definition. Activity, latest output, events, and presentation are transient
 and reset after load. Reactor component order is preserved, so continuation

@@ -22,21 +22,22 @@ func _run() -> void:
 		return
 	var initial_tick := int(main.simulation.get_tick())
 	var canvas: Node = main.canvas
-	if initial_tick != 2 or canvas.entity_nodes.size() != 38:
+	if initial_tick != 2 or canvas.entity_nodes.size() != 45:
 		_fail("deterministic demo or entity visuals are incorrect")
 		return
 	var tank_count := 0
+	var filled_tank_count := 0
 	for entity_id: int in canvas.entity_nodes:
 		var visual: FoundationEntityVisual = canvas.entity_nodes[entity_id]
 		if int(visual.state.get("type", 0)) == 10:
 			tank_count += 1
-			if int(visual.state.get("fluid_type", 0)) != 1 \
-					or int(visual.state.get("fluid_quantity", 0)) != 2500 \
-					or int(visual.state.get("fluid_capacity", 0)) != 10000:
+			if int(visual.state.get("fluid_quantity", 0)) == 2500:
+				filled_tank_count += 1
+			if int(visual.state.get("fluid_capacity", 0)) != 10000:
 				_fail("fluid tank visual has incorrect presentation fields")
 				return
-	if tank_count != 1:
-		_fail("main scene did not receive exactly one fluid tank")
+	if tank_count != 2 or filled_tank_count != 1:
+		_fail("main scene did not receive deterministic fluid tanks")
 		return
 	var pipe_count := 0
 	for entity_id: int in canvas.entity_nodes:
@@ -47,8 +48,8 @@ func _run() -> void:
 					or int(visual.state.get("network_id", 0)) == 0:
 				_fail("pipe visual has incorrect network fields")
 				return
-	if pipe_count != 3:
-		_fail("main scene did not receive exactly three pipes")
+	if pipe_count != 5:
+		_fail("main scene did not receive exactly five pipes")
 		return
 	var water_extractor_count := 0
 	var boiler_count := 0
@@ -56,6 +57,8 @@ func _run() -> void:
 	var solar_generator_count := 0
 	var accumulator_count := 0
 	var reactor_count := 0
+	var heat_conductor_count := 0
+	var heat_exchanger_count := 0
 	for entity_id: int in canvas.entity_nodes:
 		var visual: FoundationEntityVisual = canvas.entity_nodes[entity_id]
 		if int(visual.state.get("type", 0)) == 12:
@@ -95,14 +98,27 @@ func _run() -> void:
 				return
 		elif int(visual.state.get("type", 0)) == 17:
 			reactor_count += 1
-			if int(visual.state.get("stored_heat", -1)) != 100 \
+			if int(visual.state.get("stored_heat", -1)) != 0 \
 					or int(visual.state.get("heat_capacity", 0)) != 10000 \
 					or int(visual.state.get("remaining_burn_ticks", 0)) != 99:
 				_fail("reactor visual has incorrect fields")
 				return
+		elif int(visual.state.get("type", 0)) == 18:
+			heat_conductor_count += 1
+			if int(visual.state.get("heat_network_id", 0)) == 0 \
+					or int(visual.state.get("connection_mask", 0)) == 0:
+				_fail("heat conductor visual has incorrect fields")
+				return
+		elif int(visual.state.get("type", 0)) == 19:
+			heat_exchanger_count += 1
+			if int(visual.state.get("stored_steam", -1)) != 100 \
+					or int(visual.state.get("consumed_heat_last_tick", 0)) != 100:
+				_fail("heat exchanger visual has incorrect fields")
+				return
 	if water_extractor_count != 1 or boiler_count != 1 \
 			or steam_engine_count != 1 or solar_generator_count != 1 \
-			or accumulator_count != 1 or reactor_count != 1:
+			or accumulator_count != 1 or reactor_count != 1 \
+			or heat_conductor_count != 3 or heat_exchanger_count != 1:
 		_fail("main scene did not receive fluid machines")
 		return
 	if canvas.resources.size() != 2 or canvas.edges.is_empty():
@@ -137,7 +153,7 @@ func _run() -> void:
 	if int(main.simulation.get_tick()) != initial_tick:
 		_fail("reset did not restore initial tick")
 		return
-	if canvas.entity_nodes.size() != 38 or canvas.resources.size() != 2:
+	if canvas.entity_nodes.size() != 45 or canvas.resources.size() != 2:
 		_fail("reset did not restore deterministic visuals")
 		return
 

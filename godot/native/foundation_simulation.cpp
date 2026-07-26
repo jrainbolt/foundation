@@ -72,6 +72,12 @@ FactoryCommand place(
     case FACTORY_COMMAND_PLACE_REACTOR_CORE:
         command.data.place_reactor_core = {x, y};
         break;
+    case FACTORY_COMMAND_PLACE_HEAT_CONDUCTOR:
+        command.data.place_heat_conductor = {x, y};
+        break;
+    case FACTORY_COMMAND_PLACE_HEAT_EXCHANGER:
+        command.data.place_heat_exchanger = {x, y};
+        break;
     default:
         break;
     }
@@ -138,6 +144,8 @@ const char *result_name_c(FactoryResult result)
         return "fuel incompatible";
     case FACTORY_RESULT_FUEL_INVENTORY_FULL:
         return "fuel inventory full";
+    case FACTORY_RESULT_HEAT_NETWORK_NOT_FOUND:
+        return "heat network not found";
     }
     return "unknown result";
 }
@@ -383,6 +391,23 @@ FactoryResult FoundationSimulation::build_demo()
     result = submit(reactor_fuel);
     if (result != FACTORY_RESULT_OK)
         return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_HEAT_CONDUCTOR, 9, 1));
+    if (result != FACTORY_RESULT_OK) return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_HEAT_CONDUCTOR, 8, 1));
+    if (result != FACTORY_RESULT_OK) return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_HEAT_CONDUCTOR, 7, 1));
+    if (result != FACTORY_RESULT_OK) return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_HEAT_EXCHANGER, 7, 0));
+    if (result != FACTORY_RESULT_OK) return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_PIPE, 6, 0));
+    if (result != FACTORY_RESULT_OK) return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_FLUID_TANK, 5, 0));
+    if (result != FACTORY_RESULT_OK) return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_PIPE, 8, 0));
+    if (result != FACTORY_RESULT_OK) return result;
+    result = factory_simulation_submit_fluid_insert(
+        simulation_, 44U, FACTORY_FLUID_WATER, 200U);
+    if (result != FACTORY_RESULT_OK) return result;
     result = factory_simulation_submit_fluid_insert(
         simulation_, 27U, FACTORY_FLUID_WATER, 2500U);
     if (result != FACTORY_RESULT_OK)
@@ -810,6 +835,42 @@ bool FoundationSimulation::entity_to_dictionary(
             (int64_t)entity.data.reactor.remaining_burn_ticks;
         value["reactor_activity"] =
             (int64_t)entity.data.reactor.activity;
+        value["heat_network_id"] =
+            (int64_t)entity.data.reactor.heat_network_id;
+        value["heat_connected"] = entity.data.reactor.heat_connected;
+        break;
+    case FACTORY_ENTITY_TYPE_HEAT_CONDUCTOR:
+        value["connection_mask"] =
+            (int64_t)entity.data.heat_conductor.connection_mask;
+        value["heat_network_id"] =
+            (int64_t)entity.data.heat_conductor.heat_network_id;
+        value["connected"] = entity.data.heat_conductor.connected;
+        break;
+    case FACTORY_ENTITY_TYPE_HEAT_EXCHANGER:
+        value["heat_network_id"] =
+            (int64_t)entity.data.heat_exchanger.heat_network_id;
+        value["water_network_id"] =
+            (int64_t)entity.data.heat_exchanger.water_network_id;
+        value["steam_network_id"] =
+            (int64_t)entity.data.heat_exchanger.steam_network_id;
+        value["stored_water"] =
+            (int64_t)entity.data.heat_exchanger.stored_water;
+        value["water_capacity"] =
+            (int64_t)entity.data.heat_exchanger.water_capacity;
+        value["stored_steam"] =
+            (int64_t)entity.data.heat_exchanger.stored_steam;
+        value["steam_capacity"] =
+            (int64_t)entity.data.heat_exchanger.steam_capacity;
+        if (!set_unsigned(&value,"consumed_heat_last_tick",
+                entity.data.heat_exchanger.consumed_heat_last_tick,
+                "entity.heat_exchanger.consumed_heat_last_tick"))
+            return false;
+        value["consumed_water_last_tick"] =
+            (int64_t)entity.data.heat_exchanger.consumed_water_last_tick;
+        value["produced_steam_last_tick"] =
+            (int64_t)entity.data.heat_exchanger.produced_steam_last_tick;
+        value["heat_exchanger_activity"] =
+            (int64_t)entity.data.heat_exchanger.activity;
         break;
     default:
         break;
@@ -926,6 +987,7 @@ Array FoundationSimulation::get_events() const
         value["quantity"] = (int64_t)event->quantity;
         value["related_quantity"] =
             (int64_t)event->related_quantity;
+        value["third_quantity"] = (int64_t)event->third_quantity;
         values.append(value);
     }
     return values;

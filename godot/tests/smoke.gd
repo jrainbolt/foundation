@@ -47,14 +47,15 @@ func _initialize() -> void:
 	if not _require(not simulation.has_error(), simulation.get_last_error()):
 		return
 	if not _require(
-		entities.size() == 38,
+		entities.size() == 45,
 		"missing presentation entities: got %d" % entities.size()
 	):
 		return
 	var expected_types := [
 		1, 2, 3, 2, 2, 2, 1, 2, 3, 2, 2, 2, 4, 2,
 		6, 2, 2, 5, 5, 7, 5, 8, 8, 8, 8, 9, 10, 11,
-		12, 11, 13, 11, 14, 15, 8, 16, 7, 17
+		12, 11, 13, 11, 14, 15, 8, 16, 7, 17,
+		18, 18, 18, 19, 11, 10, 11
 	]
 	var seen_ids := {}
 	for index in entities.size():
@@ -68,7 +69,7 @@ func _initialize() -> void:
 		):
 			return
 		seen_ids[entity_id] = true
-	if not _require(seen_ids.size() == 38, "duplicate or missing stable IDs"):
+	if not _require(seen_ids.size() == 45, "duplicate or missing stable IDs"):
 		return
 	var tank: Dictionary = {}
 	for entity: Dictionary in entities:
@@ -98,6 +99,8 @@ func _initialize() -> void:
 	var solar_generator: Dictionary = entities[33]
 	var accumulator: Dictionary = entities[35]
 	var reactor: Dictionary = entities[37]
+	var heat_conductor: Dictionary = entities[38]
+	var heat_exchanger: Dictionary = entities[41]
 	if not _require(
 		int(water_extractor.type) == 12
 		and int(water_extractor.stored_water) == 0
@@ -108,14 +111,38 @@ func _initialize() -> void:
 		return
 	if not _require(
 		int(reactor.type) == 17
-		and int(reactor.stored_heat) == 100
+		and int(reactor.stored_heat) == 0
 		and int(reactor.heat_capacity) == 10000
 		and int(reactor.active_fuel_id) == 1
 		and int(reactor.remaining_burn_ticks) == 99
 		and int(reactor.remaining_heat_yield) == 9900
 		and int(reactor.generated_last_tick) == 100
-		and int(reactor.reactor_activity) == 1,
+		and int(reactor.reactor_activity) == 1
+		and int(reactor.heat_network_id) == 39
+		and bool(reactor.heat_connected),
 		"reactor presentation fields"
+	):
+		return
+	if not _require(
+		int(heat_conductor.type) == 18
+		and int(heat_conductor.connection_mask) == 9
+		and int(heat_conductor.heat_network_id) == 39
+		and bool(heat_conductor.connected),
+		"heat conductor presentation fields"
+	):
+		return
+	if not _require(
+		int(heat_exchanger.type) == 19
+		and int(heat_exchanger.heat_network_id) == 39
+		and int(heat_exchanger.water_network_id) == 43
+		and int(heat_exchanger.steam_network_id) == 45
+		and int(heat_exchanger.stored_water) == 0
+		and int(heat_exchanger.stored_steam) == 100
+		and int(heat_exchanger.consumed_heat_last_tick) == 100
+		and int(heat_exchanger.consumed_water_last_tick) == 100
+		and int(heat_exchanger.produced_steam_last_tick) == 100
+		and int(heat_exchanger.heat_exchanger_activity) == 1,
+		"heat exchanger presentation fields"
 	):
 		return
 	if not _require(
@@ -188,7 +215,7 @@ func _initialize() -> void:
 	result = simulation.place_fluid_tank(9, 7)
 	if not _require(result == 0, simulation.result_name(result)):
 		return
-	result = simulation.transfer_fluid(tank_id, 39, 1000)
+	result = simulation.transfer_fluid(tank_id, 46, 1000)
 	if not _require(result == 0, simulation.result_name(result)):
 		return
 	entities = simulation.get_entities()
@@ -197,7 +224,7 @@ func _initialize() -> void:
 	for entity: Dictionary in entities:
 		if int(entity.id) == tank_id:
 			source_quantity = int(entity.fluid_quantity)
-		if int(entity.id) == 39:
+		if int(entity.id) == 46:
 			destination_quantity = int(entity.fluid_quantity)
 	if not _require(
 		source_quantity >= 0 and destination_quantity > 0
