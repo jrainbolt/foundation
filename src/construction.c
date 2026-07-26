@@ -32,6 +32,12 @@ bool factory_entity_construction_cost(
         case FACTORY_ENTITY_TYPE_INSERTER:
             cost = FACTORY_CONSTRUCTION_COST_INSERTER;
             break;
+        case FACTORY_ENTITY_TYPE_POWER_POLE:
+            cost = FACTORY_CONSTRUCTION_COST_POWER_POLE;
+            break;
+        case FACTORY_ENTITY_TYPE_POWER_GENERATOR:
+            cost = FACTORY_CONSTRUCTION_COST_POWER_GENERATOR;
+            break;
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;

@@ -5,6 +5,7 @@
 #include <stddef.h>
 
 #include "foundation/assembler.h"
+#include "foundation/power.h"
 
 typedef struct {
     FactoryAssembler *items;
@@ -33,7 +34,10 @@ bool factory_assembler_store_remove(
     FactoryAssemblerStore *store,
     FactoryEntityId entity_id
 );
-void factory_assembler_store_update(FactoryAssemblerStore *store);
+void factory_assembler_store_update(
+    FactoryAssemblerStore *store,
+    const FactorySimulation *simulation
+);
 bool factory_assembler_configure_recipe(
     FactoryAssembler *assembler,
     FactoryAssemblerRecipeId recipe_id

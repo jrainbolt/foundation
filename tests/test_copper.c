@@ -1,4 +1,5 @@
 #include "foundation/simulation.h"
+#include "power_fixture.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -56,7 +57,7 @@ static Mixed mixed_create(void)
 {
     Mixed mixed;
 
-    mixed.world = factory_world_create(6U, 2U);
+    mixed.world = factory_world_create(6U, 4U);
     CHECK(factory_world_add_resource(
         mixed.world, 0, 0, FACTORY_RESOURCE_IRON, 20U
     ) == FACTORY_RESULT_OK);
@@ -72,6 +73,7 @@ static Mixed mixed_create(void)
         submit(mixed.simulation, belt(4, y));
         submit(mixed.simulation, storage(5, y));
     }
+    CHECK(factory_test_submit_power_row(mixed.simulation, 6U, 2U));
     factory_simulation_tick(mixed.simulation);
     for (size_t index = 0U; index < 12U; ++index) {
         mixed.ids[index] = factory_simulation_get_command_result(
@@ -221,7 +223,7 @@ static void test_mixed_determinism(void)
 
 static void test_copper_ore_storage_and_recipe_mismatch(void)
 {
-    FactoryWorld *world = factory_world_create(3U, 2U);
+    FactoryWorld *world = factory_world_create(3U, 4U);
     FactorySimulation *simulation;
     FactoryStorage stored;
     FactoryBelt blocked;
@@ -243,6 +245,7 @@ static void test_copper_ore_storage_and_recipe_mismatch(void)
     submit(simulation, extractor(0, 1));
     submit(simulation, belt(1, 1));
     submit(simulation, refinery(2, 1));
+    CHECK(factory_test_submit_power_row(simulation, 3U, 2U));
     factory_simulation_tick(simulation);
     submit(simulation, select(6U, FACTORY_RECIPE_IRON_PLATE));
     factory_simulation_tick(simulation);

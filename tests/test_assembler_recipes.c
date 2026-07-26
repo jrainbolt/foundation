@@ -1,4 +1,5 @@
 #include "foundation/simulation.h"
+#include "power_fixture.h"
 
 #include "assembler_internal.h"
 #include "logistics_endpoint_internal.h"
@@ -105,7 +106,7 @@ static void test_recipe_catalog(void)
 
 static void test_fifo_selection_and_safe_switching(void)
 {
-    FactoryWorld *world = factory_world_create(3U, 1U);
+    FactoryWorld *world = factory_world_create(3U, 3U);
     FactorySimulation *simulation =
         factory_simulation_create_with_construction_units(world, UINT32_MAX);
     FactoryCommand place = place_assembler(0, 0);
@@ -178,7 +179,7 @@ static void run_recipe(
     uint32_t expected_count
 )
 {
-    FactoryWorld *world = factory_world_create(2U, 1U);
+    FactoryWorld *world = factory_world_create(2U, 3U);
     FactorySimulation *simulation =
         factory_simulation_create_with_construction_units(world, UINT32_MAX);
     FactoryCommand place = place_assembler(0, 0);
@@ -198,6 +199,7 @@ static void run_recipe(
         == FACTORY_RESULT_OK);
     CHECK(factory_simulation_submit_command(simulation, &select)
         == FACTORY_RESULT_OK);
+    CHECK(factory_test_submit_power_row(simulation, 2U, 1U));
     factory_simulation_tick(simulation);
     CHECK(factory_logistics_endpoint_can_accept(
         simulation, input_0, first_item
@@ -226,7 +228,7 @@ static void run_recipe(
     for (uint32_t tick = 0U;
         tick < FACTORY_ASSEMBLER_ELECTRONIC_COMPONENT_TICKS;
         ++tick) {
-        factory_assembler_store_update(&simulation->assemblers);
+        factory_assembler_store_update(&simulation->assemblers, simulation);
     }
     CHECK(factory_simulation_get_assembler(simulation, 1U, &state));
     CHECK(!state.processing);

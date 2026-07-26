@@ -1,4 +1,5 @@
 #include "refinery_internal.h"
+#include "power_internal.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -110,7 +111,10 @@ bool factory_refinery_store_remove(
     return false;
 }
 
-void factory_refinery_store_update(FactoryRefineryStore *store)
+void factory_refinery_store_update(
+    FactoryRefineryStore *store,
+    const FactorySimulation *simulation
+)
 {
     size_t index;
 
@@ -118,6 +122,10 @@ void factory_refinery_store_update(FactoryRefineryStore *store)
         FactoryRefinery *refinery = &store->items[index];
         const FactoryRecipe *recipe = factory_recipe_get(refinery->recipe_id);
 
+        if (!factory_power_is_entity_powered(
+                simulation, refinery->entity_id)) {
+            continue;
+        }
         if (recipe != NULL
             && !refinery->processing
             && refinery->output_item == FACTORY_ITEM_NONE

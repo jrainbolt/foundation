@@ -1,4 +1,5 @@
 #include "foundation/simulation.h"
+#include "power_fixture.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -81,7 +82,7 @@ static uint32_t total_iron(
 
 static void test_processing_boundaries_and_blocking(void)
 {
-    FactoryWorld *world = factory_world_create(3U, 1U);
+    FactoryWorld *world = factory_world_create(3U, 3U);
     FactorySimulation *simulation;
     FactoryEntityId ids[3];
     FactoryRefinery state;
@@ -96,6 +97,7 @@ static void test_processing_boundaries_and_blocking(void)
     submit(simulation, refinery(
         2, 0, FACTORY_DIRECTION_WEST, FACTORY_DIRECTION_EAST
     ));
+    CHECK(factory_test_submit_power_row(simulation, 3U, 1U));
     factory_simulation_tick(simulation);
     for (size_t index = 0U; index < 3U; ++index) {
         ids[index] =
@@ -154,7 +156,7 @@ static void test_processing_boundaries_and_blocking(void)
 
 static void test_complete_pipeline_and_storage_items(void)
 {
-    FactoryWorld *world = factory_world_create(6U, 1U);
+    FactoryWorld *world = factory_world_create(6U, 3U);
     FactorySimulation *simulation;
     FactoryEntityId ids[6];
     FactoryRefinery refinery_state;
@@ -174,6 +176,7 @@ static void test_complete_pipeline_and_storage_items(void)
     submit(simulation, belt(3, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, belt(4, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, storage(5, 0));
+    CHECK(factory_test_submit_power_row(simulation, 6U, 1U));
     factory_simulation_tick(simulation);
     for (size_t index = 0U; index < 6U; ++index) {
         ids[index] =
@@ -223,7 +226,7 @@ static void setup_pipeline(
     FactorySimulation **out_simulation
 )
 {
-    *out_world = factory_world_create(6U, 1U);
+    *out_world = factory_world_create(6U, 3U);
     CHECK(factory_world_add_resource(
         *out_world, 0, 0, FACTORY_RESOURCE_IRON, 8U
     ) == FACTORY_RESULT_OK);
@@ -236,6 +239,7 @@ static void setup_pipeline(
     submit(*out_simulation, belt(3, 0, FACTORY_DIRECTION_EAST));
     submit(*out_simulation, belt(4, 0, FACTORY_DIRECTION_EAST));
     submit(*out_simulation, storage(5, 0));
+    CHECK(factory_test_submit_power_row(*out_simulation, 6U, 1U));
 }
 
 static void test_processing_determinism(void)

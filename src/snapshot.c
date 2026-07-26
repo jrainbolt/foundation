@@ -9,7 +9,7 @@
 
 #define SNAPSHOT_HEADER_SIZE 48U
 #define SNAPSHOT_SECTION_HEADER_SIZE 16U
-#define SNAPSHOT_SECTION_COUNT 12U
+#define SNAPSHOT_SECTION_COUNT 14U
 
 static const uint8_t snapshot_magic[8] = {
     'F', 'O', 'U', 'N', 'D', 'A', 'T', 'N'
@@ -26,6 +26,8 @@ typedef enum {
     SNAPSHOT_SECTION_ASSEMBLERS,
     SNAPSHOT_SECTION_INSERTERS,
     SNAPSHOT_SECTION_STORAGES,
+    SNAPSHOT_SECTION_POWER_POLES,
+    SNAPSHOT_SECTION_POWER_GENERATORS,
     SNAPSHOT_SECTION_COMMANDS,
     SNAPSHOT_SECTION_RESULTS
 } SnapshotSection;
@@ -254,6 +256,8 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_records(&size, simulation->assemblers.count, 64U)
         || !checked_records(&size, simulation->inserters.count, 48U)
         || !checked_records(&size, simulation->storages.count, 56U)
+        || !checked_records(&size, simulation->power_poles.count, 12U)
+        || !checked_records(&size, simulation->power_generators.count, 16U)
         || !checked_records(&size, simulation->command_count, 24U)
         || !checked_records(&size, simulation->result_count, 68U)
         || !size_to_u32(simulation->entities->count)
@@ -265,6 +269,8 @@ static FactoryResult snapshot_size_unvalidated(
         || !size_to_u32(simulation->assemblers.count)
         || !size_to_u32(simulation->inserters.count)
         || !size_to_u32(simulation->storages.count)
+        || !size_to_u32(simulation->power_poles.count)
+        || !size_to_u32(simulation->power_generators.count)
         || !section_size_valid(
             simulation->entities->count, 4U, 8U)
         || !section_size_valid(tiles, 16U, 8U)
@@ -275,6 +281,8 @@ static FactoryResult snapshot_size_unvalidated(
         || !section_size_valid(simulation->assemblers.count, 64U, 0U)
         || !section_size_valid(simulation->inserters.count, 48U, 0U)
         || !section_size_valid(simulation->storages.count, 56U, 0U)
+        || !section_size_valid(simulation->power_poles.count, 12U, 0U)
+        || !section_size_valid(simulation->power_generators.count, 16U, 0U)
         || size > UINT64_MAX) {
         return FACTORY_RESULT_SNAPSHOT_SIZE_OVERFLOW;
     }
@@ -303,9 +311,14 @@ static bool entity_has_subsystem(
         factory_inserter_store_find(&simulation->inserters, id);
     const FactoryStorage *storage =
         factory_storage_store_find(&simulation->storages, id);
+    const FactoryPowerPole *pole =
+        factory_power_pole_store_find(&simulation->power_poles, id);
+    const FactoryPowerGenerator *generator =
+        factory_power_generator_store_find(&simulation->power_generators, id);
     size_t found = (extractor != NULL) + (belt != NULL)
         + (splitter != NULL) + (refinery != NULL) + (assembler != NULL)
-        + (inserter != NULL) + (storage != NULL);
+        + (inserter != NULL) + (storage != NULL)
+        + (pole != NULL) + (generator != NULL);
 
     if (found != 1U) {
         return false;
@@ -322,8 +335,12 @@ static bool entity_has_subsystem(
         *out_x = assembler->x; *out_y = assembler->y;
     } else if (inserter != NULL) {
         *out_x = inserter->x; *out_y = inserter->y;
-    } else {
+    } else if (storage != NULL) {
         *out_x = storage->x; *out_y = storage->y;
+    } else if (pole != NULL) {
+        *out_x = pole->x; *out_y = pole->y;
+    } else {
+        *out_x = generator->x; *out_y = generator->y;
     }
     return true;
 }
@@ -398,7 +415,9 @@ static FactoryResult validate_simulation(
     subsystem_count = simulation->extractors.count
         + simulation->belts.count + simulation->splitters.count
         + simulation->refineries.count + simulation->assemblers.count
-        + simulation->inserters.count + simulation->storages.count;
+        + simulation->inserters.count + simulation->storages.count
+        + simulation->power_poles.count
+        + simulation->power_generators.count;
     if (subsystem_count != simulation->entities->count) {
         return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
@@ -581,6 +600,12 @@ static FactoryResult validate_simulation(
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
         }
     }
+    for (index = 0U; index < simulation->power_generators.count; ++index) {
+        if (simulation->power_generators.items[index].generation_capacity
+            != FACTORY_BASIC_GENERATOR_CAPACITY) {
+            return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+        }
+    }
     for (index = 0U; index < simulation->command_count; ++index) {
         if (!snapshot_command_valid(&simulation->commands[index])) {
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
@@ -590,7 +615,7 @@ static FactoryResult validate_simulation(
         const FactoryCommandResult *value = &simulation->results[index];
         if (!snapshot_command_valid(&value->command)
             || value->result > FACTORY_RESULT_SNAPSHOT_IO_ERROR
-            || value->entity_type > FACTORY_ENTITY_TYPE_INSERTER
+            || value->entity_type > FACTORY_ENTITY_TYPE_POWER_GENERATOR
             || value->previous_assembler_recipe
                 >= FACTORY_ASSEMBLER_RECIPE_COUNT
             || value->new_assembler_recipe
@@ -665,6 +690,14 @@ static void write_command(
             fields[0] = command->data.set_storage_output.storage_entity;
             fields[1] = command->data.set_storage_output.item;
             break;
+        case FACTORY_COMMAND_PLACE_POWER_POLE:
+            fields[0] = (uint32_t)command->data.place_power_pole.x;
+            fields[1] = (uint32_t)command->data.place_power_pole.y;
+            break;
+        case FACTORY_COMMAND_PLACE_POWER_GENERATOR:
+            fields[0] = (uint32_t)command->data.place_power_generator.x;
+            fields[1] = (uint32_t)command->data.place_power_generator.y;
+            break;
     }
     write_u32(writer, (uint32_t)command->type);
     for (index = 0U; index < 5U; ++index) {
@@ -687,7 +720,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             return false;
         }
     }
-    if (type > FACTORY_COMMAND_SET_STORAGE_OUTPUT) {
+    if (type > FACTORY_COMMAND_PLACE_POWER_GENERATOR) {
         return false;
     }
     command->type = (FactoryCommandType)type;
@@ -708,6 +741,8 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             case FACTORY_COMMAND_SET_REFINERY_RECIPE:
             case FACTORY_COMMAND_SET_ASSEMBLER_RECIPE:
             case FACTORY_COMMAND_SET_STORAGE_OUTPUT:
+            case FACTORY_COMMAND_PLACE_POWER_POLE:
+            case FACTORY_COMMAND_PLACE_POWER_GENERATOR:
                 used = 2U;
                 break;
             case FACTORY_COMMAND_DEMOLISH_ENTITY:
@@ -784,6 +819,14 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             command->data.set_storage_output.storage_entity = fields[0];
             command->data.set_storage_output.item =
                 (FactoryItemType)fields[1];
+            break;
+        case FACTORY_COMMAND_PLACE_POWER_POLE:
+            command->data.place_power_pole.x = (int32_t)fields[0];
+            command->data.place_power_pole.y = (int32_t)fields[1];
+            break;
+        case FACTORY_COMMAND_PLACE_POWER_GENERATOR:
+            command->data.place_power_generator.x = (int32_t)fields[0];
+            command->data.place_power_generator.y = (int32_t)fields[1];
             break;
     }
     return snapshot_command_valid(command);
@@ -959,6 +1002,62 @@ static void write_snapshot(
         write_u32(writer, value->configured_output_item);
         write_u32(writer, value->output_item);
         write_u32(writer, value->output_occupied ? 1U : 0U);
+    }
+
+    write_section_header(
+        writer, SNAPSHOT_SECTION_POWER_POLES,
+        simulation->power_poles.count, simulation->power_poles.count * 12U
+    );
+    for (index = 0U; index < simulation->power_poles.count; ++index) {
+        const FactoryPowerPole *value = NULL;
+        size_t candidate;
+        for (candidate = 0U;
+            candidate < simulation->power_poles.count;
+            ++candidate) {
+            const FactoryPowerPole *item =
+                &simulation->power_poles.items[candidate];
+            size_t smaller = 0U;
+            size_t other;
+            for (other = 0U;
+                other < simulation->power_poles.count;
+                ++other) {
+                if (simulation->power_poles.items[other].entity_id
+                    < item->entity_id) ++smaller;
+            }
+            if (smaller == index) value = item;
+        }
+        write_u32(writer, value->entity_id);
+        write_i32(writer, value->x);
+        write_i32(writer, value->y);
+    }
+
+    write_section_header(
+        writer, SNAPSHOT_SECTION_POWER_GENERATORS,
+        simulation->power_generators.count,
+        simulation->power_generators.count * 16U
+    );
+    for (index = 0U; index < simulation->power_generators.count; ++index) {
+        const FactoryPowerGenerator *value = NULL;
+        size_t candidate;
+        for (candidate = 0U;
+            candidate < simulation->power_generators.count;
+            ++candidate) {
+            const FactoryPowerGenerator *item =
+                &simulation->power_generators.items[candidate];
+            size_t smaller = 0U;
+            size_t other;
+            for (other = 0U;
+                other < simulation->power_generators.count;
+                ++other) {
+                if (simulation->power_generators.items[other].entity_id
+                    < item->entity_id) ++smaller;
+            }
+            if (smaller == index) value = item;
+        }
+        write_u32(writer, value->entity_id);
+        write_i32(writer, value->x);
+        write_i32(writer, value->y);
+        write_u32(writer, value->generation_capacity);
     }
 
     write_section_header(
@@ -1345,6 +1444,40 @@ static bool load_sections(
 #undef LOAD_STORE
 
     if (!read_section_header(
+            reader, SNAPSHOT_SECTION_POWER_POLES, 12U, 0U, &count)
+        || !allocate_records(
+            (void **)&simulation->power_poles.items,
+            count, sizeof(FactoryPowerPole))) {
+        return false;
+    }
+    simulation->power_poles.count = count;
+    simulation->power_poles.capacity = count;
+    for (index = 0U; index < count; ++index) {
+        FactoryPowerPole *v = &simulation->power_poles.items[index];
+        if (!read_u32(reader, &v->entity_id)
+            || !read_i32(reader, &v->x)
+            || !read_i32(reader, &v->y)) return false;
+    }
+
+    if (!read_section_header(
+            reader, SNAPSHOT_SECTION_POWER_GENERATORS, 16U, 0U, &count)
+        || !allocate_records(
+            (void **)&simulation->power_generators.items,
+            count, sizeof(FactoryPowerGenerator))) {
+        return false;
+    }
+    simulation->power_generators.count = count;
+    simulation->power_generators.capacity = count;
+    for (index = 0U; index < count; ++index) {
+        FactoryPowerGenerator *v =
+            &simulation->power_generators.items[index];
+        if (!read_u32(reader, &v->entity_id)
+            || !read_i32(reader, &v->x)
+            || !read_i32(reader, &v->y)
+            || !read_u32(reader, &v->generation_capacity)) return false;
+    }
+
+    if (!read_section_header(
             reader, SNAPSHOT_SECTION_COMMANDS, 24U, 0U, &count)
         || count > FACTORY_COMMAND_QUEUE_CAPACITY) {
         return false;
@@ -1464,6 +1597,11 @@ FactoryResult factory_simulation_load_snapshot(
         return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
     result = validate_simulation(simulation);
+    if (result != FACTORY_RESULT_OK) {
+        factory_simulation_destroy(simulation);
+        return result;
+    }
+    result = factory_power_rebuild(simulation);
     if (result != FACTORY_RESULT_OK) {
         factory_simulation_destroy(simulation);
         return result;

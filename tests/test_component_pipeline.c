@@ -1,4 +1,5 @@
 #include "foundation/simulation.h"
+#include "power_fixture.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -47,7 +48,7 @@ static Pipeline create_pipeline(void)
     Pipeline p;
     FactoryCommand command;
 
-    p.world = factory_world_create(7U, 2U);
+    p.world = factory_world_create(7U, 4U);
     CHECK(factory_world_add_resource(
         p.world, 0, 1, FACTORY_RESOURCE_IRON, 10U
     ) == FACTORY_RESULT_OK);
@@ -74,6 +75,7 @@ static Pipeline create_pipeline(void)
     command = (FactoryCommand){FACTORY_COMMAND_PLACE_STORAGE,
         {.place_storage = {6, 1}}};
     submit(p.simulation, command);                                 /* 12 */
+    CHECK(factory_test_submit_power_row(p.simulation, 7U, 2U));
     factory_simulation_tick(p.simulation);
     for (size_t index = 0U; index < 12U; ++index) {
         p.ids[index] = factory_simulation_get_command_result(

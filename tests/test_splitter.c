@@ -1,4 +1,5 @@
 #include "foundation/simulation.h"
+#include "power_fixture.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -36,8 +37,9 @@ static Network create_network(bool left_output, bool right_output)
 {
     Network network = {0};
     size_t result_index = 0U;
+    size_t gameplay_command_count;
 
-    network.world = factory_world_create(4U, 3U);
+    network.world = factory_world_create(4U, 5U);
     CHECK(factory_world_add_resource(
         network.world, 0, 1, FACTORY_RESOURCE_IRON, 6U
     ) == FACTORY_RESULT_OK);
@@ -71,9 +73,11 @@ static Network create_network(bool left_output, bool right_output)
             {.place_storage = {3, 2}}
         });
     }
+    gameplay_command_count = 3U + (left_output ? 2U : 0U)
+        + (right_output ? 2U : 0U);
+    CHECK(factory_test_submit_power_row(network.simulation, 4U, 3U));
     factory_simulation_tick(network.simulation);
-    while (result_index
-        < factory_simulation_get_command_result_count(network.simulation)) {
+    while (result_index < gameplay_command_count) {
         const FactoryCommandResult *result =
             factory_simulation_get_command_result(
                 network.simulation, result_index

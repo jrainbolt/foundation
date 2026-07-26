@@ -1,4 +1,5 @@
 #include "foundation/simulation.h"
+#include "power_fixture.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -149,7 +150,7 @@ static void test_empty_lifecycle_and_fifo(void)
 
 static void test_material_blocks_demolition(void)
 {
-    FactoryWorld *world = factory_world_create(2U, 1U);
+    FactoryWorld *world = factory_world_create(2U, 3U);
     FactorySimulation *simulation;
     FactoryBelt state;
     uint32_t deposit_before;
@@ -163,6 +164,7 @@ static void test_material_blocks_demolition(void)
         {.place_extractor = {0, 0, FACTORY_DIRECTION_EAST}}
     });
     submit(simulation, belt(1, 0));
+    CHECK(factory_test_submit_power_row(simulation, 2U, 1U));
     for (uint32_t tick = 0U; tick < 20U; ++tick) {
         factory_simulation_tick(simulation);
     }

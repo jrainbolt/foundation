@@ -65,3 +65,11 @@ The snapshot module depends on simulation internals but subsystems do not depend
 on serialization. Its central explicit encoder/decoder rebuilds pointer-backed
 arrays in a temporary simulation, then runs cross-subsystem validation before
 publishing the result.
+
+Power discovery is a derived layer between command application and active
+machine updates. Authoritative pole and generator stores feed a canonical edge
+list, connected components, attachment lookup, and whole-consumer allocation.
+Machines query the allocation instead of searching for poles independently.
+Network aggregation identifies connected source entities and asks
+`factory_power_source_available_generation` for each source's current output.
+It does not calculate or depend on the basic generator's production mechanism.

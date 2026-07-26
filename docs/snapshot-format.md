@@ -1,4 +1,4 @@
-# Snapshot format version 1
+# Snapshot format version 2
 
 Foundation snapshots are canonical little-endian binary files. Every value is
 written field-by-field; no C structure, pointer, enum representation, padding,
@@ -9,12 +9,12 @@ timestamp, or process-specific value enters the format.
 | Offset | Width | Field |
 |---:|---:|---|
 | 0 | 8 | Magic bytes `FOUNDATN` |
-| 8 | 4 | Version (`1`) |
+| 8 | 4 | Version (`2`) |
 | 12 | 4 | Header size (`48`) |
 | 16 | 8 | Total snapshot size |
 | 24 | 8 | Payload size |
 | 32 | 8 | Simulation tick |
-| 40 | 4 | Section count (`12`) |
+| 40 | 4 | Section count (`14`) |
 | 44 | 4 | Reserved zero |
 
 Unsigned and signed integers use 32-bit or 64-bit two's-complement
@@ -32,7 +32,7 @@ Each section starts with four 32-bit fields:
 | Record count | Number of fixed-width records |
 | Payload size | Bytes following the section header |
 
-Version 1 requires each section exactly once in this order:
+Version 2 requires each section exactly once in this order:
 
 | Type | Section | Record width |
 |---:|---|---:|
@@ -46,8 +46,10 @@ Version 1 requires each section exactly once in this order:
 | 8 | Assemblers | 64 |
 | 9 | Inserters | 48 |
 | 10 | Storage | 56 |
-| 11 | Pending commands | 24 |
-| 12 | Command results | 68 |
+| 11 | Power poles | 12 |
+| 12 | Basic generators | 16 |
+| 13 | Pending commands | 24 |
+| 14 | Command results | 68 |
 
 Unknown, reordered, duplicated, missing, incorrectly sized, or unsupported
 sections are rejected. Exact full-buffer consumption is required.
@@ -63,6 +65,9 @@ buffer item, and occupancy. Assembler records include recipe, both generic
 counted slots, processing fields, and counted output. Inserter records include
 the complete state-machine state and source/destination coordinates.
 
-Version 1 has no compression, encryption, checksum, optional sections, or
+Power edges, network membership, attachments, and allocation are not serialized;
+they are rebuilt from pole and generator positions after loading.
+
+Version 2 has no compression, encryption, checksum, optional sections, or
 migration decoder. A future incompatible change must introduce a deliberate
 new-version decoder or compatibility policy.

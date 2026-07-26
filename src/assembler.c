@@ -1,5 +1,6 @@
 #include "assembler_internal.h"
 #include "assembler_recipe_internal.h"
+#include "power_internal.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -160,7 +161,10 @@ bool factory_assembler_store_remove(
     return false;
 }
 
-void factory_assembler_store_update(FactoryAssemblerStore *store)
+void factory_assembler_store_update(
+    FactoryAssemblerStore *store,
+    const FactorySimulation *simulation
+)
 {
     size_t index;
 
@@ -171,6 +175,10 @@ void factory_assembler_store_update(FactoryAssemblerStore *store)
         bool inputs_ready = recipe != NULL;
         size_t slot;
 
+        if (!factory_power_is_entity_powered(
+                simulation, assembler->entity_id)) {
+            continue;
+        }
         for (slot = 0U;
             slot < FACTORY_ASSEMBLER_MAX_INPUT_TYPES;
             ++slot) {

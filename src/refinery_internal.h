@@ -5,6 +5,7 @@
 #include <stddef.h>
 
 #include "foundation/refinery.h"
+#include "foundation/power.h"
 
 typedef struct {
     FactoryRefinery *items;
@@ -34,6 +35,9 @@ bool factory_refinery_store_remove(
     FactoryRefineryStore *store,
     FactoryEntityId entity_id
 );
-void factory_refinery_store_update(FactoryRefineryStore *store);
+void factory_refinery_store_update(
+    FactoryRefineryStore *store,
+    const FactorySimulation *simulation
+);
 
 #endif

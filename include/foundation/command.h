@@ -30,7 +30,9 @@ typedef enum {
     FACTORY_COMMAND_PLACE_INSERTER,
     FACTORY_COMMAND_GRANT_CONSTRUCTION_UNITS,
     FACTORY_COMMAND_SET_ASSEMBLER_RECIPE,
-    FACTORY_COMMAND_SET_STORAGE_OUTPUT
+    FACTORY_COMMAND_SET_STORAGE_OUTPUT,
+    FACTORY_COMMAND_PLACE_POWER_POLE,
+    FACTORY_COMMAND_PLACE_POWER_GENERATOR
 } FactoryCommandType;
 
 typedef struct {
@@ -89,6 +91,14 @@ typedef struct {
             FactoryEntityId storage_entity;
             FactoryItemType item;
         } set_storage_output;
+        struct {
+            int32_t x;
+            int32_t y;
+        } place_power_pole;
+        struct {
+            int32_t x;
+            int32_t y;
+        } place_power_generator;
     } data;
 } FactoryCommand;
 

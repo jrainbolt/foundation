@@ -1,4 +1,5 @@
 #include "foundation/simulation.h"
+#include "power_fixture.h"
 
 #include "logistics_endpoint_internal.h"
 #include "simulation_internal.h"
@@ -148,7 +149,7 @@ static void test_configuration_and_buffer(void)
 
 static void test_endpoint_and_inserter_timing(void)
 {
-    FactoryWorld *world = factory_world_create(3U, 1U);
+    FactoryWorld *world = factory_world_create(3U, 3U);
     FactorySimulation *simulation =
         factory_simulation_create_with_construction_units(world, UINT32_MAX);
     FactoryStorage source;
@@ -162,6 +163,7 @@ static void test_endpoint_and_inserter_timing(void)
     submit(simulation, place_storage(0, 0));
     submit(simulation, place_inserter(1, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, place_storage(2, 0));
+    CHECK(factory_test_submit_power_row(simulation, 3U, 1U));
     factory_simulation_tick(simulation);
     simulation->storages.items[0].iron_gear_amount = 3U;
     submit(simulation, set_output(1U, FACTORY_ITEM_IRON_GEAR));
@@ -205,7 +207,7 @@ static void test_endpoint_and_inserter_timing(void)
 
 static void test_contention_and_conservation(void)
 {
-    FactoryWorld *world = factory_world_create(3U, 3U);
+    FactoryWorld *world = factory_world_create(3U, 5U);
     FactorySimulation *simulation =
         factory_simulation_create_with_construction_units(world, UINT32_MAX);
     FactoryStorage storage;
@@ -218,6 +220,7 @@ static void test_contention_and_conservation(void)
     submit(simulation, place_storage(1, 1));
     submit(simulation, place_inserter(2, 1, FACTORY_DIRECTION_EAST));
     submit(simulation, place_inserter(1, 2, FACTORY_DIRECTION_SOUTH));
+    CHECK(factory_test_submit_power_row(simulation, 3U, 3U));
     factory_simulation_tick(simulation);
     simulation->storages.items[0].copper_wire_amount = 4U;
     submit(simulation, set_output(1U, FACTORY_ITEM_COPPER_WIRE));
@@ -280,8 +283,8 @@ static void test_demolition_requires_empty_buffer(void)
 
 static void test_duplicate_simulations(void)
 {
-    FactoryWorld *world_a = factory_world_create(3U, 1U);
-    FactoryWorld *world_b = factory_world_create(3U, 1U);
+    FactoryWorld *world_a = factory_world_create(3U, 3U);
+    FactoryWorld *world_b = factory_world_create(3U, 3U);
     FactorySimulation *a =
         factory_simulation_create_with_construction_units(world_a, UINT32_MAX);
     FactorySimulation *b =
@@ -293,6 +296,8 @@ static void test_duplicate_simulations(void)
     submit(b, place_storage(0, 0));
     submit(b, place_inserter(1, 0, FACTORY_DIRECTION_EAST));
     submit(b, place_storage(2, 0));
+    CHECK(factory_test_submit_power_row(a, 3U, 1U));
+    CHECK(factory_test_submit_power_row(b, 3U, 1U));
     factory_simulation_tick(a);
     factory_simulation_tick(b);
     a->storages.items[0].electronic_component_amount = 3U;

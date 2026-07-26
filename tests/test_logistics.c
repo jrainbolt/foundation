@@ -1,4 +1,5 @@
 #include "foundation/simulation.h"
+#include "power_fixture.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -76,7 +77,7 @@ static uint32_t accounted_iron(
 
 static void test_full_pipeline(void)
 {
-    FactoryWorld *world = factory_world_create(4U, 1U);
+    FactoryWorld *world = factory_world_create(4U, 3U);
     FactorySimulation *simulation;
     FactoryEntityId ids[4];
     FactoryExtractor extractor_state;
@@ -93,6 +94,7 @@ static void test_full_pipeline(void)
     submit(simulation, belt(1, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, belt(2, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, storage(3, 0));
+    CHECK(factory_test_submit_power_row(simulation, 4U, 1U));
     factory_simulation_tick(simulation);
     for (size_t index = 0U; index < 4U; ++index) {
         ids[index] =
@@ -134,7 +136,7 @@ static void test_full_pipeline(void)
 
 static void test_blocked_and_conflict(void)
 {
-    FactoryWorld *world = factory_world_create(3U, 3U);
+    FactoryWorld *world = factory_world_create(3U, 5U);
     FactorySimulation *simulation;
     FactoryEntityId ids[5];
     FactoryBelt low;
@@ -154,6 +156,7 @@ static void test_blocked_and_conflict(void)
     submit(simulation, extractor(1, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, belt(2, 0, FACTORY_DIRECTION_SOUTH));
     submit(simulation, belt(2, 1, FACTORY_DIRECTION_EAST));
+    CHECK(factory_test_submit_power_row(simulation, 3U, 3U));
     factory_simulation_tick(simulation);
     for (size_t index = 0U; index < 5U; ++index) {
         ids[index] =
@@ -201,7 +204,7 @@ static void test_cardinal_directions(void)
     };
 
     for (size_t index = 0U; index < 4U; ++index) {
-        FactoryWorld *world = factory_world_create(3U, 3U);
+        FactoryWorld *world = factory_world_create(3U, 5U);
         FactorySimulation *simulation;
         FactoryStorage state;
 
@@ -226,6 +229,7 @@ static void test_cardinal_directions(void)
         submit(simulation, storage(
             cases[index].storage_x, cases[index].storage_y
         ));
+        CHECK(factory_test_submit_power_row(simulation, 3U, 3U));
         for (uint32_t tick = 0U; tick < 24U; ++tick) {
             factory_simulation_tick(simulation);
         }
@@ -238,7 +242,7 @@ static void test_cardinal_directions(void)
 
 static void test_full_storage_stalls(void)
 {
-    FactoryWorld *world = factory_world_create(3U, 1U);
+    FactoryWorld *world = factory_world_create(3U, 3U);
     FactorySimulation *simulation;
     FactoryEntityId ids[3];
     FactoryStorage storage_state;
@@ -253,6 +257,7 @@ static void test_full_storage_stalls(void)
     submit(simulation, extractor(0, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, belt(1, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, storage(2, 0));
+    CHECK(factory_test_submit_power_row(simulation, 3U, 1U));
     factory_simulation_tick(simulation);
     for (size_t index = 0U; index < 3U; ++index) {
         ids[index] =
@@ -297,7 +302,7 @@ typedef struct {
 
 static ObservableState deterministic_pipeline_run(void)
 {
-    FactoryWorld *world = factory_world_create(4U, 1U);
+    FactoryWorld *world = factory_world_create(4U, 3U);
     FactorySimulation *simulation;
     ObservableState state;
 
@@ -309,6 +314,7 @@ static ObservableState deterministic_pipeline_run(void)
     submit(simulation, belt(1, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, belt(2, 0, FACTORY_DIRECTION_EAST));
     submit(simulation, storage(3, 0));
+    CHECK(factory_test_submit_power_row(simulation, 4U, 1U));
     for (uint32_t tick = 0U; tick < 80U; ++tick) {
         factory_simulation_tick(simulation);
     }
@@ -348,7 +354,7 @@ static void test_deterministic_pipeline(void)
 
 static void test_blocking_targets(void)
 {
-    FactoryWorld *world = factory_world_create(4U, 2U);
+    FactoryWorld *world = factory_world_create(4U, 4U);
     FactorySimulation *simulation;
     FactoryEntityId extractor_id;
     FactoryEntityId belt_id;
@@ -366,6 +372,7 @@ static void test_blocking_targets(void)
     submit(simulation, belt(1, 0, FACTORY_DIRECTION_NORTH));
     submit(simulation, extractor(2, 1, FACTORY_DIRECTION_NORTH));
     submit(simulation, belt(2, 0, FACTORY_DIRECTION_EAST));
+    CHECK(factory_test_submit_power_row(simulation, 4U, 2U));
     factory_simulation_tick(simulation);
     extractor_id =
         factory_simulation_get_command_result(simulation, 0U)->entity_id;

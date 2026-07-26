@@ -1,4 +1,5 @@
 #include "foundation/simulation.h"
+#include "power_fixture.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -31,7 +32,7 @@ static FactoryEntityId result_entity(FactorySimulation *simulation)
 
 static void test_placement_and_production(void)
 {
-    FactoryWorld *world = factory_world_create(4U, 2U);
+    FactoryWorld *world = factory_world_create(4U, 4U);
     FactorySimulation *simulation;
     FactoryCommand command = place(1, 0, FACTORY_DIRECTION_WEST);
     FactoryExtractor extractor;
@@ -46,6 +47,7 @@ static void test_placement_and_production(void)
     CHECK(factory_simulation_submit_command(
         simulation, &command
     ) == FACTORY_RESULT_OK);
+    CHECK(factory_test_submit_power_row(simulation, 4U, 2U));
     factory_simulation_tick(simulation);
     entity = result_entity(simulation);
     CHECK(entity != 0U);
@@ -137,7 +139,7 @@ static void test_failed_placements_and_fifo(void)
 
 static void test_depleted_and_multiple(void)
 {
-    FactoryWorld *world = factory_world_create(2U, 1U);
+    FactoryWorld *world = factory_world_create(2U, 3U);
     FactorySimulation *simulation;
     FactoryCommand first = place(0, 0, FACTORY_DIRECTION_NORTH);
     FactoryCommand second = place(1, 0, FACTORY_DIRECTION_SOUTH);
@@ -158,6 +160,7 @@ static void test_depleted_and_multiple(void)
         == FACTORY_RESULT_OK);
     CHECK(factory_simulation_submit_command(simulation, &second)
         == FACTORY_RESULT_OK);
+    CHECK(factory_test_submit_power_row(simulation, 2U, 1U));
     for (uint32_t index = 0U; index < 20U; ++index) {
         factory_simulation_tick(simulation);
     }

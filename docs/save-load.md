@@ -44,3 +44,8 @@ without advancing it produces the original bytes.
 
 There are currently no file wrappers, compression, encryption, save slots,
 autosaving, background I/O, partial loads, or migration from other versions.
+
+Snapshot version 2 adds authoritative power-pole and basic-generator records,
+plus their queued placement commands and results. Pole edges, network IDs,
+attachments, allocation, and inspection summaries are derived and rebuilt
+immediately after load. Version 1 snapshots are deliberately unsupported.

@@ -15,6 +15,7 @@
 #include "foundation/splitter.h"
 #include "foundation/inserter.h"
 #include "foundation/construction.h"
+#include "foundation/power.h"
 
 typedef struct FactorySimulation FactorySimulation;
 

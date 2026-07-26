@@ -78,7 +78,7 @@ static void test_empty_and_header(void)
     ) == FACTORY_RESULT_OK);
     CHECK(written == required);
     CHECK(memcmp(mutated, "FOUNDATN", 8U) == 0);
-    CHECK(mutated[8] == 1U && mutated[9] == 0U);
+    CHECK(mutated[8] == FACTORY_SNAPSHOT_VERSION && mutated[9] == 0U);
     CHECK(factory_simulation_create_snapshot(simulation, &snapshot)
         == FACTORY_RESULT_OK);
     CHECK(factory_simulation_create_snapshot(simulation, &repeated)
@@ -107,6 +107,10 @@ static void test_empty_and_header(void)
         mutated, snapshot.size, &loaded
     ) == FACTORY_RESULT_SNAPSHOT_UNSUPPORTED_VERSION);
     put_u32_le(mutated, 8U, FACTORY_SNAPSHOT_VERSION + 1U);
+    CHECK(factory_simulation_load_snapshot(
+        mutated, snapshot.size, &loaded
+    ) == FACTORY_RESULT_SNAPSHOT_UNSUPPORTED_VERSION);
+    put_u32_le(mutated, 8U, 1U);
     CHECK(factory_simulation_load_snapshot(
         mutated, snapshot.size, &loaded
     ) == FACTORY_RESULT_SNAPSHOT_UNSUPPORTED_VERSION);

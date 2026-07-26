@@ -28,3 +28,8 @@ Snapshot loading validates every count and canonical ownership state before the
 simulation is returned. The format does not store separate authoritative
 conservation totals; totals remain derived from the restored world and item
 ownership using the existing integer-scaled helpers.
+
+Power generation, demand, allocation, and network membership do not represent
+item ownership and therefore do not enter material-conservation totals. Placing
+or demolishing a pole or generator affects construction inventory only through
+the same atomic cost and refund rules used by every other placeable entity.

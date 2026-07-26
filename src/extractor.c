@@ -1,4 +1,5 @@
 #include "extractor_internal.h"
+#include "power_internal.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -113,7 +114,8 @@ bool factory_extractor_store_remove(
 
 void factory_extractor_store_update(
     FactoryExtractorStore *store,
-    FactoryWorld *world
+    FactoryWorld *world,
+    const FactorySimulation *simulation
 )
 {
     size_t index = 0U;
@@ -124,7 +126,9 @@ void factory_extractor_store_update(
             world, extractor->x, extractor->y
         );
 
-        if (extractor->output_amount != 0U
+        if (!factory_power_is_entity_powered(
+                simulation, extractor->entity_id)
+            || extractor->output_amount != 0U
             || tile == NULL
             || tile->resource != extractor->resource_type
             || tile->resource_amount == 0U) {

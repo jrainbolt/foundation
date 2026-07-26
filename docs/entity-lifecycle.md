@@ -28,3 +28,8 @@ Snapshots preserve live IDs, their internal order, tombstone effects through
 the monotonic next ID, subsystem membership, and tile occupancy. Loading never
 renumbers entities; the next placement receives the same ID as uninterrupted
 execution.
+
+Power poles and generators use the same transactional placement and demolition
+path. They own no items, so demolition is permitted whenever tile/entity and
+refund validation succeeds. The next power rebuild reflects merges, splits,
+new generation, or removed generation during the same tick.

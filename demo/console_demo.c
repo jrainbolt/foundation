@@ -46,7 +46,7 @@ static const char *assembler_recipe_name(FactoryAssemblerRecipeId recipe_id)
 
 static void storage_output_demo(void)
 {
-    FactoryWorld *world = factory_world_create(5U, 1U);
+    FactoryWorld *world = factory_world_create(5U, 3U);
     FactorySimulation *simulation;
     FactoryStorage source;
     FactoryStorage destination;
@@ -83,6 +83,13 @@ static void storage_output_demo(void)
     });
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_PLACE_STORAGE, {.place_storage = {4, 0}}
+    });
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_POWER_POLE, {.place_power_pole = {2, 1}}
+    });
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_POWER_GENERATOR,
+        {.place_power_generator = {2, 2}}
     });
     for (uint32_t tick = 0U; tick < 70U; ++tick) {
         factory_simulation_tick(simulation);
@@ -210,6 +217,84 @@ static void snapshot_demo(void)
     factory_snapshot_buffer_destroy(&snapshot);
     factory_simulation_destroy(loaded);
     factory_simulation_destroy(original);
+    factory_world_destroy(world);
+}
+
+static void power_demo(void)
+{
+    FactoryWorld *world = factory_world_create(10U, 3U);
+    FactorySimulation *simulation;
+    FactoryPowerNetworkInspection network;
+    FactoryPowerConnectionInspection connection;
+    FactoryPowerConsumerInspection consumer;
+
+    if (world == NULL
+        || factory_world_add_resource(
+            world, 3, 0, FACTORY_RESOURCE_IRON, 10U
+        ) != FACTORY_RESULT_OK) {
+        factory_world_destroy(world);
+        return;
+    }
+    simulation = factory_simulation_create_with_construction_units(
+        world, UINT32_MAX
+    );
+    if (simulation == NULL) {
+        factory_world_destroy(world);
+        return;
+    }
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_POWER_POLE,
+        {.place_power_pole = {0, 0}}
+    });
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_POWER_GENERATOR,
+        {.place_power_generator = {0, 1}}
+    });
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_EXTRACTOR,
+        {.place_extractor = {3, 0, FACTORY_DIRECTION_SOUTH}}
+    });
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_POWER_POLE,
+        {.place_power_pole = {6, 0}}
+    });
+    submit(simulation, (FactoryCommand){
+        FACTORY_COMMAND_PLACE_ASSEMBLER,
+        {.place_assembler = {9, 0, FACTORY_DIRECTION_SOUTH}}
+    });
+    factory_simulation_tick(simulation);
+    (void)factory_simulation_get_power_network(simulation, 0U, &network);
+    (void)printf(
+        "\nPower network %" PRIu32 ": poles=%" PRIu32
+        ", generation=%" PRIu64 ", demand=%" PRIu64
+        ", unused=%" PRIu64 "\n",
+        network.network_id,
+        network.pole_count,
+        network.total_generation,
+        network.total_demand,
+        network.unused_generation
+    );
+    if (factory_simulation_get_power_connection(
+            simulation, 0U, &connection) == FACTORY_RESULT_OK) {
+        (void)printf(
+            "Canonical pole connection: %" PRIu32 " - %" PRIu32 "\n",
+            connection.pole_a, connection.pole_b
+        );
+    }
+    (void)factory_simulation_get_power_consumer(simulation, 3U, &consumer);
+    (void)printf(
+        "Extractor 3 powered=%s, attached pole=%" PRIu32 "\n",
+        consumer.powered ? "yes" : "no",
+        consumer.attached_pole_id
+    );
+    (void)factory_simulation_get_power_consumer(simulation, 5U, &consumer);
+    (void)printf(
+        "Assembler 5 powered=%s, network=%" PRIu32 "\n",
+        consumer.powered ? "yes" : "no",
+        consumer.network_id
+    );
+
+    factory_simulation_destroy(simulation);
     factory_world_destroy(world);
 }
 
@@ -353,5 +438,6 @@ int main(void)
     factory_world_destroy(world);
     storage_output_demo();
     snapshot_demo();
+    power_demo();
     return succeeded ? 0 : 1;
 }

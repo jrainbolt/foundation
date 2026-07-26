@@ -54,3 +54,8 @@ Snapshots may be taken between ticks, including after commands are queued.
 They preserve the tick, FIFO queue, last command results, subsystem iteration
 order, and next entity ID, allowing the loaded simulation to resume at the same
 next command phase.
+
+After commands, power topology and allocation are rebuilt before extraction.
+The resulting powered flags govern extractors, refineries, assemblers, and both
+inserter phases for that tick. Passive transfers retain their established
+relative order and require no power.

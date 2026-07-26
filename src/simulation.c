@@ -97,6 +97,9 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     if (simulation == NULL) {
         return;
     }
+    factory_power_state_destroy(&simulation->power);
+    factory_power_generator_store_destroy(&simulation->power_generators);
+    factory_power_pole_store_destroy(&simulation->power_poles);
     factory_storage_store_destroy(&simulation->storages);
     factory_belt_store_destroy(&simulation->belts);
     factory_inserter_store_destroy(&simulation->inserters);
@@ -109,6 +112,49 @@ void factory_simulation_destroy(FactorySimulation *simulation)
         factory_world_destroy(simulation->world);
     }
     free(simulation);
+}
+
+static FactoryResult validate_empty_tile(
+    FactorySimulation *simulation, int32_t x, int32_t y
+);
+static FactoryResult occupy_with_entity(
+    FactorySimulation *simulation,
+    int32_t x,
+    int32_t y,
+    FactoryEntityId *out_id
+);
+
+static FactoryResult place_power_entity(
+    FactorySimulation *simulation,
+    int32_t x,
+    int32_t y,
+    bool generator,
+    FactoryEntityId *out_id
+)
+{
+    FactoryResult result = validate_empty_tile(simulation, x, y);
+    if (result != FACTORY_RESULT_OK) return result;
+    if (generator) {
+        if (!factory_power_generator_store_reserve_one(
+                &simulation->power_generators)) {
+            return FACTORY_RESULT_OUT_OF_MEMORY;
+        }
+    } else if (!factory_power_pole_store_reserve_one(
+            &simulation->power_poles)) {
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    }
+    result = occupy_with_entity(simulation, x, y, out_id);
+    if (result != FACTORY_RESULT_OK) return result;
+    if (generator) {
+        factory_power_generator_store_add(
+            &simulation->power_generators, *out_id, x, y
+        );
+    } else {
+        factory_power_pole_store_add(
+            &simulation->power_poles, *out_id, x, y
+        );
+    }
+    return FACTORY_RESULT_OK;
 }
 
 FactoryResult factory_simulation_submit_command(
@@ -446,6 +492,10 @@ static FactoryResult validate_demolition(
         factory_splitter_store_find(&simulation->splitters, id);
     const FactoryInserter *inserter =
         factory_inserter_store_find(&simulation->inserters, id);
+    const FactoryPowerPole *power_pole =
+        factory_power_pole_store_find(&simulation->power_poles, id);
+    const FactoryPowerGenerator *power_generator =
+        factory_power_generator_store_find(&simulation->power_generators, id);
     const FactoryTile *tile;
 
     if (id == 0U) {
@@ -526,6 +576,14 @@ static FactoryResult validate_demolition(
         *out_type = FACTORY_ENTITY_TYPE_INSERTER;
         *out_x = inserter->x;
         *out_y = inserter->y;
+    } else if (power_pole != NULL) {
+        *out_type = FACTORY_ENTITY_TYPE_POWER_POLE;
+        *out_x = power_pole->x;
+        *out_y = power_pole->y;
+    } else if (power_generator != NULL) {
+        *out_type = FACTORY_ENTITY_TYPE_POWER_GENERATOR;
+        *out_x = power_generator->x;
+        *out_y = power_generator->y;
     } else {
         return FACTORY_RESULT_UNSUPPORTED_ENTITY;
     }
@@ -557,6 +615,14 @@ static bool remove_subsystem_record(
             return factory_splitter_store_remove(&simulation->splitters, id);
         case FACTORY_ENTITY_TYPE_INSERTER:
             return factory_inserter_store_remove(&simulation->inserters, id);
+        case FACTORY_ENTITY_TYPE_POWER_POLE:
+            return factory_power_pole_store_remove(
+                &simulation->power_poles, id
+            );
+        case FACTORY_ENTITY_TYPE_POWER_GENERATOR:
+            return factory_power_generator_store_remove(
+                &simulation->power_generators, id
+            );
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;
@@ -629,6 +695,12 @@ static bool placement_type(
             return true;
         case FACTORY_COMMAND_PLACE_INSERTER:
             *out_type = FACTORY_ENTITY_TYPE_INSERTER;
+            return true;
+        case FACTORY_COMMAND_PLACE_POWER_POLE:
+            *out_type = FACTORY_ENTITY_TYPE_POWER_POLE;
+            return true;
+        case FACTORY_COMMAND_PLACE_POWER_GENERATOR:
+            *out_type = FACTORY_ENTITY_TYPE_POWER_GENERATOR;
             return true;
         default:
             return false;
@@ -844,6 +916,24 @@ static void apply_commands(FactorySimulation *simulation)
                     &result->entity_id,
                     &result->previous_storage_output,
                     &result->new_storage_output
+                );
+                break;
+            case FACTORY_COMMAND_PLACE_POWER_POLE:
+                result->result = place_power_entity(
+                    simulation,
+                    result->command.data.place_power_pole.x,
+                    result->command.data.place_power_pole.y,
+                    false,
+                    &result->entity_id
+                );
+                break;
+            case FACTORY_COMMAND_PLACE_POWER_GENERATOR:
+                result->result = place_power_entity(
+                    simulation,
+                    result->command.data.place_power_generator.x,
+                    result->command.data.place_power_generator.y,
+                    true,
+                    &result->entity_id
                 );
                 break;
         }
@@ -1455,6 +1545,10 @@ static void update_inserter_pickups(FactorySimulation *simulation)
     for (index = 0U; index < simulation->inserters.count; ++index) {
         FactoryInserter *inserter = &simulation->inserters.items[index];
 
+        if (!factory_power_is_entity_powered(
+                simulation, inserter->entity_id)) {
+            continue;
+        }
         if (inserter->state == FACTORY_INSERTER_STATE_IDLE) {
             FactoryLogisticsEndpoint endpoint;
             FactoryItemType item;
@@ -1627,6 +1721,10 @@ static void update_inserter_drops(FactorySimulation *simulation)
     for (index = 0U; index < simulation->inserters.count; ++index) {
         FactoryInserter *inserter = &simulation->inserters.items[index];
 
+        if (!factory_power_is_entity_powered(
+                simulation, inserter->entity_id)) {
+            continue;
+        }
         if (inserter->state == FACTORY_INSERTER_STATE_HOLDING) {
             inserter->state = FACTORY_INSERTER_STATE_DROPPING;
             inserter->progress = 0U;
@@ -1690,12 +1788,15 @@ void factory_simulation_tick(FactorySimulation *simulation)
         return;
     }
     apply_commands(simulation);
-    factory_extractor_store_update(&simulation->extractors, simulation->world);
+    (void)factory_power_rebuild(simulation);
+    factory_extractor_store_update(
+        &simulation->extractors, simulation->world, simulation
+    );
     update_producer_transfers(simulation);
     factory_belt_store_advance(&simulation->belts);
     update_belt_transfers(simulation);
-    factory_refinery_store_update(&simulation->refineries);
-    factory_assembler_store_update(&simulation->assemblers);
+    factory_refinery_store_update(&simulation->refineries, simulation);
+    factory_assembler_store_update(&simulation->assemblers, simulation);
     factory_storage_store_update(&simulation->storages);
     update_inserters(simulation);
     ++simulation->tick;

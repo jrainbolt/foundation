@@ -1,4 +1,5 @@
 #include "foundation/simulation.h"
+#include "power_fixture.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -170,7 +171,7 @@ static uint32_t accounted_element(
 
 static void test_placement_orientation_and_invalid_sources(void)
 {
-    FactoryWorld *world = factory_world_create(4U, 3U);
+    FactoryWorld *world = factory_world_create(4U, 5U);
     FactorySimulation *simulation = factory_simulation_create_with_construction_units(world, UINT32_MAX);
     FactoryInserter state;
     FactoryCommand invalid = inserter(0, 0, (FactoryDirection)99);
@@ -180,6 +181,7 @@ static void test_placement_orientation_and_invalid_sources(void)
     submit(simulation, inserter(1, 1, FACTORY_DIRECTION_EAST));
     submit(simulation, inserter(1, 1, FACTORY_DIRECTION_NORTH));
     submit(simulation, inserter(-1, 0, FACTORY_DIRECTION_NORTH));
+    CHECK(factory_test_submit_power_row(simulation, 4U, 3U));
     factory_simulation_tick(simulation);
 
     CHECK(factory_simulation_get_command_result(simulation, 0U)->result
@@ -218,7 +220,7 @@ static void test_placement_orientation_and_invalid_sources(void)
 
 static void test_belt_pickup_storage_drop_timing_and_backpressure(void)
 {
-    FactoryWorld *world = factory_world_create(4U, 1U);
+    FactoryWorld *world = factory_world_create(4U, 3U);
     FactorySimulation *simulation;
     FactoryInserter state;
     FactoryStorage storage_state;
@@ -245,6 +247,7 @@ static void test_belt_pickup_storage_drop_timing_and_backpressure(void)
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_PLACE_STORAGE, {.place_storage = {3, 0}}
     });
+    CHECK(factory_test_submit_power_row(simulation, 4U, 1U));
     factory_simulation_tick(simulation);
 
     for (uint32_t tick = 0U; tick < 100U; ++tick) {
@@ -296,7 +299,7 @@ static void test_belt_pickup_storage_drop_timing_and_backpressure(void)
     factory_simulation_destroy(simulation);
     factory_world_destroy(world);
 
-    world = factory_world_create(5U, 1U);
+    world = factory_world_create(5U, 3U);
     CHECK(factory_world_add_resource(
         world, 0, 0, FACTORY_RESOURCE_IRON, 3U
     ) == FACTORY_RESULT_OK);
@@ -317,6 +320,7 @@ static void test_belt_pickup_storage_drop_timing_and_backpressure(void)
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_PLACE_STORAGE, {.place_storage = {4, 0}}
     });
+    CHECK(factory_test_submit_power_row(simulation, 5U, 1U));
     factory_simulation_tick(simulation);
     {
         for (uint32_t tick = 0U; tick < 100U; ++tick) {
@@ -344,7 +348,7 @@ static void test_belt_pickup_storage_drop_timing_and_backpressure(void)
 
 static void test_drop_contention_lowest_id_wins(void)
 {
-    FactoryWorld *world = factory_world_create(5U, 2U);
+    FactoryWorld *world = factory_world_create(5U, 4U);
     FactorySimulation *simulation;
     FactoryBelt destination;
     FactoryInserter left;
@@ -385,6 +389,7 @@ static void test_drop_contention_lowest_id_wins(void)
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_PLACE_STORAGE, {.place_storage = {2, 0}}
     });
+    CHECK(factory_test_submit_power_row(simulation, 5U, 2U));
     factory_simulation_tick(simulation);
 
     for (uint32_t tick = 0U; tick < 60U; ++tick) {
@@ -428,7 +433,7 @@ static void test_pickup_contention_and_determinism(void)
     FactorySimulation *simulation[2];
 
     for (size_t run = 0U; run < 2U; ++run) {
-        world[run] = factory_world_create(5U, 3U);
+        world[run] = factory_world_create(5U, 5U);
         CHECK(factory_world_add_resource(
             world[run], 2, 0, FACTORY_RESOURCE_IRON, 1U
         ) == FACTORY_RESULT_OK);
@@ -449,6 +454,7 @@ static void test_pickup_contention_and_determinism(void)
         submit(simulation[run], (FactoryCommand){
             FACTORY_COMMAND_PLACE_STORAGE, {.place_storage = {4, 1}}
         });
+        CHECK(factory_test_submit_power_row(simulation[run], 5U, 3U));
         factory_simulation_tick(simulation[run]);
     }
     for (uint32_t tick = 0U; tick < 50U; ++tick) {
@@ -502,7 +508,7 @@ static void test_pickup_contention_and_determinism(void)
 
 static void test_splitter_input_and_output(void)
 {
-    FactoryWorld *world = factory_world_create(5U, 3U);
+    FactoryWorld *world = factory_world_create(5U, 5U);
     FactorySimulation *simulation;
     FactoryStorage storage_state;
 
@@ -527,6 +533,7 @@ static void test_splitter_input_and_output(void)
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_PLACE_STORAGE, {.place_storage = {3, 2}}
     });
+    CHECK(factory_test_submit_power_row(simulation, 5U, 3U));
     factory_simulation_tick(simulation);
     for (uint32_t tick = 0U; tick < 100U; ++tick) {
         factory_simulation_tick(simulation);
@@ -607,6 +614,8 @@ static void test_machine_pipeline_and_elemental_conservation(void)
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_PLACE_STORAGE, {.place_storage = {5, 2}}
     });
+    CHECK(factory_test_submit_power_pair(simulation, 0, 2, 1, 2));
+    CHECK(factory_test_submit_power_pair(simulation, 5, 1, 5, 0));
     factory_simulation_tick(simulation);
     submit(simulation, (FactoryCommand){
         FACTORY_COMMAND_SET_REFINERY_RECIPE,

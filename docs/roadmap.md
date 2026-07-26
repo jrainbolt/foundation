@@ -17,7 +17,8 @@
 - [x] Counted generic assembler inputs and multi-item output
 - [x] Configurable one-item storage output for inserters
 - [x] Canonical versioned binary snapshots and deterministic continuation
+- [x] Deterministic Factorio-style power networks
 - [ ] Inserter variants, filters, and longer arms
 
-The next milestone can build on snapshots with explicit replay or tooling
-features without changing simulation determinism.
+The recommended next milestone is a deterministic simulation event stream for
+renderer and UI synchronization.

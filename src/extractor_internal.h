@@ -6,6 +6,7 @@
 
 #include <foundation/world.h>
 #include "foundation/extractor.h"
+#include "foundation/power.h"
 
 typedef struct {
     FactoryExtractor *items;
@@ -38,7 +39,8 @@ bool factory_extractor_store_remove(
 );
 void factory_extractor_store_update(
     FactoryExtractorStore *store,
-    FactoryWorld *world
+    FactoryWorld *world,
+    const FactorySimulation *simulation
 );
 
 #endif

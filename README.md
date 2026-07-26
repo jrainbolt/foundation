@@ -69,3 +69,6 @@ Versioned snapshots preserve the complete world, entity manager, subsystem
 state, queued commands, command results, and future entity allocation in a
 canonical portable binary format. See `docs/save-load.md` and
 `docs/snapshot-format.md`.
+
+Factorio-style power poles form automatic deterministic networks and allocate
+whole-machine power by ascending entity ID. See `docs/power.md`.
