@@ -31,6 +31,15 @@ static FactorySimulation *make_simulation(void)
     return simulation;
 }
 
+static void destroy_borrowing_simulation(FactorySimulation *simulation)
+{
+    FactoryWorld *world;
+    if (simulation == NULL) return;
+    world = (FactoryWorld *)factory_simulation_get_world(simulation);
+    factory_simulation_destroy(simulation);
+    factory_world_destroy(world);
+}
+
 static int submit_layout(FactorySimulation *simulation)
 {
     const FactoryCommand commands[] = {
@@ -74,7 +83,7 @@ static int test_clock_curve_and_events(void)
     while (factory_simulation_clock_get_day(simulation) == 0U)
         CHECK(factory_simulation_tick(simulation) == FACTORY_RESULT_OK);
     CHECK(factory_simulation_clock_get_time_of_day(simulation) == 0U);
-    factory_simulation_destroy(simulation);
+    destroy_borrowing_simulation(simulation);
     return 0;
 }
 
@@ -134,7 +143,7 @@ static int test_generation_presentation_and_continuation(void)
     }
     factory_snapshot_buffer_destroy(&snapshot);
     factory_simulation_destroy(loaded);
-    factory_simulation_destroy(simulation);
+    destroy_borrowing_simulation(simulation);
     return 0;
 }
 
@@ -162,7 +171,7 @@ static int test_transactional_demolition(void)
     CHECK(factory_simulation_get_solar_generator(
         simulation, 1U, &(FactorySolarGeneratorInspection){0})
         == FACTORY_RESULT_ENTITY_NOT_FOUND);
-    factory_simulation_destroy(simulation);
+    destroy_borrowing_simulation(simulation);
     return 0;
 }
 
@@ -211,7 +220,7 @@ static int test_mixed_burner_and_solar_generation(void)
     CHECK(factory_simulation_get_solar_generator(simulation, 3U, &solar)
         == FACTORY_RESULT_OK);
     CHECK(solar.generated_last_tick == 10U);
-    factory_simulation_destroy(simulation);
+    destroy_borrowing_simulation(simulation);
     return 0;
 }
 
