@@ -35,6 +35,10 @@ The simulation event batch is transient observer state. It is excluded from
 canonical snapshot bytes, and a successfully loaded simulation begins with an
 empty batch. Failed loads do not mutate an existing simulation or its events.
 
+Externally owned presentation snapshots are also excluded. They remain valid
+independently of simulation save/load and may be transactionally rebuilt from
+a newly loaded simulation.
+
 The continuation invariant is:
 
 ```text

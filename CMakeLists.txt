@@ -58,6 +58,7 @@ add_library(factory_engine
     src/inserter.c
     src/logistics_endpoint.c
     src/power.c
+    src/presentation.c
     src/recipe.c
     src/refinery.c
     src/simulation.c
@@ -226,4 +227,16 @@ if(BUILD_TESTING)
     )
     target_link_libraries(factory_event_tests PRIVATE factory_engine)
     add_test(NAME factory_event_tests COMMAND factory_event_tests)
+
+    add_executable(factory_presentation_tests tests/test_presentation.c)
+    target_include_directories(
+        factory_presentation_tests
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(factory_presentation_tests PRIVATE factory_engine)
+    add_test(
+        NAME factory_presentation_tests
+        COMMAND factory_presentation_tests
+    )
 endif()

@@ -19,7 +19,8 @@
 - [x] Canonical versioned binary snapshots and deterministic continuation
 - [x] Deterministic Factorio-style power networks
 - [x] Deterministic transient simulation event stream
+- [x] Deterministic renderer-neutral presentation snapshots
 - [ ] Inserter variants, filters, and longer arms
 
-Renderer synchronization and other consumers of the event stream remain
-separate future milestones.
+Godot bindings, incremental synchronization, and other frontend integrations
+remain separate future milestones.

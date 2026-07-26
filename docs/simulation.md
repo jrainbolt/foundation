@@ -21,6 +21,10 @@ failed event-capacity reservation returns before step 1 changes any observable
 state; successful batches remain inspectable until the next successful tick or
 explicit clear.
 
+After a successful tick, a caller may inspect that event batch and rebuild an
+independently owned presentation snapshot of the resulting post-tick state.
+Presentation rebuilding neither advances the simulation nor changes events.
+
 Producer conflicts and belt conflicts use lowest source entity ID. A newly
 extractor- or refinery-loaded belt gains progress 1 in that tick. A belt-loaded
 refinery begins processing and gains progress 1 in its delivery tick.

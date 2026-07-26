@@ -76,3 +76,7 @@ whole-machine power by ascending entity ID. See `docs/power.md`.
 Each successful simulation step exposes a transient deterministic event batch
 covering committed construction, demolition, production, item transfer, and
 power-state transitions. See `docs/events.md`.
+
+External frontends can independently own a deterministic full presentation
+snapshot containing visible entities, deposits, and canonical power edges.
+See `docs/presentation.md`.

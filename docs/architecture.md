@@ -78,3 +78,9 @@ The simulation also owns a transient event batch. Tick preflight reserves its
 worst-case capacity before mutation, after which authoritative commit points
 append fully initialized facts without allocation or callbacks. No subsystem
 reads the batch, and snapshot serialization deliberately excludes it.
+
+Presentation snapshots are separately owned derived copies. Their
+transactional full rebuild reads simulation internals without borrowing
+pointers, orders real entities by stable ID, copies deposits in row-major
+order, and reuses the canonical derived power-edge order. Presentation status
+and progress never flow back into authoritative state.
