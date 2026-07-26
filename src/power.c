@@ -225,6 +225,9 @@ FactoryPowerUnits factory_power_source_available_generation(
             &simulation->steam_engines, entity_id) != NULL)
         return factory_steam_engine_available_generation(
             simulation, entity_id);
+    if (factory_solar_generator_store_find(
+            &simulation->solar_generators, entity_id) != NULL)
+        return factory_solar_generator_available(simulation, entity_id);
     burner = factory_burner_store_find(&simulation->burners, entity_id);
     return burner == NULL
         ? 0U
@@ -262,6 +265,13 @@ void factory_power_consume_generation(FactorySimulation *simulation)
                     &simulation->steam_engines,
                     inspection->entity_id) != NULL) {
                 if (factory_steam_engine_consume_for_generation(
+                        simulation, inspection->entity_id,
+                        (FactoryPowerUnits)amount))
+                    remaining -= amount;
+            } else if (factory_solar_generator_store_find(
+                    &simulation->solar_generators,
+                    inspection->entity_id) != NULL) {
+                if (factory_solar_generator_record_generation(
                         simulation, inspection->entity_id,
                         (FactoryPowerUnits)amount))
                     remaining -= amount;

@@ -7,6 +7,8 @@
 
 struct FactoryPresentationSnapshot {
     uint64_t tick;
+    uint64_t day;
+    uint32_t time_of_day;
     FactoryPresentationEntity *entities;
     size_t entity_count;
     FactoryPresentationResource *resources;
@@ -180,6 +182,8 @@ static FactoryResult populate_entity(
         factory_boiler_store_find(&simulation->boilers, id);
     const FactorySteamEngine *steam_engine =
         factory_steam_engine_store_find(&simulation->steam_engines, id);
+    const FactorySolarGenerator *solar_generator =
+        factory_solar_generator_store_find(&simulation->solar_generators, id);
     FactoryPipeInspection pipe;
     FactoryPowerPoleInspection pole;
     FactoryPowerGeneratorInspection generator;
@@ -345,6 +349,23 @@ static FactoryResult populate_entity(
                     out->data.boiler.output_network_id =
                         simulation->fluid_networks.ports[i].network_id;
             }
+    } else if (solar_generator != NULL) {
+        FactorySolarGeneratorInspection machine;
+        FactoryPowerGeneratorInspection power_generator;
+        out->entity_type = FACTORY_ENTITY_TYPE_SOLAR_GENERATOR;
+        out->x = solar_generator->x; out->y = solar_generator->y;
+        if (factory_simulation_get_solar_generator(
+                simulation, id, &machine) != FACTORY_RESULT_OK
+            || factory_simulation_get_power_generator(
+                simulation, id, &power_generator) != FACTORY_RESULT_OK)
+            return FACTORY_RESULT_ENTITY_NOT_FOUND;
+        out->status = machine.active
+            ? FACTORY_PRESENTATION_MACHINE_STATUS_WORKING
+            : FACTORY_PRESENTATION_MACHINE_STATUS_IDLE;
+        out->data.solar_generator = (FactoryPresentationSolarGenerator){
+            power_generator.network_id, machine.maximum_output,
+            machine.available_output, machine.generated_last_tick,
+            machine.active};
     } else if (steam_engine != NULL) {
         FactorySteamEngineInspection machine;
         FactoryPowerGeneratorInspection generator;
@@ -441,7 +462,9 @@ FactoryResult factory_presentation_snapshot_rebuild(
     FactoryEntityId previous = 0U;
     if (snapshot == NULL || simulation == NULL)
         return FACTORY_RESULT_INVALID_ARGUMENT;
-    next.tick = simulation->tick;
+    next.tick = simulation->clock.tick;
+    next.day = simulation->clock.day;
+    next.time_of_day = simulation->clock.time_of_day;
     next.entity_count = simulation->entities->count;
     next.power_edge_count = simulation->power.connection_count;
     width = factory_world_get_width(simulation->world);
@@ -530,6 +553,18 @@ uint64_t factory_presentation_snapshot_get_tick(
 )
 {
     return snapshot == NULL ? 0U : snapshot->tick;
+}
+
+uint64_t factory_presentation_snapshot_get_day(
+    const FactoryPresentationSnapshot *snapshot)
+{
+    return snapshot == NULL ? 0U : snapshot->day;
+}
+
+uint32_t factory_presentation_snapshot_get_time_of_day(
+    const FactoryPresentationSnapshot *snapshot)
+{
+    return snapshot == NULL ? 0U : snapshot->time_of_day;
 }
 
 size_t factory_presentation_snapshot_get_entity_count(

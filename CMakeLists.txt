@@ -49,6 +49,7 @@ add_library(factory_engine
     src/assembler_recipe.c
     src/belt.c
     src/burner.c
+    src/clock.c
     src/command.c
     src/construction.c
     src/construction_inventory.c
@@ -65,6 +66,7 @@ add_library(factory_engine
     src/recipe.c
     src/refinery.c
     src/simulation.c
+    src/solar.c
     src/snapshot.c
     src/steam_engine.c
     src/splitter.c
@@ -279,4 +281,11 @@ if(BUILD_TESTING)
     )
     target_link_libraries(factory_steam_engine_tests PRIVATE factory_engine)
     add_test(NAME factory_steam_engine_tests COMMAND factory_steam_engine_tests)
+
+    add_executable(factory_solar_tests tests/test_solar.c)
+    target_include_directories(
+        factory_solar_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(factory_solar_tests PRIVATE factory_engine)
+    add_test(NAME factory_solar_tests COMMAND factory_solar_tests)
 endif()

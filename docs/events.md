@@ -63,6 +63,6 @@ the normal authoritative update phases. Fluid command events occupy their FIFO
 command positions. There is no event sorting pass.
 
 Events and their allocation capacity are observer state. They are not encoded
-in version 8 snapshots and do not affect canonical bytes. A loaded simulation
+in version 9 snapshots and do not affect canonical bytes. A loaded simulation
 starts with an empty batch. Failed loads create no simulation and cannot alter
 an existing simulation or its visible batch.

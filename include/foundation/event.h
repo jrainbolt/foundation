@@ -29,7 +29,9 @@ typedef enum {
     FACTORY_EVENT_PIPE_DISCONNECTED,
     FACTORY_EVENT_WATER_PRODUCED,
     FACTORY_EVENT_BOILER_CONVERSION_COMPLETED,
-    FACTORY_EVENT_STEAM_ENGINE_GENERATION_COMPLETED
+    FACTORY_EVENT_STEAM_ENGINE_GENERATION_COMPLETED,
+    FACTORY_EVENT_SUNRISE,
+    FACTORY_EVENT_SUNSET
 } FactoryEventType;
 
 /*
@@ -51,6 +53,7 @@ typedef enum {
  * consumed input and related_fluid_type/related_quantity are the output.
  * steam generation: entity_id is the engine, fluid_type/quantity identify
  * consumed steam, and related_quantity is generated electrical energy.
+ * sunrise/sunset carry no payload and occur once at their clock boundary.
  *
  * tick is the simulation tick at the start of the step that emitted the
  * event. Item-transfer quantity is currently one.

@@ -45,7 +45,7 @@ tick and has no unreleased energy; released energy may remain buffered. Each
 event occurs exactly once per active item.
 
 Burner inventory, active fuel, remaining ticks, accepted classes, and released
-energy are canonical version 8 snapshot state. Duration and unreleased energy
+energy are canonical version 9 snapshot state. Duration and unreleased energy
 are derived exactly from the immutable fuel definition and remaining ticks.
 Power topology and allocation remain derived. Presentation exposes inventory,
 active fuel, duration, remaining ticks, unreleased energy, released energy, and

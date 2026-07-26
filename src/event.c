@@ -42,7 +42,7 @@ void factory_simulation_emit_event(
     if (!batch->recording) return;
     /* Tick preflight guarantees capacity before authoritative mutation. */
     if (batch->count >= batch->capacity) abort();
-    event.tick = simulation->tick;
+    event.tick = simulation->clock.tick;
     batch->items[batch->count++] = event;
 }
 

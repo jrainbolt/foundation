@@ -1,4 +1,4 @@
-# Snapshot format version 8
+# Snapshot format version 9
 
 Foundation snapshots are canonical little-endian binary files. Every value is
 written field-by-field; no C structure, pointer, enum representation, padding,
@@ -9,12 +9,12 @@ timestamp, or process-specific value enters the format.
 | Offset | Width | Field |
 |---:|---:|---|
 | 0 | 8 | Magic bytes `FOUNDATN` |
-| 8 | 4 | Version (`8`) |
+| 8 | 4 | Version (`9`) |
 | 12 | 4 | Header size (`48`) |
 | 16 | 8 | Total snapshot size |
 | 24 | 8 | Payload size |
 | 32 | 8 | Simulation tick |
-| 40 | 4 | Section count (`19`) |
+| 40 | 4 | Section count (`20`) |
 | 44 | 4 | Reserved zero |
 
 Unsigned and signed integers use 32-bit or 64-bit two's-complement
@@ -32,7 +32,7 @@ Each section starts with four 32-bit fields:
 | Record count | Number of fixed-width records |
 | Payload size | Bytes following the section header |
 
-Version 8 requires each section exactly once in this order:
+Version 9 requires each section exactly once in this order:
 
 | Type | Section | Record width |
 |---:|---|---:|
@@ -53,8 +53,9 @@ Version 8 requires each section exactly once in this order:
 | 15 | Water extractors | 16 |
 | 16 | Boilers and burners | 48 |
 | 17 | Steam engines | 16 |
-| 18 | Pending commands | 24 |
-| 19 | Command results | 68 |
+| 18 | Solar generators | 12 |
+| 19 | Pending commands | 24 |
+| 20 | Command results | 68 |
 
 Unknown, reordered, duplicated, missing, incorrectly sized, or unsupported
 sections are rejected. Exact full-buffer consumption is required.
@@ -94,6 +95,10 @@ fluid storages are carried by the fluid-storage section.
 Steam-engine records contain entity ID, grid position, and stable generation
 recipe ID. Latest-tick generation activity is transient and resets after load.
 
-Version 8 has no compression, encryption, checksum, optional sections, or
+Solar-generator records contain entity ID and grid position. Intensity,
+available generation, latest-tick output, and power-network membership are
+derived and are not serialized.
+
+Version 9 has no compression, encryption, checksum, optional sections, or
 migration decoder. A future incompatible change must introduce a deliberate
 new-version decoder or compatibility policy.

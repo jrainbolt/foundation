@@ -52,6 +52,8 @@ public:
         int64_t quantity
     );
     int64_t get_tick() const;
+    int64_t get_day() const;
+    int64_t get_time_of_day() const;
     Array get_entities() const;
     Array get_resources() const;
     Array get_power_edges() const;

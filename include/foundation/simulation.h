@@ -21,6 +21,8 @@
 #include "foundation/fluid.h"
 #include "foundation/fluid_machine.h"
 #include "foundation/steam_engine.h"
+#include "foundation/clock.h"
+#include "foundation/solar.h"
 
 typedef struct FactorySimulation FactorySimulation;
 

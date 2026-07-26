@@ -21,6 +21,11 @@ func _initialize() -> void:
 		return
 	if not _require(simulation.get_tick() == 0, "unsafe initial tick"):
 		return
+	if not _require(
+		simulation.get_day() == 0 and simulation.get_time_of_day() == 0,
+		"unsafe initial clock"
+	):
+		return
 	if not _require(simulation.get_entities().is_empty(), "initial entities"):
 		return
 	if not _require(simulation.get_resources().is_empty(), "initial resources"):
@@ -42,14 +47,14 @@ func _initialize() -> void:
 	if not _require(not simulation.has_error(), simulation.get_last_error()):
 		return
 	if not _require(
-		entities.size() == 33,
+		entities.size() == 34,
 		"missing presentation entities: got %d" % entities.size()
 	):
 		return
 	var expected_types := [
 		1, 2, 3, 2, 2, 2, 1, 2, 3, 2, 2, 2, 4, 2,
 		6, 2, 2, 5, 5, 7, 5, 8, 8, 8, 8, 9, 10, 11,
-		12, 11, 13, 11, 14
+		12, 11, 13, 11, 14, 15
 	]
 	var seen_ids := {}
 	for index in entities.size():
@@ -63,7 +68,7 @@ func _initialize() -> void:
 		):
 			return
 		seen_ids[entity_id] = true
-	if not _require(seen_ids.size() == 33, "duplicate or missing stable IDs"):
+	if not _require(seen_ids.size() == 34, "duplicate or missing stable IDs"):
 		return
 	var tank: Dictionary = {}
 	for entity: Dictionary in entities:
@@ -90,12 +95,22 @@ func _initialize() -> void:
 	var water_extractor: Dictionary = entities[28]
 	var boiler: Dictionary = entities[30]
 	var steam_engine: Dictionary = entities[32]
+	var solar_generator: Dictionary = entities[33]
 	if not _require(
 		int(water_extractor.type) == 12
 		and int(water_extractor.stored_water) == 0
 		and int(water_extractor.output_capacity) == 1000
 		and int(water_extractor.progress) == 1,
 		"water extractor presentation fields"
+	):
+		return
+	if not _require(
+		int(solar_generator.type) == 15
+		and int(solar_generator.maximum_output) == 100
+		and int(solar_generator.available_generation) == 0
+		and int(solar_generator.generated_last_tick) == 0
+		and not bool(solar_generator.generation_active),
+		"solar generator presentation fields"
 	):
 		return
 	if not _require(
@@ -148,7 +163,7 @@ func _initialize() -> void:
 	result = simulation.place_fluid_tank(9, 7)
 	if not _require(result == 0, simulation.result_name(result)):
 		return
-	result = simulation.transfer_fluid(tank_id, 34, 1000)
+	result = simulation.transfer_fluid(tank_id, 35, 1000)
 	if not _require(result == 0, simulation.result_name(result)):
 		return
 	entities = simulation.get_entities()
@@ -157,7 +172,7 @@ func _initialize() -> void:
 	for entity: Dictionary in entities:
 		if int(entity.id) == tank_id:
 			source_quantity = int(entity.fluid_quantity)
-		if int(entity.id) == 34:
+		if int(entity.id) == 35:
 			destination_quantity = int(entity.fluid_quantity)
 	if not _require(
 		source_quantity >= 0 and destination_quantity > 0

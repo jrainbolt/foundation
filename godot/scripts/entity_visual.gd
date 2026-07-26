@@ -10,6 +10,7 @@ const COLORS := {
 	12: Color("#3388bb"),
 	13: Color("#b86b3c"),
 	14: Color("#7aa6d8"),
+	15: Color("#f0b429"),
 }
 const NAMES := {
 	1: "EX", 2: "BELT", 3: "REF", 4: "ASM", 5: "BOX",
@@ -17,6 +18,7 @@ const NAMES := {
 	11: "PIPE",
 	12: "WATER", 13: "BOIL",
 	14: "STEAM",
+	15: "SOLAR",
 }
 
 var state: Dictionary = {}
@@ -98,6 +100,16 @@ func _draw() -> void:
 			"S%d G%d %s" % [
 				int(state.get("stored_steam", 0)),
 				int(state.get("generated_last_tick", 0)),
+				"ON" if bool(state.get("generation_active", false)) else "OFF"
+			],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9
+		)
+	if entity_type == 15:
+		draw_string(
+			ThemeDB.fallback_font, Vector2(7, 39),
+			"G%d/%d %s" % [
+				int(state.get("generated_last_tick", 0)),
+				int(state.get("available_generation", 0)),
 				"ON" if bool(state.get("generation_active", false)) else "OFF"
 			],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 9

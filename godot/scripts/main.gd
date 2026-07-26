@@ -61,11 +61,15 @@ func _synchronize() -> bool:
 	var resources: Array = simulation.get_resources()
 	var power_edges: Array = simulation.get_power_edges()
 	var tick: int = simulation.get_tick()
+	var day: int = simulation.get_day()
+	var time_of_day: int = simulation.get_time_of_day()
 	if simulation.has_error():
 		status_label.text = "Status: %s" % simulation.get_last_error()
 		return false
 	canvas.synchronize(entities, resources, power_edges)
-	tick_label.text = "Tick: %d" % tick
+	tick_label.text = "Tick: %d  Day: %d  Time: %d" % [
+		tick, day, time_of_day
+	]
 	event_log.text = "\n".join(event_lines)
 	return true
 

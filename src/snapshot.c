@@ -9,7 +9,7 @@
 
 #define SNAPSHOT_HEADER_SIZE 48U
 #define SNAPSHOT_SECTION_HEADER_SIZE 16U
-#define SNAPSHOT_SECTION_COUNT 19U
+#define SNAPSHOT_SECTION_COUNT 20U
 
 static const uint8_t snapshot_magic[8] = {
     'F', 'O', 'U', 'N', 'D', 'A', 'T', 'N'
@@ -33,6 +33,7 @@ typedef enum {
     SNAPSHOT_SECTION_WATER_EXTRACTORS,
     SNAPSHOT_SECTION_BOILERS,
     SNAPSHOT_SECTION_STEAM_ENGINES,
+    SNAPSHOT_SECTION_SOLAR_GENERATORS,
     SNAPSHOT_SECTION_COMMANDS,
     SNAPSHOT_SECTION_RESULTS
 } SnapshotSection;
@@ -268,6 +269,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_records(&size, simulation->water_extractors.count, 16U)
         || !checked_records(&size, simulation->boilers.count, 48U)
         || !checked_records(&size, simulation->steam_engines.count, 16U)
+        || !checked_records(&size, simulation->solar_generators.count, 12U)
         || !checked_records(&size, simulation->command_count, 24U)
         || !checked_records(&size, simulation->result_count, 68U)
         || !size_to_u32(simulation->entities->count)
@@ -286,6 +288,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !size_to_u32(simulation->water_extractors.count)
         || !size_to_u32(simulation->boilers.count)
         || !size_to_u32(simulation->steam_engines.count)
+        || !size_to_u32(simulation->solar_generators.count)
         || !section_size_valid(
             simulation->entities->count, 4U, 8U)
         || !section_size_valid(tiles, 16U, 8U)
@@ -303,6 +306,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !section_size_valid(simulation->water_extractors.count, 16U, 0U)
         || !section_size_valid(simulation->boilers.count, 48U, 0U)
         || !section_size_valid(simulation->steam_engines.count, 16U, 0U)
+        || !section_size_valid(simulation->solar_generators.count, 12U, 0U)
         || size > UINT64_MAX) {
         return FACTORY_RESULT_SNAPSHOT_SIZE_OVERFLOW;
     }
@@ -345,6 +349,8 @@ static bool entity_has_subsystem(
         factory_boiler_store_find(&simulation->boilers, id);
     const FactorySteamEngine *steam_engine =
         factory_steam_engine_store_find(&simulation->steam_engines, id);
+    const FactorySolarGenerator *solar_generator =
+        factory_solar_generator_store_find(&simulation->solar_generators, id);
     bool tank = fluid_storage != NULL && water_extractor == NULL
         && steam_engine == NULL;
     size_t found = (extractor != NULL) + (belt != NULL)
@@ -352,8 +358,9 @@ static bool entity_has_subsystem(
         + (inserter != NULL) + (storage != NULL)
         + (pole != NULL) + (generator != NULL) + tank
         + (pipe != NULL) + (water_extractor != NULL) + (boiler != NULL)
-        + (steam_engine != NULL);
+        + (steam_engine != NULL) + (solar_generator != NULL);
     if (steam_engine != NULL && generator != NULL) --found;
+    if (solar_generator != NULL && generator != NULL) --found;
 
     if (found != 1U) {
         return false;
@@ -382,6 +389,8 @@ static bool entity_has_subsystem(
         *out_x = boiler->x; *out_y = boiler->y;
     } else if (steam_engine != NULL) {
         *out_x = steam_engine->x; *out_y = steam_engine->y;
+    } else if (solar_generator != NULL) {
+        *out_x = solar_generator->x; *out_y = solar_generator->y;
     } else if (tank) {
         *out_x = fluid_storage->x; *out_y = fluid_storage->y;
     } else {
@@ -454,14 +463,19 @@ static FactoryResult validate_simulation(
         || simulation->world->width == 0U
         || simulation->world->height == 0U
         || simulation->command_count > FACTORY_COMMAND_QUEUE_CAPACITY
-        || simulation->result_count > FACTORY_COMMAND_QUEUE_CAPACITY) {
+        || simulation->result_count > FACTORY_COMMAND_QUEUE_CAPACITY
+        || simulation->clock.day
+            != simulation->clock.tick / FACTORY_CLOCK_TICKS_PER_DAY
+        || simulation->clock.time_of_day
+            != simulation->clock.tick % FACTORY_CLOCK_TICKS_PER_DAY) {
         return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
     if (simulation->fluid_storages.count
         < simulation->water_extractors.count + simulation->boilers.count * 2U
             + simulation->steam_engines.count)
         return FACTORY_RESULT_SNAPSHOT_CORRUPT;
-    if (simulation->power_generators.count < simulation->steam_engines.count)
+    if (simulation->power_generators.count
+        < simulation->steam_engines.count + simulation->solar_generators.count)
         return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     subsystem_count = simulation->extractors.count
         + simulation->belts.count + simulation->splitters.count
@@ -471,10 +485,12 @@ static FactoryResult validate_simulation(
         + simulation->power_generators.count + simulation->pipes.count
         + simulation->water_extractors.count + simulation->boilers.count
         + simulation->steam_engines.count
+        + simulation->solar_generators.count
         + simulation->fluid_storages.count
         - simulation->water_extractors.count - simulation->boilers.count * 2U
         - simulation->steam_engines.count
-        - simulation->steam_engines.count;
+        - simulation->steam_engines.count
+        - simulation->solar_generators.count;
     if (subsystem_count != simulation->entities->count) {
         return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
@@ -663,6 +679,9 @@ static FactoryResult validate_simulation(
         const FactorySteamEngine *steam_engine =
             factory_steam_engine_store_find(
                 &simulation->steam_engines, generator->entity_id);
+        const FactorySolarGenerator *solar_generator =
+            factory_solar_generator_store_find(
+                &simulation->solar_generators, generator->entity_id);
         const FactoryBurner *burner = factory_burner_store_find(
             &simulation->burners, generator->entity_id);
         const FactoryFuelDefinition *inventory_definition;
@@ -675,6 +694,10 @@ static FactoryResult validate_simulation(
                 || steam_engine->recipe_id
                     != FACTORY_STEAM_GENERATION_RECIPE_BASIC)
                 return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+            continue;
+        }
+        if (solar_generator != NULL) {
+            if (burner != NULL) return FACTORY_RESULT_SNAPSHOT_CORRUPT;
             continue;
         }
         if (burner == NULL
@@ -709,6 +732,7 @@ static FactoryResult validate_simulation(
     }
     if (simulation->burners.count
         != simulation->power_generators.count - simulation->steam_engines.count
+            - simulation->solar_generators.count
             + simulation->boilers.count)
         return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     for (index = 0U; index < simulation->steam_engines.count; ++index) {
@@ -726,6 +750,20 @@ static FactoryResult validate_simulation(
             || storage == NULL || generator == NULL
             || storage->capacity != FACTORY_STEAM_ENGINE_STORAGE_CAPACITY
             || storage->accepted_fluid_classes != FACTORY_FLUID_CLASS_VAPOR)
+            return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
+    for (index = 0U; index < simulation->solar_generators.count; ++index) {
+        const FactorySolarGenerator *solar =
+            &simulation->solar_generators.items[index];
+        const FactoryPowerGenerator *generator =
+            factory_power_generator_store_find(
+                &simulation->power_generators, solar->entity_id);
+        if (generator == NULL
+            || generator->generation_capacity
+                != FACTORY_SOLAR_GENERATOR_MAX_OUTPUT
+            || solar->generated_last_tick
+                > factory_solar_generator_available(
+                    simulation, solar->entity_id))
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
     for (index = 0U; index < simulation->water_extractors.count; ++index) {
@@ -856,7 +894,7 @@ static FactoryResult validate_simulation(
         const FactoryCommandResult *value = &simulation->results[index];
         if (!snapshot_command_valid(&value->command)
             || value->result > FACTORY_RESULT_FLUID_NETWORK_NOT_FOUND
-            || value->entity_type > FACTORY_ENTITY_TYPE_STEAM_ENGINE
+            || value->entity_type > FACTORY_ENTITY_TYPE_SOLAR_GENERATOR
             || value->previous_assembler_recipe
                 >= FACTORY_ASSEMBLER_RECIPE_COUNT
             || value->new_assembler_recipe
@@ -975,6 +1013,10 @@ static void write_command(
             fields[0] = (uint32_t)command->data.place_steam_engine.x;
             fields[1] = (uint32_t)command->data.place_steam_engine.y;
             break;
+        case FACTORY_COMMAND_PLACE_SOLAR_GENERATOR:
+            fields[0] = (uint32_t)command->data.place_solar_generator.x;
+            fields[1] = (uint32_t)command->data.place_solar_generator.y;
+            break;
     }
     write_u32(writer, (uint32_t)command->type);
     for (index = 0U; index < 5U; ++index) {
@@ -997,7 +1039,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             return false;
         }
     }
-    if (type > FACTORY_COMMAND_PLACE_STEAM_ENGINE) {
+    if (type > FACTORY_COMMAND_PLACE_SOLAR_GENERATOR) {
         return false;
     }
     command->type = (FactoryCommandType)type;
@@ -1028,6 +1070,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             case FACTORY_COMMAND_PLACE_WATER_EXTRACTOR:
             case FACTORY_COMMAND_PLACE_BOILER:
             case FACTORY_COMMAND_PLACE_STEAM_ENGINE:
+            case FACTORY_COMMAND_PLACE_SOLAR_GENERATOR:
                 used = 2U;
                 break;
             case FACTORY_COMMAND_DEMOLISH_ENTITY:
@@ -1148,6 +1191,10 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             command->data.place_steam_engine.x = (int32_t)fields[0];
             command->data.place_steam_engine.y = (int32_t)fields[1];
             break;
+        case FACTORY_COMMAND_PLACE_SOLAR_GENERATOR:
+            command->data.place_solar_generator.x = (int32_t)fields[0];
+            command->data.place_solar_generator.y = (int32_t)fields[1];
+            break;
     }
     return snapshot_command_valid(command);
 }
@@ -1167,12 +1214,12 @@ static void write_snapshot(
     write_u32(writer, SNAPSHOT_HEADER_SIZE);
     write_u64(writer, total_size);
     write_u64(writer, total_size - SNAPSHOT_HEADER_SIZE);
-    write_u64(writer, simulation->tick);
+    write_u64(writer, simulation->clock.tick);
     write_u32(writer, SNAPSHOT_SECTION_COUNT);
     write_u32(writer, 0U);
 
     write_section_header(writer, SNAPSHOT_SECTION_METADATA, 1U, 16U);
-    write_u64(writer, simulation->tick);
+    write_u64(writer, simulation->clock.tick);
     write_u32(writer, simulation->construction_inventory.units);
     write_u32(writer, 0U);
 
@@ -1477,6 +1524,19 @@ static void write_snapshot(
     }
 
     write_section_header(
+        writer, SNAPSHOT_SECTION_SOLAR_GENERATORS,
+        simulation->solar_generators.count,
+        simulation->solar_generators.count * 12U
+    );
+    for (index = 0U; index < simulation->solar_generators.count; ++index) {
+        const FactorySolarGenerator *value =
+            &simulation->solar_generators.items[index];
+        write_u32(writer, value->entity_id);
+        write_i32(writer, value->x);
+        write_i32(writer, value->y);
+    }
+
+    write_section_header(
         writer, SNAPSHOT_SECTION_COMMANDS,
         simulation->command_count, simulation->command_count * 24U
     );
@@ -1677,7 +1737,7 @@ static bool load_sections(
         || reserved != 0U) {
         return false;
     }
-    simulation->tick = tick;
+    factory_simulation_clock_set(&simulation->clock, tick);
 
     if (!read_section_header(
             reader, SNAPSHOT_SECTION_ENTITIES, 4U, 8U, &count)
@@ -2024,6 +2084,21 @@ static bool load_sections(
     }
 
     if (!read_section_header(
+            reader, SNAPSHOT_SECTION_SOLAR_GENERATORS, 12U, 0U, &count)
+        || !allocate_records(
+            (void **)&simulation->solar_generators.items,
+            count, sizeof(FactorySolarGenerator))) return false;
+    simulation->solar_generators.count = count;
+    simulation->solar_generators.capacity = count;
+    for (index = 0U; index < count; ++index) {
+        FactorySolarGenerator *v = &simulation->solar_generators.items[index];
+        if (!read_u32(reader, &v->entity_id)
+            || !read_i32(reader, &v->x)
+            || !read_i32(reader, &v->y)) return false;
+        v->generated_last_tick = 0U;
+    }
+
+    if (!read_section_header(
             reader, SNAPSHOT_SECTION_COMMANDS, 24U, 0U, &count)
         || count > FACTORY_COMMAND_QUEUE_CAPACITY) {
         return false;
@@ -2138,7 +2213,7 @@ FactoryResult factory_simulation_load_snapshot(
         factory_simulation_destroy(simulation);
         return result;
     }
-    if (reader.offset != reader.size || simulation->tick != header_tick) {
+    if (reader.offset != reader.size || simulation->clock.tick != header_tick) {
         factory_simulation_destroy(simulation);
         return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }

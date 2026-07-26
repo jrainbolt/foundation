@@ -63,6 +63,9 @@ FactoryCommand place(
     case FACTORY_COMMAND_PLACE_STEAM_ENGINE:
         command.data.place_steam_engine = {x, y};
         break;
+    case FACTORY_COMMAND_PLACE_SOLAR_GENERATOR:
+        command.data.place_solar_generator = {x, y};
+        break;
     default:
         break;
     }
@@ -157,6 +160,10 @@ void FoundationSimulation::_bind_methods()
         &FoundationSimulation::transfer_fluid
     );
     ClassDB::bind_method(D_METHOD("get_tick"), &FoundationSimulation::get_tick);
+    ClassDB::bind_method(D_METHOD("get_day"), &FoundationSimulation::get_day);
+    ClassDB::bind_method(
+        D_METHOD("get_time_of_day"), &FoundationSimulation::get_time_of_day
+    );
     ClassDB::bind_method(
         D_METHOD("get_entities"), &FoundationSimulation::get_entities
     );
@@ -343,6 +350,9 @@ FactoryResult FoundationSimulation::build_demo()
     result = submit(place(FACTORY_COMMAND_PLACE_STEAM_ENGINE, 11, 6));
     if (result != FACTORY_RESULT_OK)
         return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_SOLAR_GENERATOR, 11, 0));
+    if (result != FACTORY_RESULT_OK)
+        return result;
     result = factory_simulation_submit_fluid_insert(
         simulation_, 27U, FACTORY_FLUID_WATER, 2500U);
     if (result != FACTORY_RESULT_OK)
@@ -466,6 +476,24 @@ int64_t FoundationSimulation::get_tick() const
         return -1;
     }
     return converted;
+}
+
+int64_t FoundationSimulation::get_day() const
+{
+    if (simulation_ == nullptr) return 0;
+    const uint64_t day = factory_simulation_clock_get_day(simulation_);
+    int64_t converted = 0;
+    if (!foundation_godot::checked_uint64_to_godot_int(day, &converted)) {
+        set_conversion_error("simulation.day", day);
+        return -1;
+    }
+    return converted;
+}
+
+int64_t FoundationSimulation::get_time_of_day() const
+{
+    return simulation_ == nullptr
+        ? 0 : (int64_t)factory_simulation_clock_get_time_of_day(simulation_);
 }
 
 void FoundationSimulation::set_conversion_error(
@@ -686,6 +714,17 @@ bool FoundationSimulation::entity_to_dictionary(
         value["generated_last_tick"] =
             (int64_t)entity.data.steam_engine.generated_last_tick;
         value["generation_active"] = entity.data.steam_engine.active;
+        break;
+    case FACTORY_ENTITY_TYPE_SOLAR_GENERATOR:
+        value["power_network_id"] =
+            (int64_t)entity.data.solar_generator.power_network_id;
+        value["maximum_output"] =
+            (int64_t)entity.data.solar_generator.maximum_output;
+        value["available_generation"] =
+            (int64_t)entity.data.solar_generator.available_output;
+        value["generated_last_tick"] =
+            (int64_t)entity.data.solar_generator.actual_output;
+        value["generation_active"] = entity.data.solar_generator.active;
         break;
     default:
         break;

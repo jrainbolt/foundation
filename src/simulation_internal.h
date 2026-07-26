@@ -19,9 +19,11 @@
 #include "fluid_internal.h"
 #include "fluid_machine_internal.h"
 #include "steam_engine_internal.h"
+#include "clock_internal.h"
+#include "solar_internal.h"
 
 struct FactorySimulation {
-    uint64_t tick;
+    FactorySimulationClock clock;
     FactoryWorld *world;
     bool owns_world;
     FactoryEntityManager *entities;
@@ -42,6 +44,7 @@ struct FactorySimulation {
     FactoryWaterExtractorStore water_extractors;
     FactoryBoilerStore boilers;
     FactorySteamEngineStore steam_engines;
+    FactorySolarGeneratorStore solar_generators;
     /* Test-fixture setup only; production simulations leave this zero. */
     uint32_t fixture_initial_generator_fuel;
     FactoryPowerState power;

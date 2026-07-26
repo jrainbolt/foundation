@@ -105,6 +105,7 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     factory_water_extractor_store_destroy(&simulation->water_extractors);
     factory_boiler_store_destroy(&simulation->boilers);
     factory_steam_engine_store_destroy(&simulation->steam_engines);
+    factory_solar_generator_store_destroy(&simulation->solar_generators);
     factory_burner_store_destroy(&simulation->burners);
     factory_power_state_destroy(&simulation->power);
     factory_power_generator_store_destroy(&simulation->power_generators);
@@ -487,6 +488,24 @@ static FactoryResult place_steam_engine(
     return FACTORY_RESULT_OK;
 }
 
+static FactoryResult place_solar_generator(
+    FactorySimulation *s, const FactoryCommand *command, FactoryEntityId *out_id
+)
+{
+    int32_t x = command->data.place_solar_generator.x;
+    int32_t y = command->data.place_solar_generator.y;
+    FactoryResult result = validate_empty_tile(s, x, y);
+    if (result != FACTORY_RESULT_OK) return result;
+    if (!factory_solar_generator_store_reserve_one(&s->solar_generators)
+        || !factory_power_generator_store_reserve_one(&s->power_generators))
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    result = occupy_with_entity(s, x, y, out_id);
+    if (result != FACTORY_RESULT_OK) return result;
+    factory_solar_generator_store_add(&s->solar_generators, *out_id, x, y);
+    factory_power_generator_store_add(&s->power_generators, *out_id, x, y);
+    return FACTORY_RESULT_OK;
+}
+
 static FactoryResult place_refinery(
     FactorySimulation *simulation,
     const FactoryCommand *command,
@@ -681,6 +700,8 @@ static FactoryResult validate_demolition(
         factory_boiler_store_find(&simulation->boilers, id);
     const FactorySteamEngine *steam_engine =
         factory_steam_engine_store_find(&simulation->steam_engines, id);
+    const FactorySolarGenerator *solar_generator =
+        factory_solar_generator_store_find(&simulation->solar_generators, id);
     const FactoryTile *tile;
 
     if (id == 0U) {
@@ -765,6 +786,12 @@ static FactoryResult validate_demolition(
         *out_type = FACTORY_ENTITY_TYPE_POWER_POLE;
         *out_x = power_pole->x;
         *out_y = power_pole->y;
+    } else if (solar_generator != NULL) {
+        if (power_generator == NULL)
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        *out_type = FACTORY_ENTITY_TYPE_SOLAR_GENERATOR;
+        *out_x = solar_generator->x;
+        *out_y = solar_generator->y;
     } else if (steam_engine != NULL) {
         const FactoryFluidStorage *steam =
             factory_fluid_storage_store_find_slot(
@@ -913,6 +940,12 @@ static bool remove_subsystem_record(
             simulation->fluid_networks.dirty = true;
             return factory_steam_engine_store_remove(
                 &simulation->steam_engines, id);
+        case FACTORY_ENTITY_TYPE_SOLAR_GENERATOR:
+            if (!factory_power_generator_store_remove(
+                    &simulation->power_generators, id))
+                return false;
+            return factory_solar_generator_store_remove(
+                &simulation->solar_generators, id);
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;
@@ -1006,6 +1039,9 @@ static bool placement_type(
             return true;
         case FACTORY_COMMAND_PLACE_STEAM_ENGINE:
             *out_type = FACTORY_ENTITY_TYPE_STEAM_ENGINE;
+            return true;
+        case FACTORY_COMMAND_PLACE_SOLAR_GENERATOR:
+            *out_type = FACTORY_ENTITY_TYPE_SOLAR_GENERATOR;
             return true;
         default:
             return false;
@@ -1330,6 +1366,10 @@ static void apply_commands(FactorySimulation *simulation)
                 break;
             case FACTORY_COMMAND_PLACE_STEAM_ENGINE:
                 result->result = place_steam_engine(
+                    simulation, &result->command, &result->entity_id);
+                break;
+            case FACTORY_COMMAND_PLACE_SOLAR_GENERATOR:
+                result->result = place_solar_generator(
                     simulation, &result->command, &result->entity_id);
                 break;
             case FACTORY_COMMAND_FLUID_INSERT:
@@ -2220,6 +2260,8 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     if (simulation == NULL) {
         return FACTORY_RESULT_INVALID_ARGUMENT;
     }
+    if (!factory_simulation_clock_can_advance(&simulation->clock))
+        return FACTORY_RESULT_POWER_OVERFLOW;
     if (simulation->entities->count
             > SIZE_MAX - simulation->command_count) {
         return FACTORY_RESULT_POWER_OVERFLOW;
@@ -2236,11 +2278,18 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     simulation->events.count = 0U;
     simulation->events.recording = true;
     apply_commands(simulation);
+    if (simulation->clock.time_of_day == FACTORY_CLOCK_SUNRISE)
+        factory_simulation_emit_event(simulation, (FactoryEvent){
+            .type = FACTORY_EVENT_SUNRISE});
+    if (simulation->clock.time_of_day == FACTORY_CLOCK_SUNSET)
+        factory_simulation_emit_event(simulation, (FactoryEvent){
+            .type = FACTORY_EVENT_SUNSET});
     (void)factory_fluid_network_rebuild(simulation, true);
     factory_fluid_network_transfer(simulation);
     factory_burner_store_begin_tick(&simulation->burners, simulation);
     factory_fluid_machines_update(simulation);
     factory_steam_engine_begin_tick(simulation);
+    factory_solar_generator_begin_tick(simulation);
     (void)factory_power_rebuild(simulation, true);
     factory_power_consume_generation(simulation);
     factory_burner_store_finish_tick(&simulation->burners, simulation);
@@ -2255,13 +2304,13 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     factory_storage_store_update(&simulation->storages);
     update_inserters(simulation);
     simulation->events.recording = false;
-    ++simulation->tick;
+    factory_simulation_clock_advance(&simulation->clock);
     return FACTORY_RESULT_OK;
 }
 
 uint64_t factory_simulation_get_tick(const FactorySimulation *simulation)
 {
-    return simulation == NULL ? 0U : simulation->tick;
+    return simulation == NULL ? 0U : simulation->clock.tick;
 }
 
 const FactoryWorld *factory_simulation_get_world(

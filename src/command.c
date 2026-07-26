@@ -60,6 +60,7 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
         case FACTORY_COMMAND_PLACE_WATER_EXTRACTOR:
         case FACTORY_COMMAND_PLACE_BOILER:
         case FACTORY_COMMAND_PLACE_STEAM_ENGINE:
+        case FACTORY_COMMAND_PLACE_SOLAR_GENERATOR:
             return true;
         case FACTORY_COMMAND_FLUID_INSERT:
             return command->data.fluid_insert.destination_entity_id != 0U

@@ -42,6 +42,9 @@ conversion.
 Steam-engine presentation contains explicit stored steam and capacity, derived
 fluid and power network IDs, bounded available generation, actual generation
 from the latest tick, and activity.
+Solar presentation contains its power network, maximum and currently
+available output, demand-aware actual output from the latest tick, and
+activity. The snapshot also copies the authoritative day and time-of-day.
 Progress is always a tick numerator and duration denominator; no percentage
 or interpolation value is calculated.
 
@@ -79,7 +82,7 @@ Presentation rebuild does not clear or copy events. Event clearing does not
 alter an existing presentation snapshot. If a tick or rebuild fails, a caller
 may continue displaying its previous presentation snapshot.
 
-Presentation data is excluded from canonical version 8 simulation snapshots.
+Presentation data is excluded from canonical version 9 simulation snapshots.
 After simulation load, callers rebuild a new presentation snapshot. Equivalent
 authoritative simulations produce field-wise equivalent presentation records.
 

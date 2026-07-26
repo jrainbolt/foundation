@@ -22,7 +22,7 @@ func _run() -> void:
 		return
 	var initial_tick := int(main.simulation.get_tick())
 	var canvas: Node = main.canvas
-	if initial_tick != 2 or canvas.entity_nodes.size() != 33:
+	if initial_tick != 2 or canvas.entity_nodes.size() != 34:
 		_fail("deterministic demo or entity visuals are incorrect")
 		return
 	var tank_count := 0
@@ -53,6 +53,7 @@ func _run() -> void:
 	var water_extractor_count := 0
 	var boiler_count := 0
 	var steam_engine_count := 0
+	var solar_generator_count := 0
 	for entity_id: int in canvas.entity_nodes:
 		var visual: FoundationEntityVisual = canvas.entity_nodes[entity_id]
 		if int(visual.state.get("type", 0)) == 12:
@@ -77,8 +78,14 @@ func _run() -> void:
 					or int(visual.state.get("power_network_id", 0)) == 0:
 				_fail("steam engine visual has incorrect fields")
 				return
+		elif int(visual.state.get("type", 0)) == 15:
+			solar_generator_count += 1
+			if int(visual.state.get("maximum_output", 0)) != 100 \
+					or int(visual.state.get("available_generation", -1)) != 0:
+				_fail("solar generator visual has incorrect fields")
+				return
 	if water_extractor_count != 1 or boiler_count != 1 \
-			or steam_engine_count != 1:
+			or steam_engine_count != 1 or solar_generator_count != 1:
 		_fail("main scene did not receive fluid machines")
 		return
 	if canvas.resources.size() != 2 or canvas.edges.is_empty():
@@ -113,7 +120,7 @@ func _run() -> void:
 	if int(main.simulation.get_tick()) != initial_tick:
 		_fail("reset did not restore initial tick")
 		return
-	if canvas.entity_nodes.size() != 33 or canvas.resources.size() != 2:
+	if canvas.entity_nodes.size() != 34 or canvas.resources.size() != 2:
 		_fail("reset did not restore deterministic visuals")
 		return
 

@@ -74,6 +74,11 @@ Network aggregation identifies connected source entities and asks
 `factory_power_source_available_generation` for each source's current output.
 It does not calculate or depend on the basic generator's production mechanism.
 
+The simulation clock is the single authoritative time source. Its integer
+tick derives day and time-of-day, and solar generators query its reusable
+piecewise-linear intensity curve through the same generic power-source
+availability boundary used by burner and steam generation.
+
 The simulation also owns a transient event batch. Tick preflight reserves its
 worst-case capacity before mutation, after which authoritative commit points
 append fully initialized facts without allocation or callbacks. No subsystem

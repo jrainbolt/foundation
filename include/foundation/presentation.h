@@ -153,6 +153,14 @@ typedef struct {
 } FactoryPresentationSteamEngine;
 
 typedef struct {
+    FactoryPowerNetworkId power_network_id;
+    FactoryPowerUnits maximum_output;
+    FactoryPowerUnits available_output;
+    FactoryPowerUnits actual_output;
+    bool active;
+} FactoryPresentationSolarGenerator;
+
+typedef struct {
     FactoryEntityId entity_id;
     FactoryEntityType entity_type;
     int32_t x;
@@ -175,6 +183,7 @@ typedef struct {
         FactoryPresentationWaterExtractor water_extractor;
         FactoryPresentationBoiler boiler;
         FactoryPresentationSteamEngine steam_engine;
+        FactoryPresentationSolarGenerator solar_generator;
     } data;
 } FactoryPresentationEntity;
 
@@ -206,6 +215,12 @@ FactoryResult factory_presentation_snapshot_rebuild(
 );
 
 uint64_t factory_presentation_snapshot_get_tick(
+    const FactoryPresentationSnapshot *snapshot
+);
+uint64_t factory_presentation_snapshot_get_day(
+    const FactoryPresentationSnapshot *snapshot
+);
+uint32_t factory_presentation_snapshot_get_time_of_day(
     const FactoryPresentationSnapshot *snapshot
 );
 size_t factory_presentation_snapshot_get_entity_count(

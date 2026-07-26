@@ -33,7 +33,7 @@ same-tick power allocation. Boiler output produced during step 3 becomes
 network-transportable on the following tick because fluid transport has
 already completed.
 
-Snapshot version 8 stores the engine identity, position, recipe, generator
+Snapshot version 9 stores the engine identity, position, recipe, generator
 component, and explicit steam storage. Fluid and power network IDs are
 reconstructed. Latest-tick generation activity, events, and presentation are
 transient. Snapshot-chain identity and continuation tests cover engines
