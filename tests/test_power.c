@@ -1,4 +1,6 @@
 #include "foundation/snapshot.h"
+#include "foundation/steam_turbine.h"
+#include "../src/fluid_internal.h"
 #include "../src/power_internal.h"
 #include "power_fixture.h"
 
@@ -499,6 +501,133 @@ static void test_multiple_generator_actual_energy_consumption(void)
     factory_world_destroy(world);
 }
 
+static FactorySimulation *build_mixed_generator_turbine(
+    FactoryWorld **out_world, bool turbine_first,
+    FactoryEntityId *out_turbine_id
+)
+{
+    static const int32_t assembler_positions[8][2] = {
+        {1, 1}, {2, 1}, {3, 1}, {5, 1}, {6, 1}, {7, 1}, {1, 7}, {2, 7}
+    };
+    FactoryWorld *world = factory_world_create(9U, 9U);
+    FactorySimulation *simulation =
+        factory_simulation_create_with_construction_units(world, UINT32_MAX);
+    size_t i;
+    FactoryCommand turbine_command = {
+        FACTORY_COMMAND_PLACE_STEAM_TURBINE, {.place_steam_turbine = {4, 2}}
+    };
+    submit(simulation, pole(4, 4));
+    if (turbine_first) {
+        submit(simulation, turbine_command);
+        submit(simulation, generator(4, 6));
+    } else {
+        submit(simulation, generator(4, 6));
+        submit(simulation, turbine_command);
+    }
+    for (i = 0U; i < 8U; ++i)
+        submit(simulation, (FactoryCommand){
+            FACTORY_COMMAND_PLACE_ASSEMBLER,
+            {.place_assembler = {
+                assembler_positions[i][0], assembler_positions[i][1],
+                FACTORY_DIRECTION_NORTH
+            }}
+        });
+    CHECK(factory_simulation_tick(simulation) == FACTORY_RESULT_OK);
+    {
+        FactoryEntityId turbine_id = turbine_first ? 2U : 3U;
+        FactoryFluidStorage *storage =
+            factory_fluid_storage_store_find_slot_mutable(
+                &simulation->fluid_storages, turbine_id,
+                FACTORY_FLUID_STORAGE_STEAM_TURBINE_INPUT);
+        CHECK(storage != NULL);
+        if (storage != NULL) {
+            storage->fluid_type = FACTORY_FLUID_STEAM;
+            storage->quantity = 200U;
+        }
+        *out_turbine_id = turbine_id;
+    }
+    *out_world = world;
+    return simulation;
+}
+
+/*
+ * Regression for the mixed-generator quantum bug: a network with one basic
+ * generator (100, divisible) and one steam turbine (200, atomic) covering
+ * exactly 200 of consumer demand must dispatch the full turbine quantum
+ * rather than conservatively stopping at the divisible generator's 100 and
+ * discarding the turbine's otherwise-usable cycle. The check runs with the
+ * turbine on both sides of the generator's entity ID, since the dispatcher
+ * and the real per-generator consumption pass must agree regardless of
+ * placement order.
+ */
+static void check_mixed_generator_turbine_quantum(bool turbine_first)
+{
+    FactoryWorld *world;
+    FactorySimulation *simulation;
+    FactoryEntityId turbine_id;
+    FactoryPowerNetworkInspection network;
+    FactorySteamTurbineInspection turbine;
+
+    simulation = build_mixed_generator_turbine(&world, turbine_first, &turbine_id);
+    CHECK(factory_simulation_tick(simulation) == FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_power_network(simulation, 0U, &network)
+        == FACTORY_RESULT_OK);
+    CHECK(network.total_demand == 200U);
+    /*
+     * The basic generator's 100 continuous capacity is always "on" and
+     * serves the four lowest-ID assemblers first (ascending entity-ID
+     * priority); the turbine then fires its full 200-unit cycle for the
+     * rest. total_generation reports raw realized capacity (100 continuous
+     * + the turbine's fired 200), of which only 200 is actually claimed by
+     * consumers -- the turbine's other 100 sits unused with no accumulator
+     * to catch it.
+     */
+    CHECK(network.total_generation == 300U);
+    CHECK(network.allocated_power == 200U);
+    CHECK(network.unused_generation == 100U);
+    CHECK(network.powered_consumer_count == 8U);
+    CHECK(network.unpowered_consumer_count == 0U);
+    CHECK(factory_simulation_get_steam_turbine(simulation, turbine_id, &turbine)
+        == FACTORY_RESULT_OK);
+    CHECK(turbine.actual_output == 200U
+        && turbine.steam_consumed_last_tick == 100U
+        && turbine.completed_cycles_last_tick == 1U);
+
+    factory_simulation_destroy(simulation);
+    factory_world_destroy(world);
+}
+
+static void test_mixed_generator_turbine_quantum(void)
+{
+    check_mixed_generator_turbine_quantum(true);
+    check_mixed_generator_turbine_quantum(false);
+}
+
+static void test_mixed_generator_turbine_determinism(void)
+{
+    FactoryWorld *world_a;
+    FactoryWorld *world_b;
+    FactorySimulation *a;
+    FactorySimulation *b;
+    FactoryEntityId turbine_id_a;
+    FactoryEntityId turbine_id_b;
+    uint32_t tick;
+
+    a = build_mixed_generator_turbine(&world_a, false, &turbine_id_a);
+    b = build_mixed_generator_turbine(&world_b, false, &turbine_id_b);
+    CHECK(turbine_id_a == turbine_id_b);
+    for (tick = 0U; tick < 10U; ++tick) {
+        CHECK(factory_simulation_tick(a) == FACTORY_RESULT_OK);
+        CHECK(factory_simulation_tick(b) == FACTORY_RESULT_OK);
+        CHECK(snapshot_equal(a, b));
+    }
+
+    factory_simulation_destroy(b);
+    factory_simulation_destroy(a);
+    factory_world_destroy(world_b);
+    factory_world_destroy(world_a);
+}
+
 int main(void)
 {
     test_topology_allocation_and_pause();
@@ -507,6 +636,8 @@ int main(void)
     test_zero_power_snapshot_and_duplicate_determinism();
     test_snapshot_continuation();
     test_multiple_generator_actual_energy_consumption();
+    test_mixed_generator_turbine_quantum();
+    test_mixed_generator_turbine_determinism();
     if (failures != 0) return 1;
     (void)printf("All power tests passed.\n");
     return 0;

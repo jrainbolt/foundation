@@ -70,6 +70,29 @@ FactoryResult factory_power_rebuild(
     FactorySimulation *simulation, bool emit_transitions
 );
 void factory_power_consume_generation(FactorySimulation *simulation);
+
+/*
+ * The reusable quantum-aware allocation step: attempts to cover one
+ * consumer's demand from the network's generators, in ascending entity-ID
+ * order, and commits per-generator output only if the complete demand is
+ * met. `available`, `quantum` (0 = continuous; otherwise the generator's
+ * indivisible output unit), and `unlocked` are parallel arrays indexed the
+ * same as `generators`; `generators[i].committed_output` and `unlocked[i]`
+ * are the only state mutated, and only on success. `committed_delta` is
+ * caller-owned scratch space sized `generator_count`, reused per call.
+ * Exposed (not static) so it is independently testable without a full
+ * FactorySimulation/entity graph.
+ */
+bool factory_power_allocate_consumer(
+    FactoryPowerGeneratorInspection *generators,
+    const FactoryPowerUnits *available,
+    const FactoryPowerUnits *quantum,
+    bool *unlocked,
+    size_t generator_count,
+    FactoryPowerNetworkId network_id,
+    FactoryPowerUnits demand,
+    FactoryPowerUnits *committed_delta
+);
 bool factory_power_is_entity_powered(
     const FactorySimulation *simulation, FactoryEntityId entity_id
 );

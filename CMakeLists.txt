@@ -230,6 +230,18 @@ if(BUILD_TESTING)
     target_link_libraries(factory_power_tests PRIVATE factory_engine)
     add_test(NAME factory_power_tests COMMAND factory_power_tests)
 
+    add_executable(factory_power_allocation_tests tests/test_power_allocation.c)
+    target_include_directories(
+        factory_power_allocation_tests
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(factory_power_allocation_tests PRIVATE factory_engine)
+    add_test(
+        NAME factory_power_allocation_tests
+        COMMAND factory_power_allocation_tests
+    )
+
     add_executable(factory_event_tests tests/test_event.c)
     target_include_directories(
         factory_event_tests

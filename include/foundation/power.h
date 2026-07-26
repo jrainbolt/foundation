@@ -53,6 +53,14 @@ typedef struct {
     FactoryEntityId attached_pole_id;
     FactoryPowerNetworkId network_id;
     bool connected;
+    /*
+     * The exact output this generator committed to during this tick's
+     * preflight allocation. Transient (rebuilt every tick, never
+     * snapshotted): factory_power_consume_generation consumes precisely
+     * this amount from this generator rather than re-deriving an amount
+     * independently.
+     */
+    FactoryPowerUnits committed_output;
 } FactoryPowerGeneratorInspection;
 
 typedef struct {

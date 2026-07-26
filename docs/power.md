@@ -1,8 +1,28 @@
 # Deterministic power networks
 
-Steam Turbines are ordinary generators in ascending stable entity-ID order.
-Their atomic 200-energy quantum is preflighted against consumer demand and
-accumulator charge capacity before matching steam can be committed.
+Generators are considered in ascending stable entity-ID order regardless of
+type; there is no global rule preferring atomic generators (Steam Turbines)
+over continuous ones (basic generators, Steam Engines, solar) or vice versa.
+For each consumer, in that same ascending order, a continuous generator may
+contribute any bounded amount up to what remains of its availability, while
+an atomic generator not yet fired contributes only its complete output
+quantum. If a later atomic generator's quantum alone would cover the
+consumer's complete demand, any partial continuous amount tentatively drawn
+ahead of it is discarded first: a lower-ID continuous generator's partial
+contribution never strands a self-sufficient atomic generator behind it, and
+is never spent once a self-sufficient atomic generator is found. A plan
+commits only once a consumer's complete demand is met; accumulator charging
+is attributed to specific generators' leftover capacity the same way,
+ascending generator ID, after consumer allocation.
+
+A complete atomic cycle may fire when only part of its output ends up
+committed to consumers and accumulator charging combined. The full input
+resource for that cycle is always consumed in full the moment any part of it
+is needed, and any output beyond what was committed to a consumer or an
+accumulator is recorded as unused generation. Generation consumption
+executes this exact per-generator plan -- a continuous generator produces
+exactly its committed output, and a generator that fired produces its
+complete quantum -- never re-deriving an amount from a network total.
 
 Power uses integer units and Factorio-style pole coverage. A pole covers
 machines within Chebyshev distance 3 and connects automatically to every pole

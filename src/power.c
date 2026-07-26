@@ -218,6 +218,78 @@ static FactoryPowerNetworkInspection *network_for(
     return NULL;
 }
 
+/*
+ * The indivisible output unit a generator must produce in, rather than a
+ * bounded/divisible amount up to its availability. Zero means the generator
+ * is continuous (any amount up to its availability is usable). This is the
+ * single reusable touchpoint atomic generators register through; adding a
+ * future atomic generator type means teaching only this function (and its
+ * own consume function) about it, not the allocation algorithm itself.
+ */
+static FactoryPowerUnits generator_quantum(
+    const FactorySimulation *simulation, FactoryEntityId entity_id
+)
+{
+    const FactorySteamTurbine *turbine = factory_steam_turbine_store_find(
+        &simulation->steam_turbines, entity_id);
+    const FactorySteamTurbineDefinition *definition;
+    if (turbine == NULL) return 0U;
+    definition = factory_steam_turbine_definition_get(turbine->definition_id);
+    return definition == NULL ? 0U : definition->energy_per_cycle;
+}
+
+/*
+ * See power_internal.h for the contract. This is the sole place the
+ * ascending-ID-with-replacement rule is implemented; factory_power_rebuild
+ * calls it once per consumer and nothing else re-derives an allocation.
+ */
+bool factory_power_allocate_consumer(
+    FactoryPowerGeneratorInspection *generators,
+    const FactoryPowerUnits *available,
+    const FactoryPowerUnits *quantum,
+    bool *unlocked,
+    size_t generator_count,
+    FactoryPowerNetworkId network_id,
+    FactoryPowerUnits demand,
+    FactoryPowerUnits *committed_delta
+)
+{
+    FactoryPowerUnits need = demand;
+    size_t j;
+    for (j = 0U; j < generator_count; ++j) committed_delta[j] = 0U;
+    for (j = 0U; j < generator_count && need != 0U; ++j) {
+        FactoryPowerGeneratorInspection *g = &generators[j];
+        FactoryPowerUnits amount;
+        if (g->network_id != network_id) continue;
+        if (quantum[j] != 0U && !unlocked[j]) {
+            if (available[j] == 0U) continue;
+            if (available[j] >= demand) {
+                size_t discard;
+                for (discard = 0U; discard < generator_count; ++discard)
+                    committed_delta[discard] = 0U;
+                committed_delta[j] = demand;
+                need = 0U;
+                break;
+            }
+            committed_delta[j] = available[j] < need ? available[j] : need;
+            need -= committed_delta[j];
+            continue;
+        }
+        amount = available[j] - g->committed_output;
+        if (amount == 0U) continue;
+        if (amount > need) amount = need;
+        committed_delta[j] = amount;
+        need -= amount;
+    }
+    if (need != 0U) return false;
+    for (j = 0U; j < generator_count; ++j) {
+        if (committed_delta[j] == 0U) continue;
+        generators[j].committed_output += committed_delta[j];
+        if (quantum[j] != 0U) unlocked[j] = true;
+    }
+    return true;
+}
+
 FactoryPowerUnits factory_power_source_available_generation(
     const FactorySimulation *simulation, FactoryEntityId entity_id
 )
@@ -248,66 +320,50 @@ FactoryPowerUnits factory_power_source_available_generation(
             : generator->generation_capacity;
 }
 
+/*
+ * Execute the exact per-generator plan factory_power_rebuild committed --
+ * no network aggregate, no threshold walk, no re-derivation. A continuous
+ * generator with committed_output > 0 produces exactly that amount. An
+ * atomic generator with committed_output > 0 fires its one complete,
+ * fixed-size cycle regardless of how much of that cycle consumers and
+ * accumulator charging actually claimed between them; the difference
+ * between the fired quantum and committed_output is exactly what
+ * factory_power_rebuild already recorded as unused_generation.
+ */
 void factory_power_consume_generation(FactorySimulation *simulation)
 {
-    size_t network_index;
+    size_t generator_index;
     if (simulation == NULL) return;
-    for (network_index = 0U;
-        network_index < simulation->power.network_count;
-        ++network_index) {
-        FactoryPowerTotal remaining =
-            simulation->power.networks[network_index].allocated_power
-            - simulation->power.networks[network_index].accumulator_discharge
-            + simulation->power.networks[network_index].accumulator_charge;
-        size_t generator_index;
-        for (generator_index = 0U;
-            generator_index < simulation->power.generator_count
-                && remaining != 0U;
-            ++generator_index) {
-            const FactoryPowerGeneratorInspection *inspection =
-                &simulation->power.generators[generator_index];
-            FactoryEnergy amount;
-            FactoryPowerUnits available;
-            if (inspection->network_id
-                != simulation->power.networks[network_index].network_id)
-                continue;
-            available = factory_power_source_available_generation(
-                simulation, inspection->entity_id);
-            if (available == 0U) continue;
-            amount = remaining > available ? available : remaining;
-            if (factory_steam_turbine_store_find(
-                    &simulation->steam_turbines,
-                    inspection->entity_id)!=NULL) {
-                const FactorySteamTurbineDefinition *definition=
-                    factory_steam_turbine_definition_get(
-                        FACTORY_STEAM_TURBINE_DEFINITION_BASIC);
-                amount=(amount/definition->energy_per_cycle)
-                    *definition->energy_per_cycle;
-                if (amount!=0U&&factory_steam_turbine_consume_for_generation(
-                        simulation,inspection->entity_id,
-                        (FactoryPowerUnits)amount))
-                    remaining-=amount;
-            } else if (factory_steam_engine_store_find(
-                    &simulation->steam_engines,
-                    inspection->entity_id) != NULL) {
-                if (factory_steam_engine_consume_for_generation(
-                        simulation, inspection->entity_id,
-                        (FactoryPowerUnits)amount))
-                    remaining -= amount;
-            } else if (factory_solar_generator_store_find(
-                    &simulation->solar_generators,
-                    inspection->entity_id) != NULL) {
-                if (factory_solar_generator_record_generation(
-                        simulation, inspection->entity_id,
-                        (FactoryPowerUnits)amount))
-                    remaining -= amount;
-            } else {
-                FactoryBurner *burner =
-                    factory_burner_store_find_mutable(
-                        &simulation->burners, inspection->entity_id);
-                if (factory_burner_consume_energy(burner, amount))
-                    remaining -= amount;
-            }
+    for (generator_index = 0U;
+        generator_index < simulation->power.generator_count;
+        ++generator_index) {
+        FactoryPowerGeneratorInspection *inspection =
+            &simulation->power.generators[generator_index];
+        FactoryPowerUnits quantum;
+        if (inspection->committed_output == 0U) continue;
+        quantum = generator_quantum(simulation, inspection->entity_id);
+        if (quantum != 0U) {
+            (void)factory_steam_turbine_consume_for_generation(
+                simulation, inspection->entity_id, quantum);
+            continue;
+        }
+        if (factory_steam_engine_store_find(
+                &simulation->steam_engines,
+                inspection->entity_id) != NULL) {
+            (void)factory_steam_engine_consume_for_generation(
+                simulation, inspection->entity_id,
+                inspection->committed_output);
+        } else if (factory_solar_generator_store_find(
+                &simulation->solar_generators,
+                inspection->entity_id) != NULL) {
+            (void)factory_solar_generator_record_generation(
+                simulation, inspection->entity_id,
+                inspection->committed_output);
+        } else {
+            FactoryBurner *burner = factory_burner_store_find_mutable(
+                &simulation->burners, inspection->entity_id);
+            (void)factory_burner_consume_energy(
+                burner, inspection->committed_output);
         }
     }
 }
@@ -322,6 +378,17 @@ FactoryResult factory_power_rebuild(
     size_t consumers = simulation->extractors.count
         + simulation->refineries.count + simulation->assemblers.count
         + simulation->inserters.count;
+    /*
+     * Per-generator plan, alive for the whole rebuild: consumer allocation
+     * and accumulator-charge attribution both write into
+     * next.generators[*].committed_output, so factory_power_consume_
+     * generation later has one authoritative number per generator instead
+     * of re-deriving anything from a network aggregate.
+     */
+    FactoryPowerUnits *available = NULL;
+    FactoryPowerUnits *quantum = NULL;
+    bool *unlocked = NULL;
+    FactoryPowerUnits *committed_delta = NULL;
 
     next.pole_count = simulation->power_poles.count;
     next.generator_count = simulation->power_generators.count;
@@ -431,7 +498,7 @@ FactoryResult factory_power_rebuild(
         const FactoryPowerGenerator *g = &simulation->power_generators.items[i];
         next.generators[i] = (FactoryPowerGeneratorInspection){
             g->entity_id, g->x, g->y, g->generation_capacity,
-            0U, FACTORY_POWER_NETWORK_NONE, false
+            0U, FACTORY_POWER_NETWORK_NONE, false, 0U
         };
     }
     for (i = 0U; i < next.accumulator_count; ++i) {
@@ -461,26 +528,48 @@ FactoryResult factory_power_rebuild(
             sizeof(*next.generators), compare_generators
         );
     }
+    if (next.generator_count != 0U
+        && ((available = calloc(next.generator_count, sizeof(*available)))
+                == NULL
+            || (quantum = calloc(next.generator_count, sizeof(*quantum)))
+                == NULL
+            || (unlocked = calloc(next.generator_count, sizeof(*unlocked)))
+                == NULL
+            || (committed_delta = calloc(
+                    next.generator_count, sizeof(*committed_delta)))
+                == NULL)) {
+        free(available); free(quantum); free(unlocked);
+        free(committed_delta);
+        factory_power_state_destroy(&next);
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    }
     for (i = 0U; i < next.generator_count; ++i) {
         FactoryPowerGeneratorInspection *g = &next.generators[i];
         FactoryPowerNetworkInspection *network;
-        FactoryPowerUnits available;
         g->attached_pole_id = attachment(&next, g->x, g->y);
         g->network_id = pole_network(&next, g->attached_pole_id);
         g->connected = g->attached_pole_id != 0U;
+        available[i] = factory_power_source_available_generation(
+            simulation, g->entity_id);
+        quantum[i] = generator_quantum(simulation, g->entity_id);
         network = network_for(&next, g->network_id);
-        if (network != NULL) {
-            available = factory_power_source_available_generation(
-                simulation, g->entity_id
-            );
-            if (network->total_generation
-                > UINT64_MAX - available) {
-                factory_power_state_destroy(&next);
-                return FACTORY_RESULT_POWER_OVERFLOW;
-            }
-            network->total_generation += available;
-            ++network->generator_count;
+        if (network == NULL) continue;
+        ++network->generator_count;
+        /*
+         * Continuous capacity counts toward total_generation up front: it
+         * is available regardless of whether anything ends up using it. An
+         * atomic generator's capacity is conditional on actually firing, so
+         * it is added back in only for the generators the allocation below
+         * commits to.
+         */
+        if (quantum[i] != 0U) continue;
+        if (network->total_generation > UINT64_MAX - available[i]) {
+            free(available); free(quantum); free(unlocked);
+            free(committed_delta);
+            factory_power_state_destroy(&next);
+            return FACTORY_RESULT_POWER_OVERFLOW;
         }
+        network->total_generation += available[i];
     }
     i = 0U;
     for (j = 0U; j < simulation->extractors.count; ++j)
@@ -515,71 +604,50 @@ FactoryResult factory_power_rebuild(
         c->network_id = pole_network(&next, c->attached_pole_id);
         c->connected = c->attached_pole_id != 0U;
         network = network_for(&next, c->network_id);
-        if (network != NULL) {
-            if (network->total_demand > UINT64_MAX - c->demand) {
-                factory_power_state_destroy(&next);
-                return FACTORY_RESULT_POWER_OVERFLOW;
-            }
-            network->total_demand += c->demand;
-            ++network->consumer_count;
+        if (network == NULL) continue;
+        if (network->total_demand > UINT64_MAX - c->demand) {
+            free(available); free(quantum); free(unlocked);
+            free(committed_delta);
+            factory_power_state_destroy(&next);
+            return FACTORY_RESULT_POWER_OVERFLOW;
         }
+        network->total_demand += c->demand;
+        ++network->consumer_count;
     }
     /*
-     * Atomic-cycle generators may contribute only when the network can use a
-     * complete output quantum. Conservative preflight avoids crediting a
-     * consumer or accumulator with power whose steam commit would be partial.
-     * Non-turbine sources are counted first; this can defer otherwise usable
-     * turbine capacity, but never over-allocates or consumes steam.
+     * Ascending entity ID remains the default priority across every
+     * generator, continuous or atomic alike -- there is no global
+     * atomic-before-continuous rule; see factory_power_allocate_consumer
+     * for the per-consumer construction/replacement rule. Consumers
+     * themselves are processed in that same ascending order, and each
+     * one's plan commits only once it reaches its complete demand.
      */
-    for (i=0U;i<next.network_count;++i) {
-        FactoryPowerNetworkInspection *network=&next.networks[i];
-        FactoryPowerTotal ordinary=0U;
-        FactoryPowerTotal turbine=0U;
-        FactoryPowerTotal absorbable=network->total_demand;
-        bool has_turbine=false;
-        for (j=0U;j<next.accumulator_count;++j) {
-            FactoryPowerAccumulatorInspection *inspection=&next.accumulators[j];
-            const FactoryAccumulator *a;
-            FactoryElectricalEnergy capacity;
-            if (inspection->network_id!=network->network_id) continue;
-            a=factory_accumulator_store_find(
-                &simulation->accumulators,inspection->entity_id);
-            if (a==NULL) continue;
-            capacity=FACTORY_ACCUMULATOR_CAPACITY-a->stored_energy;
-            absorbable+=capacity<FACTORY_ACCUMULATOR_MAX_CHARGE_RATE
-                ?capacity:FACTORY_ACCUMULATOR_MAX_CHARGE_RATE;
-        }
-        for (j=0U;j<next.generator_count;++j) {
-            FactoryPowerGeneratorInspection *g=&next.generators[j];
-            FactoryPowerUnits available;
-            if (g->network_id!=network->network_id) continue;
-            available=factory_power_source_available_generation(
-                simulation,g->entity_id);
-            if (factory_steam_turbine_store_find(
-                    &simulation->steam_turbines,g->entity_id)!=NULL) {
-                turbine+=available;
-                has_turbine=true;
-            } else ordinary+=available;
-        }
-        if (!has_turbine) continue;
-        if (ordinary>absorbable) ordinary=absorbable;
-        absorbable-=ordinary;
-        turbine=(turbine<absorbable?turbine:absorbable)
-            /FACTORY_STEAM_TURBINE_MAX_OUTPUT
-            *FACTORY_STEAM_TURBINE_MAX_OUTPUT;
-        network->total_generation=ordinary+turbine;
-    }
     for (i = 0U; i < consumers; ++i) {
         FactoryPowerConsumerInspection *c = &next.consumers[i];
         FactoryPowerNetworkInspection *network =
             network_for(&next, c->network_id);
-        if (network != NULL
-            && c->demand
-                <= network->total_generation - network->allocated_power) {
-            c->powered = true;
-            network->allocated_power += c->demand;
-            ++network->powered_consumer_count;
+        if (network == NULL) continue;
+        if (!factory_power_allocate_consumer(
+                next.generators, available, quantum, unlocked,
+                next.generator_count, c->network_id, c->demand,
+                committed_delta))
+            continue;
+        c->powered = true;
+        network->allocated_power += c->demand;
+        ++network->powered_consumer_count;
+    }
+    for (i = 0U; i < next.generator_count; ++i) {
+        FactoryPowerNetworkInspection *network;
+        if (quantum[i] == 0U || !unlocked[i]) continue;
+        network = network_for(&next, next.generators[i].network_id);
+        if (network == NULL) continue;
+        if (network->total_generation > UINT64_MAX - available[i]) {
+            free(available); free(quantum); free(unlocked);
+            free(committed_delta);
+            factory_power_state_destroy(&next);
+            return FACTORY_RESULT_POWER_OVERFLOW;
         }
+        network->total_generation += available[i];
     }
     if (emit_transitions) for (i = 0U; i < consumers; ++i) {
         FactoryPowerConsumerInspection *c = &next.consumers[i];
@@ -635,35 +703,71 @@ FactoryResult factory_power_rebuild(
         if (network != NULL && !c->powered)
             ++network->unpowered_consumer_count;
     }
-    for (i = 0U; i < next.network_count; ++i) {
+    /*
+     * Accumulator charging is attributed to specific generators, not drawn
+     * from a network aggregate: for each accumulator (ascending ID), walk
+     * generators in the same ascending order used everywhere else and add
+     * the charge directly to their committed_output, exactly like a
+     * consumer's delivery. This never fires an atomic generator solely to
+     * charge a battery -- only a generator already producing (continuous,
+     * or an atomic generator a consumer already triggered this tick) is a
+     * source -- so charging never changes the fire/no-fire decision, only
+     * how much of what is already being produced gets claimed.
+     */
+    if (emit_transitions) for (i = 0U; i < next.network_count; ++i) {
         FactoryPowerNetworkInspection *network = &next.networks[i];
-        FactoryPowerTotal ordinary_delivered =
-            network->allocated_power - network->accumulator_discharge;
-        FactoryPowerTotal remaining =
-            network->total_generation - ordinary_delivered;
-        if (emit_transitions) for (
-            j = 0U; j < next.accumulator_count && remaining != 0U; ++j
-        ) {
+        for (j = 0U; j < next.accumulator_count; ++j) {
             FactoryPowerAccumulatorInspection *inspection =
                 &next.accumulators[j];
             FactoryAccumulator *a;
             FactoryElectricalEnergy capacity;
-            FactoryPowerUnits amount;
+            FactoryPowerUnits target;
+            FactoryPowerUnits need;
+            size_t k;
             if (inspection->network_id != network->network_id) continue;
             a = factory_accumulator_store_find_mutable(
                 &simulation->accumulators, inspection->entity_id);
             if (a == NULL || a->discharged_last_tick != 0U) continue;
             capacity = FACTORY_ACCUMULATOR_CAPACITY - a->stored_energy;
-            amount = FACTORY_ACCUMULATOR_MAX_CHARGE_RATE;
-            if (capacity < amount) amount = (FactoryPowerUnits)capacity;
-            if (remaining < amount) amount = (FactoryPowerUnits)remaining;
-            a->stored_energy += amount;
-            a->charged_last_tick += amount;
-            remaining -= amount;
-            network->accumulator_charge += amount;
+            target = FACTORY_ACCUMULATOR_MAX_CHARGE_RATE;
+            if (capacity < target) target = (FactoryPowerUnits)capacity;
+            need = target;
+            for (k = 0U; k < next.generator_count && need != 0U; ++k) {
+                FactoryPowerGeneratorInspection *g = &next.generators[k];
+                FactoryPowerUnits leftover;
+                FactoryPowerUnits amount;
+                if (g->network_id != network->network_id) continue;
+                if (quantum[k] != 0U && !unlocked[k]) continue;
+                leftover = available[k] - g->committed_output;
+                if (leftover == 0U) continue;
+                amount = leftover < need ? leftover : need;
+                g->committed_output += amount;
+                need -= amount;
+            }
+            if (need == target) continue;
+            {
+                FactoryPowerUnits charged = target - need;
+                a->stored_energy += charged;
+                a->charged_last_tick += charged;
+                network->accumulator_charge += charged;
+            }
         }
-        network->unused_generation = remaining;
     }
+    for (i = 0U; i < next.network_count; ++i) {
+        FactoryPowerNetworkInspection *network = &next.networks[i];
+        FactoryPowerTotal committed_total = 0U;
+        for (j = 0U; j < next.generator_count; ++j) {
+            if (next.generators[j].network_id != network->network_id)
+                continue;
+            committed_total += next.generators[j].committed_output;
+        }
+        network->unused_generation =
+            network->total_generation - committed_total;
+    }
+    free(available);
+    free(quantum);
+    free(unlocked);
+    free(committed_delta);
     if (emit_transitions) {
         for (i = 0U; i < next.accumulator_count; ++i) {
             FactoryAccumulator *a = factory_accumulator_store_find_mutable(
