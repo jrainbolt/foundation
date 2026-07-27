@@ -201,10 +201,13 @@ static bool consumer_position(
         factory_assembler_store_find(&simulation->assemblers, id);
     const FactoryInserter *i =
         factory_inserter_store_find(&simulation->inserters, id);
+    const FactorySteamCondenser *sc =
+        factory_steam_condenser_store_find(&simulation->steam_condensers, id);
     if (e != NULL) { *out_x = e->x; *out_y = e->y; return true; }
     if (r != NULL) { *out_x = r->x; *out_y = r->y; return true; }
     if (a != NULL) { *out_x = a->x; *out_y = a->y; return true; }
     if (i != NULL) { *out_x = i->x; *out_y = i->y; return true; }
+    if (sc != NULL) { *out_x = sc->x; *out_y = sc->y; return true; }
     return false;
 }
 
@@ -377,7 +380,7 @@ FactoryResult factory_power_rebuild(
     size_t j;
     size_t consumers = simulation->extractors.count
         + simulation->refineries.count + simulation->assemblers.count
-        + simulation->inserters.count;
+        + simulation->inserters.count + simulation->steam_condensers.count;
     /*
      * Per-generator plan, alive for the whole rebuild: consumer allocation
      * and accumulator-charge attribution both write into
@@ -588,6 +591,10 @@ FactoryResult factory_power_rebuild(
         add_consumer(&next.consumers[i++],
             simulation->inserters.items[j].entity_id,
             FACTORY_POWER_DEMAND_INSERTER);
+    for (j = 0U; j < simulation->steam_condensers.count; ++j)
+        add_consumer(&next.consumers[i++],
+            simulation->steam_condensers.items[j].entity_id,
+            FACTORY_POWER_DEMAND_STEAM_CONDENSER);
     if (consumers > 1U) {
         qsort(
             next.consumers, consumers,

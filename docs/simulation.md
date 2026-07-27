@@ -3,6 +3,9 @@
 Steam Turbine availability follows the single fluid transport pass and
 precedes ordinary power allocation. Exact steam consumption follows committed
 allocation; reactors and Heat Exchangers run later, with no second transport.
+Steam Condensers run after power allocation and consumption too, alongside
+Heat Exchangers, so a Condenser's own powered state for that tick is already
+settled before its recipe is attempted.
 
 `factory_simulation_tick()` executes this fixed order:
 
@@ -14,7 +17,8 @@ allocation; reactors and Heat Exchangers run later, with no second transport.
 5. Reset accumulator activity, rebuild power, and consume ordinary generation
 6. Finish burner ticks
 7. Generate reactor heat once per core
-8. Withdraw network heat and atomically run heat exchangers
+8. Withdraw network heat, atomically run heat exchangers, and run one
+   deterministic steam condenser recipe cycle each
 9. Update extractor production and commit existing producer outputs
 10. Advance belts and commit belt transfers
 11. Update refinery and assembler processing

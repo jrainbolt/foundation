@@ -67,7 +67,7 @@ static void test_definitions_and_transactional_primitives(void)
     };
     FactoryFluidType moved = FACTORY_FLUID_NONE;
 
-    CHECK(factory_fluid_definition_count() == 2U);
+    CHECK(factory_fluid_definition_count() == 3U);
     water = factory_fluid_definition_at(0U);
     CHECK(water != NULL && factory_fluid_definition_is_valid(water));
     CHECK(water != NULL && water->fluid_type == FACTORY_FLUID_WATER);
@@ -76,7 +76,11 @@ static void test_definitions_and_transactional_primitives(void)
     CHECK(definition != NULL);
     CHECK(definition->fluid_type == FACTORY_FLUID_STEAM);
     CHECK(definition->fluid_class == FACTORY_FLUID_CLASS_VAPOR);
-    CHECK(factory_fluid_definition_at(2U) == NULL);
+    definition = factory_fluid_definition_at(2U);
+    CHECK(definition != NULL);
+    CHECK(definition->fluid_type == FACTORY_FLUID_EXHAUST_STEAM);
+    CHECK(definition->fluid_class == FACTORY_FLUID_CLASS_VAPOR);
+    CHECK(factory_fluid_definition_at(3U) == NULL);
     CHECK(factory_fluid_definition_get(FACTORY_FLUID_NONE) == NULL);
     CHECK(!factory_fluid_definition_is_valid(&invalid));
 

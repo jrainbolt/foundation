@@ -237,6 +237,73 @@ static int test_full_reactor_resume_and_multi_priority(void)
     return 0;
 }
 
+/* Demolition must not silently discard stored fluid: it is blocked while
+ * either the water input or the steam output holds anything, independently
+ * and together, and only succeeds once both are empty. */
+static int test_demolition_blocked_by_stored_fluid(void)
+{
+    FactorySimulation *s=make_simulation();
+    FactoryFluidStorage *water;
+    FactoryFluidStorage *steam;
+    CHECK(s!=NULL && build_line(s,false,false)==0);
+    water=factory_fluid_storage_store_find_slot_mutable(&s->fluid_storages,4U,
+        FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_INPUT);
+    steam=factory_fluid_storage_store_find_slot_mutable(&s->fluid_storages,4U,
+        FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_OUTPUT);
+    CHECK(water!=NULL && steam!=NULL);
+
+    /* Water input alone. */
+    CHECK(factory_fluid_storage_insert(water,FACTORY_FLUID_WATER,50U)
+        ==FACTORY_RESULT_OK);
+    CHECK(submit(s,(FactoryCommand){FACTORY_COMMAND_DEMOLISH_ENTITY,
+        {.demolish_entity={4U}}})==0);
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_command_result(s,0U)->result
+        ==FACTORY_RESULT_ENTITY_HAS_MATERIAL);
+    CHECK(water->quantity==50U);
+
+    /* Steam output alone (water drained first). */
+    CHECK(factory_fluid_storage_remove(water,50U,
+        &(FactoryFluidType){FACTORY_FLUID_NONE})==FACTORY_RESULT_OK);
+    CHECK(factory_fluid_storage_insert(steam,FACTORY_FLUID_STEAM,30U)
+        ==FACTORY_RESULT_OK);
+    CHECK(submit(s,(FactoryCommand){FACTORY_COMMAND_DEMOLISH_ENTITY,
+        {.demolish_entity={4U}}})==0);
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_command_result(s,0U)->result
+        ==FACTORY_RESULT_ENTITY_HAS_MATERIAL);
+    CHECK(steam->quantity==30U);
+
+    /* Both at once. */
+    CHECK(factory_fluid_storage_insert(water,FACTORY_FLUID_WATER,20U)
+        ==FACTORY_RESULT_OK);
+    CHECK(submit(s,(FactoryCommand){FACTORY_COMMAND_DEMOLISH_ENTITY,
+        {.demolish_entity={4U}}})==0);
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_command_result(s,0U)->result
+        ==FACTORY_RESULT_ENTITY_HAS_MATERIAL);
+    CHECK(water->quantity==20U && steam->quantity==30U);
+
+    /* Both empty: demolition succeeds and nothing was ever discarded --
+     * every unit removed above was via an explicit accounted removal, not
+     * demolition silently dropping it. */
+    CHECK(factory_fluid_storage_remove(water,20U,
+        &(FactoryFluidType){FACTORY_FLUID_NONE})==FACTORY_RESULT_OK);
+    CHECK(factory_fluid_storage_remove(steam,30U,
+        &(FactoryFluidType){FACTORY_FLUID_NONE})==FACTORY_RESULT_OK);
+    CHECK(submit(s,(FactoryCommand){FACTORY_COMMAND_DEMOLISH_ENTITY,
+        {.demolish_entity={4U}}})==0);
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_command_result(s,0U)->result
+        ==FACTORY_RESULT_OK);
+    CHECK(factory_fluid_storage_store_find_slot(&s->fluid_storages,4U,
+        FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_INPUT)==NULL);
+    CHECK(factory_fluid_storage_store_find_slot(&s->fluid_storages,4U,
+        FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_OUTPUT)==NULL);
+    destroy_borrowing(s);
+    return 0;
+}
+
 static int test_network_split_and_merge(void)
 {
     FactorySimulation *s=make_simulation();
@@ -278,6 +345,7 @@ int main(void)
     CHECK(test_atomic_blocks_and_resume()==0);
     CHECK(test_split_merge_and_snapshot_continuation()==0);
     CHECK(test_full_reactor_resume_and_multi_priority()==0);
+    CHECK(test_demolition_blocked_by_stored_fluid()==0);
     CHECK(test_network_split_and_merge()==0);
     puts("heat network tests passed");
     return 0;

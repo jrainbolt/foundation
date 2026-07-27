@@ -7,7 +7,7 @@
 namespace godot {
 namespace {
 
-constexpr uint32_t DEMO_WIDTH = 12U;
+constexpr uint32_t DEMO_WIDTH = 13U;
 constexpr uint32_t DEMO_HEIGHT = 8U;
 constexpr FactoryConstructionMaterial DEMO_CONSTRUCTION_UNITS = 1000U;
 constexpr int64_t MAX_STEP_MANY = 10000;
@@ -80,6 +80,9 @@ FactoryCommand place(
         break;
     case FACTORY_COMMAND_PLACE_STEAM_TURBINE:
         command.data.place_steam_turbine = {x, y};
+        break;
+    case FACTORY_COMMAND_PLACE_STEAM_CONDENSER:
+        command.data.place_steam_condenser = {x, y};
         break;
     default:
         break;
@@ -371,13 +374,17 @@ FactoryResult FoundationSimulation::build_demo()
     result = submit(place(FACTORY_COMMAND_PLACE_STEAM_ENGINE, 11, 6));
     if (result != FACTORY_RESULT_OK)
         return result;
-    result = submit(place(FACTORY_COMMAND_PLACE_SOLAR_GENERATOR, 11, 0));
+    /* The turbine's east tile (10, 0) is reserved for its exhaust pipe (see
+     * below), so the solar generator and accumulator that used to sit at
+     * (11, 0) and (10, 0) move to (12, 2) and (12, 1); both stay within
+     * this pole's radius-3 reach. */
+    result = submit(place(FACTORY_COMMAND_PLACE_SOLAR_GENERATOR, 12, 2));
     if (result != FACTORY_RESULT_OK)
         return result;
     result = submit(place(FACTORY_COMMAND_PLACE_POWER_POLE, 11, 1));
     if (result != FACTORY_RESULT_OK)
         return result;
-    result = submit(place(FACTORY_COMMAND_PLACE_ACCUMULATOR, 10, 0));
+    result = submit(place(FACTORY_COMMAND_PLACE_ACCUMULATOR, 12, 1));
     if (result != FACTORY_RESULT_OK)
         return result;
     result = submit(place(
@@ -409,6 +416,16 @@ FactoryResult FoundationSimulation::build_demo()
     result = submit(place(FACTORY_COMMAND_PLACE_PIPE, 8, 0));
     if (result != FACTORY_RESULT_OK) return result;
     result = submit(place(FACTORY_COMMAND_PLACE_STEAM_TURBINE, 9, 0));
+    if (result != FACTORY_RESULT_OK) return result;
+    /* Closes the real thermal loop: the turbine's east port carries its own
+     * exhaust steam (never live steam), one pipe tile bridges it directly
+     * to the Steam Condenser's west input port, and the condenser recovers
+     * that exhaust into water in its own storage. The condenser does not
+     * tap the boiler/heat-exchanger side of the network at all, so it never
+     * competes with the turbine for fresh steam. */
+    result = submit(place(FACTORY_COMMAND_PLACE_PIPE, 10, 0));
+    if (result != FACTORY_RESULT_OK) return result;
+    result = submit(place(FACTORY_COMMAND_PLACE_STEAM_CONDENSER, 11, 0));
     if (result != FACTORY_RESULT_OK) return result;
     result = factory_simulation_submit_fluid_insert(
         simulation_, 44U, FACTORY_FLUID_WATER, 200U);
@@ -884,12 +901,22 @@ bool FoundationSimulation::entity_to_dictionary(
             (int64_t)entity.data.steam_turbine.stored_steam;
         value["steam_capacity"] =
             (int64_t)entity.data.steam_turbine.steam_capacity;
+        value["exhaust_fluid"] =
+            (int64_t)entity.data.steam_turbine.exhaust_fluid;
+        value["stored_exhaust"] =
+            (int64_t)entity.data.steam_turbine.stored_exhaust;
+        value["exhaust_capacity"] =
+            (int64_t)entity.data.steam_turbine.exhaust_capacity;
         value["fluid_network_id"] =
             (int64_t)entity.data.steam_turbine.fluid_network_id;
+        value["exhaust_network_id"] =
+            (int64_t)entity.data.steam_turbine.exhaust_network_id;
         value["power_network_id"] =
             (int64_t)entity.data.steam_turbine.power_network_id;
         value["fluid_connected"] =
             entity.data.steam_turbine.fluid_connected;
+        value["exhaust_connected"] =
+            entity.data.steam_turbine.exhaust_connected;
         value["power_connected"] =
             entity.data.steam_turbine.power_connected;
         value["turbine_definition_id"] =
@@ -902,10 +929,46 @@ bool FoundationSimulation::entity_to_dictionary(
             (int64_t)entity.data.steam_turbine.actual_output;
         value["steam_consumed_last_tick"] =
             (int64_t)entity.data.steam_turbine.steam_consumed_last_tick;
+        value["exhaust_produced_last_tick"] =
+            (int64_t)entity.data.steam_turbine.exhaust_produced_last_tick;
         value["completed_cycles_last_tick"] =
             (int64_t)entity.data.steam_turbine.completed_cycles_last_tick;
         value["turbine_activity"] =
             (int64_t)entity.data.steam_turbine.activity;
+        break;
+    case FACTORY_ENTITY_TYPE_STEAM_CONDENSER:
+        value["condenser_definition_id"] =
+            (int64_t)entity.data.steam_condenser.definition_id;
+        value["steam_fluid"] =
+            (int64_t)entity.data.steam_condenser.steam_fluid;
+        value["stored_steam"] =
+            (int64_t)entity.data.steam_condenser.stored_steam;
+        value["steam_capacity"] =
+            (int64_t)entity.data.steam_condenser.steam_capacity;
+        value["water_fluid"] =
+            (int64_t)entity.data.steam_condenser.water_fluid;
+        value["stored_water"] =
+            (int64_t)entity.data.steam_condenser.stored_water;
+        value["water_capacity"] =
+            (int64_t)entity.data.steam_condenser.water_capacity;
+        value["steam_network_id"] =
+            (int64_t)entity.data.steam_condenser.steam_network_id;
+        value["water_network_id"] =
+            (int64_t)entity.data.steam_condenser.water_network_id;
+        value["power_network_id"] =
+            (int64_t)entity.data.steam_condenser.power_network_id;
+        value["fluid_connected"] =
+            entity.data.steam_condenser.fluid_connected;
+        value["power_per_cycle"] =
+            (int64_t)entity.data.steam_condenser.power_per_cycle;
+        value["steam_consumed_last_tick"] =
+            (int64_t)entity.data.steam_condenser.steam_consumed_last_tick;
+        value["water_produced_last_tick"] =
+            (int64_t)entity.data.steam_condenser.water_produced_last_tick;
+        value["completed_cycles_last_tick"] =
+            (int64_t)entity.data.steam_condenser.completed_cycles_last_tick;
+        value["condenser_activity"] =
+            (int64_t)entity.data.steam_condenser.activity;
         break;
     default:
         break;

@@ -16,6 +16,7 @@ const COLORS := {
 	18: Color("#e879f9"),
 	19: Color("#67e8f9"),
 	20: Color("#38bdf8"),
+	21: Color("#0ea5e9"),
 }
 const NAMES := {
 	1: "EX", 2: "BELT", 3: "REF", 4: "ASM", 5: "BOX",
@@ -29,6 +30,7 @@ const NAMES := {
 	18: "HEAT",
 	19: "HEX",
 	20: "TURB",
+	21: "COND",
 }
 
 var state: Dictionary = {}
@@ -41,7 +43,7 @@ func apply(next_state: Dictionary) -> void:
 func _draw() -> void:
 	var entity_type: int = int(state.get("type", 0))
 	var color: Color = COLORS.get(entity_type, Color.GRAY)
-	if not bool(state.get("powered", true)) and entity_type in [1, 3, 4, 7]:
+	if not bool(state.get("powered", true)) and entity_type in [1, 3, 4, 7, 21]:
 		color = color.darkened(0.55)
 	draw_rect(Rect2(4, 4, 56, 56), color, true)
 	draw_rect(Rect2(4, 4, 56, 56), Color("#1d2430"), false, 2.0)
@@ -174,9 +176,20 @@ func _draw() -> void:
 	if entity_type == 20:
 		draw_string(
 			ThemeDB.fallback_font, Vector2(7, 39),
-			"S%d G%d C%d" % [
+			"S%d E%d G%d C%d" % [
 				int(state.get("stored_steam", 0)),
+				int(state.get("stored_exhaust", 0)),
 				int(state.get("generated_last_tick", 0)),
+				int(state.get("completed_cycles_last_tick", 0))
+			],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 8
+		)
+	if entity_type == 21:
+		draw_string(
+			ThemeDB.fallback_font, Vector2(7, 39),
+			"S%d W%d C%d" % [
+				int(state.get("stored_steam", 0)),
+				int(state.get("stored_water", 0)),
 				int(state.get("completed_cycles_last_tick", 0))
 			],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 8

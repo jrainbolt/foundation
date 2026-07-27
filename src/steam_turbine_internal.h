@@ -10,6 +10,7 @@ typedef struct {
     FactorySteamTurbineDefinitionId definition_id;
     FactoryPowerUnits actual_output;
     FactoryFluidQuantity steam_consumed_last_tick;
+    FactoryFluidQuantity exhaust_produced_last_tick;
     uint32_t completed_cycles_last_tick;
     FactorySteamTurbineActivity activity;
 } FactorySteamTurbine;

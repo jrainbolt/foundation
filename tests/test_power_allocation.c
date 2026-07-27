@@ -467,16 +467,36 @@ static void test_4_atomic_partial_use(void)
 
     CHECK(factory_simulation_get_power_generator(s, 2U, &generator)
         == FACTORY_RESULT_OK);
+    /* committed_output (what the network's own bookkeeping attributes to
+     * this generator as claimed) is deliberately NOT the same number as
+     * actual_output (the full physical output of the one fired, complete,
+     * indivisible cycle) -- this is the atomic-generator accounting this
+     * test exists to pin down. */
     CHECK(generator.committed_output == 100U);
     CHECK(factory_simulation_get_steam_turbine(s, 2U, &turbine)
         == FACTORY_RESULT_OK);
     CHECK(turbine.actual_output == 200U);
     CHECK(turbine.steam_consumed_last_tick == 100U);
+    CHECK(turbine.exhaust_produced_last_tick == 100U);
     CHECK(turbine.completed_cycles_last_tick == 1U);
     CHECK(factory_simulation_get_power_network(s, 0U, &network)
         == FACTORY_RESULT_OK);
+    /* Four 25-demand assemblers stand in for "one 100-unit consumer": no
+     * single built-in consumer type demands exactly 100, so the aggregate
+     * (all four fully powered, summing to exactly 100) is the equivalent
+     * scenario. allocated_power is that aggregate; each consumer's own
+     * demand/powered is also checked individually below. */
+    CHECK(network.total_demand == 100U);
+    CHECK(network.total_generation == 200U);
     CHECK(network.allocated_power == 100U);
     CHECK(network.unused_generation == 100U);
+    for (i = 0U; i < 4U; ++i) {
+        FactoryPowerConsumerInspection consumer;
+        CHECK(factory_simulation_get_power_consumer(
+                s, (FactoryEntityId)(3U + i), &consumer)
+            == FACTORY_RESULT_OK);
+        CHECK(consumer.demand == 25U && consumer.powered);
+    }
 
     factory_simulation_destroy(s);
     factory_world_destroy(world);
@@ -521,19 +541,32 @@ static void test_5_atomic_partial_use_plus_accumulator(void)
 
     CHECK(factory_simulation_get_power_generator(s, 2U, &generator)
         == FACTORY_RESULT_OK);
+    /* committed_output now includes both the consumers' 100 and the
+     * accumulator's 50 -- still short of actual_output (200), the
+     * remaining 50 of the fired cycle's physical output going unused. */
     CHECK(generator.committed_output == 150U);
     CHECK(factory_simulation_get_steam_turbine(s, 2U, &turbine)
         == FACTORY_RESULT_OK);
     CHECK(turbine.actual_output == 200U);
     CHECK(turbine.steam_consumed_last_tick == 100U);
+    CHECK(turbine.exhaust_produced_last_tick == 100U);
     CHECK(factory_simulation_get_accumulator(s, 3U, &accumulator)
         == FACTORY_RESULT_OK);
     CHECK(accumulator.stored_energy == FACTORY_ACCUMULATOR_CAPACITY);
     CHECK(factory_simulation_get_power_network(s, 0U, &network)
         == FACTORY_RESULT_OK);
+    CHECK(network.total_demand == 100U);
+    CHECK(network.total_generation == 200U);
     CHECK(network.allocated_power == 100U);
     CHECK(network.accumulator_charge == 50U);
     CHECK(network.unused_generation == 50U);
+    for (i = 0U; i < 4U; ++i) {
+        FactoryPowerConsumerInspection consumer;
+        CHECK(factory_simulation_get_power_consumer(
+                s, (FactoryEntityId)(4U + i), &consumer)
+            == FACTORY_RESULT_OK);
+        CHECK(consumer.demand == 25U && consumer.powered);
+    }
 
     factory_simulation_destroy(s);
     factory_world_destroy(world);

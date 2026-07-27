@@ -23,17 +23,21 @@ typedef enum {
     FACTORY_STEAM_TURBINE_DISCONNECTED_POWER,
     FACTORY_STEAM_TURBINE_BLOCKED_NO_STEAM,
     FACTORY_STEAM_TURBINE_BLOCKED_INSUFFICIENT_STEAM,
-    FACTORY_STEAM_TURBINE_BLOCKED_NO_DEMAND
+    FACTORY_STEAM_TURBINE_BLOCKED_NO_DEMAND,
+    FACTORY_STEAM_TURBINE_BLOCKED_EXHAUST_FULL
 } FactorySteamTurbineActivity;
 
 typedef struct {
     FactorySteamTurbineDefinitionId definition_id;
     FactoryFluidType input_fluid;
+    FactoryFluidType exhaust_fluid;
     FactoryFluidQuantity steam_per_cycle;
+    FactoryFluidQuantity exhaust_per_cycle;
     FactoryPowerUnits energy_per_cycle;
     uint32_t maximum_cycles_per_tick;
     FactoryPowerUnits maximum_output_per_tick;
     FactoryFluidQuantity storage_capacity;
+    FactoryFluidQuantity exhaust_capacity;
     uint32_t construction_cost;
 } FactorySteamTurbineDefinition;
 
@@ -43,16 +47,23 @@ typedef struct {
     FactoryFluidType steam_fluid;
     FactoryFluidQuantity stored_steam;
     FactoryFluidQuantity steam_capacity;
+    FactoryFluidType exhaust_fluid;
+    FactoryFluidQuantity stored_exhaust;
+    FactoryFluidQuantity exhaust_capacity;
     FactoryFluidNetworkId fluid_network_id;
+    FactoryFluidNetworkId exhaust_network_id;
     FactoryPowerNetworkId power_network_id;
     bool fluid_connected;
+    bool exhaust_connected;
     bool power_connected;
     FactoryFluidQuantity steam_per_cycle;
+    FactoryFluidQuantity exhaust_per_cycle;
     FactoryPowerUnits energy_per_cycle;
     FactoryPowerUnits maximum_output_per_tick;
     FactoryPowerUnits available_output;
     FactoryPowerUnits actual_output;
     FactoryFluidQuantity steam_consumed_last_tick;
+    FactoryFluidQuantity exhaust_produced_last_tick;
     uint32_t completed_cycles_last_tick;
     FactorySteamTurbineActivity activity;
 } FactorySteamTurbineInspection;

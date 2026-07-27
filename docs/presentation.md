@@ -2,7 +2,12 @@
 
 Steam Turbine records expose steam, fluid/power network IDs and connections,
 definition ID, maximum/available/actual output, consumed steam, completed
-cycles, and activity. Presentation never calculates conversion or allocation.
+cycles, and activity. Steam Condenser records expose the same shape mirrored
+for a consumer instead of a generator: steam and water quantities/capacities,
+fluid/power network IDs, fluid connection state, definition ID, power demand
+per cycle, consumed steam, produced water, completed cycles, and activity;
+its powered flag uses the same top-level field as every other power consumer.
+Presentation never calculates conversion or allocation.
 
 A presentation snapshot is an externally owned, transient copy of the current
 visible simulation state. It answers “what exists now,” while the simulation
@@ -58,7 +63,11 @@ derived idle/generating/heat-full activity, and derived heat-network
 connectivity. Heat-conductor presentation contains its connection mask,
 network ID, and connectivity. Heat-exchanger presentation contains heat and
 fluid network IDs, water/steam quantities and capacities, latest committed
-conversion quantities, and activity.
+conversion quantities, and activity. Steam-condenser presentation contains
+definition ID, steam/water quantities and capacities, steam and water network
+IDs, power network ID, fluid connection state, power demand per cycle, latest
+committed steam-consumed/water-produced quantities, completed cycles, and
+activity.
 Progress is always a tick numerator and duration denominator; no percentage
 or interpolation value is calculated.
 
@@ -96,7 +105,7 @@ Presentation rebuild does not clear or copy events. Event clearing does not
 alter an existing presentation snapshot. If a tick or rebuild fails, a caller
 may continue displaying its previous presentation snapshot.
 
-Presentation data is excluded from canonical version 12 simulation snapshots.
+Presentation data is excluded from canonical version 14 simulation snapshots.
 After simulation load, callers rebuild a new presentation snapshot. Equivalent
 authoritative simulations produce field-wise equivalent presentation records.
 

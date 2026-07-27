@@ -106,6 +106,7 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     factory_boiler_store_destroy(&simulation->boilers);
     factory_steam_engine_store_destroy(&simulation->steam_engines);
     factory_steam_turbine_store_destroy(&simulation->steam_turbines);
+    factory_steam_condenser_store_destroy(&simulation->steam_condensers);
     factory_solar_generator_store_destroy(&simulation->solar_generators);
     factory_accumulator_store_destroy(&simulation->accumulators);
     factory_reactor_store_destroy(&simulation->reactors);
@@ -523,8 +524,8 @@ static FactoryResult place_steam_turbine(
     if (result!=FACTORY_RESULT_OK) return result;
     if (!factory_steam_turbine_store_reserve_one(&s->steam_turbines)
         || !factory_power_generator_store_reserve_one(&s->power_generators)
-        || !factory_fluid_storage_store_reserve_one(&s->fluid_storages)
-        || !factory_fluid_port_store_reserve_one(&s->fluid_ports))
+        || !reserve_two_fluid_storages(&s->fluid_storages)
+        || !reserve_two_fluid_ports(&s->fluid_ports))
         return FACTORY_RESULT_OUT_OF_MEMORY;
     result=occupy_with_entity(s,x,y,out_id);
     if (result!=FACTORY_RESULT_OK) return result;
@@ -535,9 +536,46 @@ static FactoryResult place_steam_turbine(
     factory_fluid_storage_store_add(&s->fluid_storages,*out_id,
         FACTORY_FLUID_STORAGE_STEAM_TURBINE_INPUT,x,y,
         FACTORY_FLUID_CLASS_VAPOR,FACTORY_STEAM_TURBINE_STORAGE_CAPACITY);
+    factory_fluid_storage_store_add(&s->fluid_storages,*out_id,
+        FACTORY_FLUID_STORAGE_STEAM_TURBINE_OUTPUT,x,y,
+        FACTORY_FLUID_CLASS_VAPOR,FACTORY_STEAM_TURBINE_STORAGE_CAPACITY);
     factory_fluid_port_store_add(&s->fluid_ports,*out_id,
         FACTORY_FLUID_STORAGE_STEAM_TURBINE_INPUT,x,y,
         FACTORY_FLUID_CONNECTION_WEST,FACTORY_FLUID_CLASS_VAPOR);
+    factory_fluid_port_store_add(&s->fluid_ports,*out_id,
+        FACTORY_FLUID_STORAGE_STEAM_TURBINE_OUTPUT,x,y,
+        FACTORY_FLUID_CONNECTION_EAST,FACTORY_FLUID_CLASS_VAPOR);
+    s->fluid_networks.dirty=true;
+    return FACTORY_RESULT_OK;
+}
+
+static FactoryResult place_steam_condenser(
+    FactorySimulation *s, const FactoryCommand *command, FactoryEntityId *out_id
+)
+{
+    int32_t x=command->data.place_steam_condenser.x;
+    int32_t y=command->data.place_steam_condenser.y;
+    FactoryResult result=validate_empty_tile(s,x,y);
+    if (result!=FACTORY_RESULT_OK) return result;
+    if (!factory_steam_condenser_store_reserve_one(&s->steam_condensers)
+        || !reserve_two_fluid_storages(&s->fluid_storages)
+        || !reserve_two_fluid_ports(&s->fluid_ports))
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    result=occupy_with_entity(s,x,y,out_id);
+    if (result!=FACTORY_RESULT_OK) return result;
+    factory_steam_condenser_store_add(&s->steam_condensers,*out_id,x,y);
+    factory_fluid_storage_store_add(&s->fluid_storages,*out_id,
+        FACTORY_FLUID_STORAGE_STEAM_CONDENSER_INPUT,x,y,
+        FACTORY_FLUID_CLASS_VAPOR,FACTORY_STEAM_CONDENSER_STEAM_CAPACITY);
+    factory_fluid_storage_store_add(&s->fluid_storages,*out_id,
+        FACTORY_FLUID_STORAGE_STEAM_CONDENSER_OUTPUT,x,y,
+        FACTORY_FLUID_CLASS_AQUEOUS,FACTORY_STEAM_CONDENSER_WATER_CAPACITY);
+    factory_fluid_port_store_add(&s->fluid_ports,*out_id,
+        FACTORY_FLUID_STORAGE_STEAM_CONDENSER_INPUT,x,y,
+        FACTORY_FLUID_CONNECTION_WEST,FACTORY_FLUID_CLASS_VAPOR);
+    factory_fluid_port_store_add(&s->fluid_ports,*out_id,
+        FACTORY_FLUID_STORAGE_STEAM_CONDENSER_OUTPUT,x,y,
+        FACTORY_FLUID_CONNECTION_EAST,FACTORY_FLUID_CLASS_AQUEOUS);
     s->fluid_networks.dirty=true;
     return FACTORY_RESULT_OK;
 }
@@ -844,6 +882,8 @@ static FactoryResult validate_demolition(
         factory_steam_engine_store_find(&simulation->steam_engines, id);
     const FactorySteamTurbine *steam_turbine =
         factory_steam_turbine_store_find(&simulation->steam_turbines,id);
+    const FactorySteamCondenser *steam_condenser =
+        factory_steam_condenser_store_find(&simulation->steam_condensers,id);
     const FactorySolarGenerator *solar_generator =
         factory_solar_generator_store_find(&simulation->solar_generators, id);
     const FactoryAccumulator *accumulator =
@@ -950,17 +990,42 @@ static FactoryResult validate_demolition(
         *out_type=FACTORY_ENTITY_TYPE_HEAT_CONDUCTOR;
         *out_x=heat_conductor->x; *out_y=heat_conductor->y;
     } else if (heat_exchanger != NULL) {
+        const FactoryFluidStorage *water=factory_fluid_storage_store_find_slot(
+            &simulation->fluid_storages,id,
+            FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_INPUT);
+        const FactoryFluidStorage *steam=factory_fluid_storage_store_find_slot(
+            &simulation->fluid_storages,id,
+            FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_OUTPUT);
+        if (water==NULL||steam==NULL) return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        if (water->quantity!=0U||steam->quantity!=0U)
+            return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
         *out_type=FACTORY_ENTITY_TYPE_HEAT_EXCHANGER;
         *out_x=heat_exchanger->x; *out_y=heat_exchanger->y;
     } else if (steam_turbine != NULL) {
         const FactoryFluidStorage *steam=factory_fluid_storage_store_find_slot(
             &simulation->fluid_storages,id,
             FACTORY_FLUID_STORAGE_STEAM_TURBINE_INPUT);
-        if (power_generator==NULL||steam==NULL)
+        const FactoryFluidStorage *exhaust=factory_fluid_storage_store_find_slot(
+            &simulation->fluid_storages,id,
+            FACTORY_FLUID_STORAGE_STEAM_TURBINE_OUTPUT);
+        if (power_generator==NULL||steam==NULL||exhaust==NULL)
             return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
-        if (steam->quantity!=0U) return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
+        if (steam->quantity!=0U||exhaust->quantity!=0U)
+            return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
         *out_type=FACTORY_ENTITY_TYPE_STEAM_TURBINE;
         *out_x=steam_turbine->x; *out_y=steam_turbine->y;
+    } else if (steam_condenser != NULL) {
+        const FactoryFluidStorage *steam=factory_fluid_storage_store_find_slot(
+            &simulation->fluid_storages,id,
+            FACTORY_FLUID_STORAGE_STEAM_CONDENSER_INPUT);
+        const FactoryFluidStorage *water=factory_fluid_storage_store_find_slot(
+            &simulation->fluid_storages,id,
+            FACTORY_FLUID_STORAGE_STEAM_CONDENSER_OUTPUT);
+        if (steam==NULL||water==NULL) return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        if (steam->quantity!=0U||water->quantity!=0U)
+            return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
+        *out_type=FACTORY_ENTITY_TYPE_STEAM_CONDENSER;
+        *out_x=steam_condenser->x; *out_y=steam_condenser->y;
     } else if (solar_generator != NULL) {
         if (power_generator == NULL)
             return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
@@ -1118,6 +1183,10 @@ static bool remove_subsystem_record(
         case FACTORY_ENTITY_TYPE_STEAM_TURBINE:
             if (!factory_fluid_port_store_remove(
                     &simulation->fluid_ports,id)
+                || !factory_fluid_port_store_remove(
+                    &simulation->fluid_ports,id)
+                || !factory_fluid_storage_store_remove(
+                    &simulation->fluid_storages,id)
                 || !factory_fluid_storage_store_remove(
                     &simulation->fluid_storages,id)
                 || !factory_power_generator_store_remove(
@@ -1125,6 +1194,17 @@ static bool remove_subsystem_record(
             simulation->fluid_networks.dirty=true;
             return factory_steam_turbine_store_remove(
                 &simulation->steam_turbines,id);
+        case FACTORY_ENTITY_TYPE_STEAM_CONDENSER:
+            if (!factory_fluid_port_store_remove(&simulation->fluid_ports,id)
+                || !factory_fluid_port_store_remove(&simulation->fluid_ports,id)
+                || !factory_fluid_storage_store_remove(
+                    &simulation->fluid_storages,id)
+                || !factory_fluid_storage_store_remove(
+                    &simulation->fluid_storages,id))
+                return false;
+            simulation->fluid_networks.dirty=true;
+            return factory_steam_condenser_store_remove(
+                &simulation->steam_condensers,id);
         case FACTORY_ENTITY_TYPE_SOLAR_GENERATOR:
             if (!factory_power_generator_store_remove(
                     &simulation->power_generators, id))
@@ -1265,6 +1345,8 @@ static bool placement_type(
             *out_type=FACTORY_ENTITY_TYPE_HEAT_EXCHANGER; return true;
         case FACTORY_COMMAND_PLACE_STEAM_TURBINE:
             *out_type=FACTORY_ENTITY_TYPE_STEAM_TURBINE; return true;
+        case FACTORY_COMMAND_PLACE_STEAM_CONDENSER:
+            *out_type=FACTORY_ENTITY_TYPE_STEAM_CONDENSER; return true;
         default:
             return false;
     }
@@ -1616,6 +1698,10 @@ static void apply_commands(FactorySimulation *simulation)
                 break;
             case FACTORY_COMMAND_PLACE_STEAM_TURBINE:
                 result->result=place_steam_turbine(
+                    simulation,&result->command,&result->entity_id);
+                break;
+            case FACTORY_COMMAND_PLACE_STEAM_CONDENSER:
+                result->result=place_steam_condenser(
                     simulation,&result->command,&result->entity_id);
                 break;
             case FACTORY_COMMAND_FLUID_INSERT:
@@ -2545,6 +2631,7 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     factory_burner_store_finish_tick(&simulation->burners, simulation);
     factory_reactor_store_update(&simulation->reactors, simulation);
     factory_heat_exchangers_update(simulation);
+    factory_steam_condensers_update(simulation);
     factory_extractor_store_update(
         &simulation->extractors, simulation->world, simulation
     );

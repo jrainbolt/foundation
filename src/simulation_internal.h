@@ -20,6 +20,7 @@
 #include "fluid_machine_internal.h"
 #include "steam_engine_internal.h"
 #include "steam_turbine_internal.h"
+#include "steam_condenser_internal.h"
 #include "clock_internal.h"
 #include "solar_internal.h"
 #include "accumulator_internal.h"
@@ -49,6 +50,7 @@ struct FactorySimulation {
     FactoryBoilerStore boilers;
     FactorySteamEngineStore steam_engines;
     FactorySteamTurbineStore steam_turbines;
+    FactorySteamCondenserStore steam_condensers;
     FactorySolarGeneratorStore solar_generators;
     FactoryAccumulatorStore accumulators;
     FactoryReactorStore reactors;

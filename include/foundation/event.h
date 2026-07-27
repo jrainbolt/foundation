@@ -44,7 +44,8 @@ typedef enum {
     FACTORY_EVENT_HEAT_PORT_DISCONNECTED,
     FACTORY_EVENT_HEAT_TRANSFERRED,
     FACTORY_EVENT_HEAT_EXCHANGER_CYCLE_COMPLETED,
-    FACTORY_EVENT_STEAM_TURBINE_CYCLE_COMPLETED
+    FACTORY_EVENT_STEAM_TURBINE_CYCLE_COMPLETED,
+    FACTORY_EVENT_STEAM_CONDENSER_CYCLE_COMPLETED
 } FactoryEventType;
 
 /*
@@ -79,7 +80,12 @@ typedef enum {
  * consumed, and third_quantity is steam produced.
  * turbine cycle: entity_id identifies the turbine, nuclear_fuel_id carries
  * its stable definition ID, quantity is completed cycles, related_quantity
- * is consumed steam, and third_quantity is generated electrical energy.
+ * is consumed steam (equal to produced exhaust steam, a fixed 1:1 ratio),
+ * fluid_type/related_fluid_type are the consumed and produced fluid types,
+ * and third_quantity is generated electrical energy.
+ * condenser cycle: entity_id is the condenser; fluid_type/quantity are the
+ * consumed steam and related_fluid_type/related_quantity are the produced
+ * water.
  *
  * tick is the simulation tick at the start of the step that emitted the
  * event. Item-transfer quantity is currently one.

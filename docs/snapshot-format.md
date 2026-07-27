@@ -1,8 +1,15 @@
-# Snapshot format version 13
+# Snapshot format version 15
 
-Version 13 adds the authoritative Steam Turbine component section. Turbine
-steam remains in generic fluid storage; topology and latest-tick fields are
-reconstructed or cleared.
+Version 15 gives each Steam Turbine a second fluid storage/port pair for its
+exhaust output (`FACTORY_FLUID_STORAGE_STEAM_TURBINE_OUTPUT`), alongside the
+existing input pair. This is an incompatible structural change from version
+14: a version-14 snapshot's fluid-storage section has exactly one
+turbine-owned record per turbine, but version 15 validates exactly two, so
+older snapshots are rejected outright rather than silently misread.
+
+Version 14 added the authoritative Steam Condenser component section.
+Condenser steam and water remain in generic fluid storage; topology and
+latest-tick fields are reconstructed or cleared.
 
 Foundation snapshots are canonical little-endian binary files. Every value is
 written field-by-field; no C structure, pointer, enum representation, padding,
@@ -13,12 +20,12 @@ timestamp, or process-specific value enters the format.
 | Offset | Width | Field |
 |---:|---:|---|
 | 0 | 8 | Magic bytes `FOUNDATN` |
-| 8 | 4 | Version (`13`) |
+| 8 | 4 | Version (`15`) |
 | 12 | 4 | Header size (`48`) |
 | 16 | 8 | Total snapshot size |
 | 24 | 8 | Payload size |
 | 32 | 8 | Simulation tick |
-| 40 | 4 | Section count (`25`) |
+| 40 | 4 | Section count (`26`) |
 | 44 | 4 | Reserved zero |
 
 Unsigned and signed integers use 32-bit or 64-bit two's-complement
@@ -36,7 +43,7 @@ Each section starts with four 32-bit fields:
 | Record count | Number of fixed-width records |
 | Payload size | Bytes following the section header |
 
-Version 13 requires each section exactly once in this order:
+Version 15 requires each section exactly once in this order:
 
 | Type | Section | Record width |
 |---:|---|---:|
@@ -63,8 +70,9 @@ Version 13 requires each section exactly once in this order:
 | 21 | Heat conductors | 12 |
 | 22 | Heat exchangers | 12 |
 | 23 | Steam turbines | 16 |
-| 24 | Pending commands | 24 |
-| 25 | Command results | 68 |
+| 24 | Steam condensers | 16 |
+| 25 | Pending commands | 24 |
+| 26 | Command results | 68 |
 
 Unknown, reordered, duplicated, missing, incorrectly sized, or unsupported
 sections are rejected. Exact full-buffer consumption is required.
@@ -91,7 +99,11 @@ they are rebuilt from pole and generator positions after loading.
 Fluid-storage records contain owner, stable storage slot, grid position,
 accepted class mask, fluid type, quantity, and capacity. Empty storage is
 canonically `NONE` with zero quantity; non-empty storage must reference a
-valid compatible definition.
+valid compatible definition. Record count is dynamic: every fluid-owning
+machine contributes one record per storage slot it owns -- one for a fluid
+tank, two each for boilers, heat exchangers, and steam condensers, and (as
+of version 15) two for steam turbines (input and exhaust output, where
+version 14 validated only one).
 
 Pipe records contain authoritative entity ID and grid position. Connection
 masks, ports, networks, and network IDs are deterministically reconstructed.
@@ -124,9 +136,19 @@ Connection masks, heat ports, heat/fluid network IDs, latest conversion
 quantities, and activity are reconstructed or transient.
 
 Steam-turbine records contain entity ID, grid position, and stable definition
-ID. Steam is carried by generic fluid storage. Network IDs, availability,
-actual output, consumption, completed cycles, and activity are transient.
+ID -- unchanged in shape by version 15. Steam and exhaust steam are both
+carried by generic fluid storage, in two separate storage/port slots (input
+and output) as of version 15, where version 14 had only the input slot.
+Network IDs, availability, actual output, consumption, exhaust production,
+completed cycles, and activity are transient.
 
-Version 13 has no compression, encryption, checksum, optional sections, or
+Steam-condenser records contain entity ID, grid position, and stable
+definition ID -- the same 16-byte shape as steam-turbine records. Steam and
+water are carried by generic fluid storage (two slots: input and output).
+Fluid/power network IDs, connection state, powered state, consumed steam,
+produced water, completed cycles, and activity are transient and are
+recomputed after load.
+
+Version 15 has no compression, encryption, checksum, optional sections, or
 migration decoder. A future incompatible change must introduce a deliberate
 new-version decoder or compatibility policy.

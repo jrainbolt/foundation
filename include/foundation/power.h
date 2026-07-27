@@ -21,6 +21,7 @@ typedef uint32_t FactoryPowerNetworkId;
 #define FACTORY_POWER_DEMAND_REFINERY 20U
 #define FACTORY_POWER_DEMAND_ASSEMBLER 25U
 #define FACTORY_POWER_DEMAND_INSERTER 5U
+#define FACTORY_POWER_DEMAND_STEAM_CONDENSER 50U
 
 typedef struct {
     FactoryEntityId entity_id;

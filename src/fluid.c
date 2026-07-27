@@ -8,7 +8,8 @@
 
 static const FactoryFluidDefinition fluid_definitions[] = {
     {FACTORY_FLUID_WATER, "water", FACTORY_FLUID_CLASS_AQUEOUS},
-    {FACTORY_FLUID_STEAM, "steam", FACTORY_FLUID_CLASS_VAPOR}
+    {FACTORY_FLUID_STEAM, "steam", FACTORY_FLUID_CLASS_VAPOR},
+    {FACTORY_FLUID_EXHAUST_STEAM, "exhaust steam", FACTORY_FLUID_CLASS_VAPOR}
 };
 
 size_t factory_fluid_definition_count(void)
@@ -22,7 +23,7 @@ bool factory_fluid_definition_is_valid(
 {
     return definition != NULL
         && definition->fluid_type > FACTORY_FLUID_NONE
-        && definition->fluid_type <= FACTORY_FLUID_STEAM
+        && definition->fluid_type <= FACTORY_FLUID_EXHAUST_STEAM
         && definition->display_name != NULL
         && definition->display_name[0] != '\0'
         && definition->fluid_class != 0U;
@@ -153,6 +154,44 @@ bool factory_fluid_storage_store_remove(
     return false;
 }
 
+/*
+ * A slot's declared fluid identity, when it has one, is a structural
+ * property of what the slot is for -- not a function of its current
+ * contents. This is what lets a dedicated machine slot (e.g. a turbine's
+ * live-steam input or a condenser's exhaust-steam input) reject the wrong
+ * fluid even while empty, while an ordinary multi-purpose fluid tank
+ * (FACTORY_FLUID_STORAGE_DEFAULT) still determines its type on first fill.
+ * Every dedicated slot enum already names exactly one machine and
+ * direction, so this mapping is total and requires no per-entity-type code
+ * anywhere else in the fluid system.
+ */
+static FactoryFluidType slot_declared_fluid_type(FactoryFluidStorageSlot slot)
+{
+    switch (slot) {
+    case FACTORY_FLUID_STORAGE_DEFAULT:
+        return FACTORY_FLUID_NONE;
+    case FACTORY_FLUID_STORAGE_BOILER_INPUT:
+        return FACTORY_FLUID_WATER;
+    case FACTORY_FLUID_STORAGE_BOILER_OUTPUT:
+        return FACTORY_FLUID_STEAM;
+    case FACTORY_FLUID_STORAGE_STEAM_ENGINE_INPUT:
+        return FACTORY_FLUID_STEAM;
+    case FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_INPUT:
+        return FACTORY_FLUID_WATER;
+    case FACTORY_FLUID_STORAGE_HEAT_EXCHANGER_OUTPUT:
+        return FACTORY_FLUID_STEAM;
+    case FACTORY_FLUID_STORAGE_STEAM_TURBINE_INPUT:
+        return FACTORY_FLUID_STEAM;
+    case FACTORY_FLUID_STORAGE_STEAM_TURBINE_OUTPUT:
+        return FACTORY_FLUID_EXHAUST_STEAM;
+    case FACTORY_FLUID_STORAGE_STEAM_CONDENSER_INPUT:
+        return FACTORY_FLUID_EXHAUST_STEAM;
+    case FACTORY_FLUID_STORAGE_STEAM_CONDENSER_OUTPUT:
+        return FACTORY_FLUID_WATER;
+    }
+    return FACTORY_FLUID_NONE;
+}
+
 static bool accepts(
     const FactoryFluidStorage *storage,
     const FactoryFluidDefinition *definition
@@ -161,6 +200,22 @@ static bool accepts(
     return storage != NULL && definition != NULL
         && (storage->accepted_fluid_classes
             & definition->fluid_class) != 0U;
+}
+
+/*
+ * True when fluid_type cannot enter this storage: either it conflicts with
+ * what the slot is declared for (checked regardless of current quantity),
+ * or -- for slots with no fixed declaration -- it conflicts with whatever
+ * that particular tank has already committed to holding.
+ */
+static bool conflicts_with_slot(
+    const FactoryFluidStorage *storage, FactoryFluidType fluid_type
+)
+{
+    FactoryFluidType declared = slot_declared_fluid_type(storage->slot);
+    if (declared != FACTORY_FLUID_NONE)
+        return declared != fluid_type;
+    return storage->quantity != 0U && storage->fluid_type != fluid_type;
 }
 
 FactoryResult factory_fluid_storage_insert(
@@ -175,7 +230,7 @@ FactoryResult factory_fluid_storage_insert(
         return FACTORY_RESULT_INVALID_ARGUMENT;
     if (!accepts(storage, definition))
         return FACTORY_RESULT_FLUID_INCOMPATIBLE;
-    if (storage->quantity != 0U && storage->fluid_type != fluid_type)
+    if (conflicts_with_slot(storage, fluid_type))
         return FACTORY_RESULT_FLUID_MISMATCH;
     if (quantity > storage->capacity - storage->quantity)
         return FACTORY_RESULT_FLUID_CAPACITY_EXCEEDED;
@@ -221,8 +276,7 @@ FactoryResult factory_fluid_storage_transfer(
     definition = factory_fluid_definition_get(fluid_type);
     if (!accepts(destination, definition))
         return FACTORY_RESULT_FLUID_INCOMPATIBLE;
-    if (destination->quantity != 0U
-        && destination->fluid_type != fluid_type)
+    if (conflicts_with_slot(destination, fluid_type))
         return FACTORY_RESULT_FLUID_MISMATCH;
     if (quantity > destination->capacity - destination->quantity)
         return FACTORY_RESULT_FLUID_CAPACITY_EXCEEDED;

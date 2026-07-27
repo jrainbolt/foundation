@@ -47,7 +47,7 @@ func _initialize() -> void:
 	if not _require(not simulation.has_error(), simulation.get_last_error()):
 		return
 	if not _require(
-		entities.size() == 46,
+		entities.size() == 48,
 		"missing presentation entities: got %d" % entities.size()
 	):
 		return
@@ -55,7 +55,8 @@ func _initialize() -> void:
 		1, 2, 3, 2, 2, 2, 1, 2, 3, 2, 2, 2, 4, 2,
 		6, 2, 2, 5, 5, 7, 5, 8, 8, 8, 8, 9, 10, 11,
 		12, 11, 13, 11, 14, 15, 8, 16, 7, 17,
-		18, 18, 18, 19, 11, 10, 11, 20
+		18, 18, 18, 19, 11, 10, 11, 20,
+		11, 21
 	]
 	var seen_ids := {}
 	for index in entities.size():
@@ -69,7 +70,7 @@ func _initialize() -> void:
 		):
 			return
 		seen_ids[entity_id] = true
-	if not _require(seen_ids.size() == 46, "duplicate or missing stable IDs"):
+	if not _require(seen_ids.size() == 48, "duplicate or missing stable IDs"):
 		return
 	var tank: Dictionary = {}
 	for entity: Dictionary in entities:
@@ -117,8 +118,33 @@ func _initialize() -> void:
 		and int(steam_turbine.available_generation) == 0
 		and int(steam_turbine.generated_last_tick) == 0
 		and int(steam_turbine.steam_consumed_last_tick) == 0
-		and int(steam_turbine.completed_cycles_last_tick) == 0,
+		and int(steam_turbine.completed_cycles_last_tick) == 0
+		and int(steam_turbine.exhaust_capacity) == 2000
+		and int(steam_turbine.stored_exhaust) == 0
+		and int(steam_turbine.exhaust_produced_last_tick) == 0
+		and int(steam_turbine.exhaust_network_id) != 0
+		and int(steam_turbine.exhaust_network_id)
+			!= int(steam_turbine.fluid_network_id),
 		"steam turbine presentation fields"
+	):
+		return
+	var steam_condenser: Dictionary = entities[47]
+	if not _require(
+		int(steam_condenser.type) == 21
+		and int(steam_condenser.steam_capacity) == 2000
+		and int(steam_condenser.water_capacity) == 2000
+		and int(steam_condenser.stored_steam) == 0
+		and int(steam_condenser.stored_water) == 0
+		and int(steam_condenser.steam_consumed_last_tick) == 0
+		and int(steam_condenser.water_produced_last_tick) == 0
+		and int(steam_condenser.completed_cycles_last_tick) == 0
+		# Closed-loop correctness: the condenser must be on the turbine's
+		# exhaust network, never on its live-steam input network.
+		and int(steam_condenser.steam_network_id)
+			== int(steam_turbine.exhaust_network_id)
+		and int(steam_condenser.steam_network_id)
+			!= int(steam_turbine.fluid_network_id),
+		"steam condenser presentation fields"
 	):
 		return
 	if not _require(
@@ -227,7 +253,7 @@ func _initialize() -> void:
 	result = simulation.place_fluid_tank(9, 7)
 	if not _require(result == 0, simulation.result_name(result)):
 		return
-	result = simulation.transfer_fluid(tank_id, 47, 1000)
+	result = simulation.transfer_fluid(tank_id, 49, 1000)
 	if not _require(result == 0, simulation.result_name(result)):
 		return
 	entities = simulation.get_entities()
@@ -236,7 +262,7 @@ func _initialize() -> void:
 	for entity: Dictionary in entities:
 		if int(entity.id) == tank_id:
 			source_quantity = int(entity.fluid_quantity)
-		if int(entity.id) == 47:
+		if int(entity.id) == 49:
 			destination_quantity = int(entity.fluid_quantity)
 	if not _require(
 		source_quantity >= 0 and destination_quantity > 0

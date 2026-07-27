@@ -165,3 +165,38 @@ Platform status:
 | macOS universal | Yes | No in correction pass | No |
 | Linux x86_64 | Yes | No | No |
 | Linux arm64 | Yes | No | No |
+
+### Turbine-exhaust re-verification
+
+Re-run after introducing authoritative turbine exhaust fluid and the real
+closed loop (Water -> Heat Exchanger -> Live Steam -> Steam Turbine ->
+Exhaust Steam -> Steam Condenser -> Water), using the same
+`4.7.1.stable.official.a13da4feb` at `/Applications/Godot.app`. `godot-cpp`
+was a fresh checkout at the pinned tag/commit (no prior sibling checkout
+existed in this environment); `scons` came from the `SCons` package already
+present in the local Python user site. Successful commands:
+
+```sh
+export GODOT_CPP_DIR=/path/to/godot-cpp-4.5   # pinned godot-4.5-stable checkout
+./tools/build_extension.sh macos template_debug
+/Applications/Godot.app/Contents/MacOS/Godot \
+  --headless --path . --script tests/smoke.gd
+/Applications/Godot.app/Contents/MacOS/Godot \
+  --headless --path . --script tests/main_scene_smoke.gd
+/Applications/Godot.app/Contents/MacOS/Godot --path . --quit-after 180
+```
+
+The build, both headless smoke tests, and a non-editor game-mode launch
+(`--quit-after 180`, no `--editor`) all completed cleanly: no registration,
+load, symbol, or parse errors, zero exit status throughout. One real bug was
+caught and fixed by this run that a native-only C harness could not have
+caught: `tests/smoke.gd` used C-style `/* */` block comments, which GDScript
+does not support -- `godot --headless --script` failed with a parse error
+until they were changed to `#` line comments. The demo world now has 48
+entities (was 49): the turbine's east tile is reserved for a real exhaust
+pipe to the condenser, so the accumulator and solar generator moved to
+(12, 1) and (12, 2), and the condenser moved from tapping the boiler's
+live-steam network at (11, 5) to sitting directly on the turbine's exhaust
+network at (11, 0). The full `--editor` launch and `tests/capture_visual.gd`
+were not re-run in this pass; only the headless smoke tests and a non-
+editor game-mode launch were.

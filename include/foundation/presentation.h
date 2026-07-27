@@ -210,18 +210,43 @@ typedef struct {
     FactoryFluidType steam_fluid;
     FactoryFluidQuantity stored_steam;
     FactoryFluidQuantity steam_capacity;
+    FactoryFluidType exhaust_fluid;
+    FactoryFluidQuantity stored_exhaust;
+    FactoryFluidQuantity exhaust_capacity;
     FactoryFluidNetworkId fluid_network_id;
+    FactoryFluidNetworkId exhaust_network_id;
     FactoryPowerNetworkId power_network_id;
     bool fluid_connected;
+    bool exhaust_connected;
     bool power_connected;
     FactorySteamTurbineDefinitionId definition_id;
     FactoryPowerUnits maximum_output;
     FactoryPowerUnits available_output;
     FactoryPowerUnits actual_output;
     FactoryFluidQuantity steam_consumed_last_tick;
+    FactoryFluidQuantity exhaust_produced_last_tick;
     uint32_t completed_cycles_last_tick;
     FactorySteamTurbineActivity activity;
 } FactoryPresentationSteamTurbine;
+
+typedef struct {
+    FactorySteamCondenserDefinitionId definition_id;
+    FactoryFluidType steam_fluid;
+    FactoryFluidQuantity stored_steam;
+    FactoryFluidQuantity steam_capacity;
+    FactoryFluidType water_fluid;
+    FactoryFluidQuantity stored_water;
+    FactoryFluidQuantity water_capacity;
+    FactoryFluidNetworkId steam_network_id;
+    FactoryFluidNetworkId water_network_id;
+    FactoryPowerNetworkId power_network_id;
+    bool fluid_connected;
+    FactoryPowerUnits power_per_cycle;
+    FactoryFluidQuantity steam_consumed_last_tick;
+    FactoryFluidQuantity water_produced_last_tick;
+    uint32_t completed_cycles_last_tick;
+    FactorySteamCondenserActivity activity;
+} FactoryPresentationSteamCondenser;
 
 typedef struct {
     FactoryEntityId entity_id;
@@ -252,6 +277,7 @@ typedef struct {
         FactoryPresentationHeatConductor heat_conductor;
         FactoryPresentationHeatExchanger heat_exchanger;
         FactoryPresentationSteamTurbine steam_turbine;
+        FactoryPresentationSteamCondenser steam_condenser;
     } data;
 } FactoryPresentationEntity;
 
