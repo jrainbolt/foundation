@@ -114,6 +114,7 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     factory_heat_port_store_destroy(&simulation->heat_ports);
     factory_heat_exchanger_store_destroy(&simulation->heat_exchangers);
     factory_heat_network_state_destroy(&simulation->heat_networks);
+    factory_tick_preflight_destroy(&simulation->tick_preflight);
     factory_burner_store_destroy(&simulation->burners);
     factory_power_state_destroy(&simulation->power);
     factory_power_generator_store_destroy(&simulation->power_generators);
@@ -2607,6 +2608,10 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     if (!factory_event_batch_reserve(&simulation->events, event_limit)) {
         return FACTORY_RESULT_OUT_OF_MEMORY;
     }
+    {
+        FactoryResult preflight=factory_simulation_preflight_tick(simulation);
+        if (preflight!=FACTORY_RESULT_OK) return preflight;
+    }
     simulation->events.count = 0U;
     simulation->events.recording = true;
     apply_commands(simulation);
@@ -2643,6 +2648,7 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     factory_storage_store_update(&simulation->storages);
     update_inserters(simulation);
     simulation->events.recording = false;
+    factory_tick_preflight_finish(simulation);
     factory_simulation_clock_advance(&simulation->clock);
     return FACTORY_RESULT_OK;
 }

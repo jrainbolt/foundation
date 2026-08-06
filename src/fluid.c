@@ -2,6 +2,7 @@
 
 #include "foundation/command.h"
 #include "simulation_internal.h"
+#include "tick_preflight_internal.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -477,12 +478,13 @@ FactoryResult factory_fluid_network_rebuild(
     }
     next.pipe_count = simulation->pipes.count;
     next.port_count = simulation->fluid_ports.count;
-    if ((next.pipe_count && (next.pipes = calloc(
-            next.pipe_count, sizeof(*next.pipes))) == NULL)
-        || (next.port_count && (next.ports = calloc(
-            next.port_count, sizeof(*next.ports))) == NULL)
-        || (next.pipe_count && (next.networks = calloc(
-            next.pipe_count, sizeof(*next.networks))) == NULL)) {
+    if ((next.pipe_count && (next.pipes = factory_topology_calloc(simulation,
+            FACTORY_TOPOLOGY_FLUID,next.pipe_count,sizeof(*next.pipes))) == NULL)
+        || (next.port_count && (next.ports = factory_topology_calloc(simulation,
+            FACTORY_TOPOLOGY_FLUID,next.port_count,sizeof(*next.ports))) == NULL)
+        || (next.pipe_count && (next.networks = factory_topology_calloc(
+            simulation,FACTORY_TOPOLOGY_FLUID,next.pipe_count,
+            sizeof(*next.networks))) == NULL)) {
         factory_fluid_network_state_destroy(&next);
         return FACTORY_RESULT_OUT_OF_MEMORY;
     }

@@ -77,6 +77,7 @@ add_library(factory_engine
     src/steam_condenser.c
     src/splitter.c
     src/storage.c
+    src/tick_preflight.c
     src/world.c
 )
 target_include_directories(factory_engine
@@ -344,4 +345,10 @@ if(BUILD_TESTING)
     )
     target_link_libraries(factory_heat_network_tests PRIVATE factory_engine)
     add_test(NAME factory_heat_network_tests COMMAND factory_heat_network_tests)
+
+    add_executable(factory_tick_preflight_tests tests/test_tick_preflight.c)
+    target_include_directories(
+        factory_tick_preflight_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(factory_tick_preflight_tests PRIVATE factory_engine)
+    add_test(NAME factory_tick_preflight_tests COMMAND factory_tick_preflight_tests)
 endif()

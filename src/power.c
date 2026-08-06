@@ -1,6 +1,7 @@
 #include "power_internal.h"
 
 #include "simulation_internal.h"
+#include "tick_preflight_internal.h"
 
 #include <stdlib.h>
 
@@ -398,17 +399,21 @@ FactoryResult factory_power_rebuild(
     next.accumulator_count = simulation->accumulators.count;
     next.consumer_count = consumers;
     if ((next.pole_count != 0U
-            && (next.poles = calloc(next.pole_count, sizeof(*next.poles)))
+            && (next.poles = factory_topology_calloc(simulation,
+                FACTORY_TOPOLOGY_POWER,next.pole_count,sizeof(*next.poles)))
                 == NULL)
         || (next.generator_count != 0U
-            && (next.generators = calloc(
-                next.generator_count, sizeof(*next.generators))) == NULL)
+            && (next.generators = factory_topology_calloc(simulation,
+                FACTORY_TOPOLOGY_POWER,next.generator_count,
+                sizeof(*next.generators))) == NULL)
         || (next.accumulator_count != 0U
-            && (next.accumulators = calloc(
-                next.accumulator_count, sizeof(*next.accumulators))) == NULL)
+            && (next.accumulators = factory_topology_calloc(simulation,
+                FACTORY_TOPOLOGY_POWER,next.accumulator_count,
+                sizeof(*next.accumulators))) == NULL)
         || (consumers != 0U
-            && (next.consumers = calloc(
-                consumers, sizeof(*next.consumers))) == NULL)) {
+            && (next.consumers = factory_topology_calloc(simulation,
+                FACTORY_TOPOLOGY_POWER,consumers,
+                sizeof(*next.consumers))) == NULL)) {
         factory_power_state_destroy(&next);
         return FACTORY_RESULT_OUT_OF_MEMORY;
     }
@@ -431,7 +436,8 @@ FactoryResult factory_power_rebuild(
             return FACTORY_RESULT_POWER_OVERFLOW;
         }
         maximum = next.pole_count * (next.pole_count - 1U) / 2U;
-        next.connections = calloc(maximum, sizeof(*next.connections));
+        next.connections = factory_topology_calloc(simulation,
+            FACTORY_TOPOLOGY_POWER,maximum,sizeof(*next.connections));
         if (next.connections == NULL) {
             factory_power_state_destroy(&next);
             return FACTORY_RESULT_OUT_OF_MEMORY;
@@ -482,7 +488,8 @@ FactoryResult factory_power_rebuild(
         }
     }
     if (next.pole_count != 0U) {
-        next.networks = calloc(next.pole_count, sizeof(*next.networks));
+        next.networks = factory_topology_calloc(simulation,
+            FACTORY_TOPOLOGY_POWER,next.pole_count,sizeof(*next.networks));
         if (next.networks == NULL) {
             factory_power_state_destroy(&next);
             return FACTORY_RESULT_OUT_OF_MEMORY;
@@ -532,14 +539,19 @@ FactoryResult factory_power_rebuild(
         );
     }
     if (next.generator_count != 0U
-        && ((available = calloc(next.generator_count, sizeof(*available)))
+        && ((available = factory_topology_calloc(simulation,
+                FACTORY_TOPOLOGY_POWER,next.generator_count,
+                sizeof(*available)))
                 == NULL
-            || (quantum = calloc(next.generator_count, sizeof(*quantum)))
+            || (quantum = factory_topology_calloc(simulation,
+                FACTORY_TOPOLOGY_POWER,next.generator_count,sizeof(*quantum)))
                 == NULL
-            || (unlocked = calloc(next.generator_count, sizeof(*unlocked)))
+            || (unlocked = factory_topology_calloc(simulation,
+                FACTORY_TOPOLOGY_POWER,next.generator_count,sizeof(*unlocked)))
                 == NULL
-            || (committed_delta = calloc(
-                    next.generator_count, sizeof(*committed_delta)))
+            || (committed_delta = factory_topology_calloc(simulation,
+                    FACTORY_TOPOLOGY_POWER,next.generator_count,
+                    sizeof(*committed_delta)))
                 == NULL)) {
         free(available); free(quantum); free(unlocked);
         free(committed_delta);

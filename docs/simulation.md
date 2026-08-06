@@ -1,5 +1,10 @@
 # Deterministic Simulation
 
+Before a tick clears events or mutates authoritative state, a shared preflight
+reserves the conservative post-command component and power/fluid/heat topology
+bounds. A failed reservation leaves commands, events, clock, world state, and
+active derived topology unchanged. See `tick-preflight.md`.
+
 Steam Turbine availability follows the single fluid transport pass and
 precedes ordinary power allocation. Exact steam consumption follows committed
 allocation; reactors and Heat Exchangers run later, with no second transport.

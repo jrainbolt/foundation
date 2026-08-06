@@ -4,6 +4,7 @@
 #include "fluid_internal.h"
 #include "reactor_internal.h"
 #include "simulation_internal.h"
+#include "tick_preflight_internal.h"
 
 #include <stdlib.h>
 
@@ -147,14 +148,17 @@ FactoryResult factory_heat_network_rebuild(
     next.conductor_count = simulation->heat_conductors.count;
     next.port_count = simulation->heat_ports.count;
     if ((next.conductor_count != 0U
-            && (next.conductors = calloc(
-                next.conductor_count, sizeof(*next.conductors))) == NULL)
+            && (next.conductors = factory_topology_calloc(simulation,
+                FACTORY_TOPOLOGY_HEAT,next.conductor_count,
+                sizeof(*next.conductors))) == NULL)
         || (next.port_count != 0U
-            && (next.ports = calloc(
-                next.port_count, sizeof(*next.ports))) == NULL)
+            && (next.ports = factory_topology_calloc(simulation,
+                FACTORY_TOPOLOGY_HEAT,next.port_count,
+                sizeof(*next.ports))) == NULL)
         || (next.conductor_count != 0U
-            && (next.networks = calloc(
-                next.conductor_count, sizeof(*next.networks))) == NULL)) {
+            && (next.networks = factory_topology_calloc(simulation,
+                FACTORY_TOPOLOGY_HEAT,next.conductor_count,
+                sizeof(*next.networks))) == NULL)) {
         factory_heat_network_state_destroy(&next);
         return FACTORY_RESULT_OUT_OF_MEMORY;
     }
