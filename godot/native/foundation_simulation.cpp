@@ -159,6 +159,8 @@ const char *result_name_c(FactoryResult result)
         return "technology prerequisites missing";
     case FACTORY_RESULT_RESEARCH_INVENTORY_OVERFLOW:
         return "research inventory overflow";
+    case FACTORY_RESULT_TECHNOLOGY_LOCKED:
+        return "technology locked";
     }
     return "unknown result";
 }
@@ -350,6 +352,24 @@ FactoryResult FoundationSimulation::build_demo()
         || assembler->result != FACTORY_RESULT_OK
         || storage->result != FACTORY_RESULT_OK)
         return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+
+    /* Demo setup unlocks gated content through the same deterministic public
+     * research commands used by normal clients. */
+    for (int tick = 0; tick < 5; ++tick) {
+        result = factory_simulation_tick(simulation_);
+        if (result != FACTORY_RESULT_OK) return result;
+    }
+    research_science.data.insert_research_science.quantity = 2U;
+    result = submit(research_science);
+    if (result != FACTORY_RESULT_OK) return result;
+    select_research.data.select_research.technology_id =
+        FACTORY_TECHNOLOGY_FLUID_HANDLING;
+    result = submit(select_research);
+    if (result != FACTORY_RESULT_OK) return result;
+    for (int tick = 0; tick < 4; ++tick) {
+        result = factory_simulation_tick(simulation_);
+        if (result != FACTORY_RESULT_OK) return result;
+    }
 
     FactoryCommand configuration[4] = {};
     configuration[0].type = FACTORY_COMMAND_SET_REFINERY_RECIPE;

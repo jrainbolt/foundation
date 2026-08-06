@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "foundation/item.h"
+#include "foundation/research.h"
 
 #define FACTORY_ASSEMBLER_MAX_INPUT_TYPES 2U
 #define FACTORY_ASSEMBLER_ELECTRONIC_COMPONENT_TICKS 15U
@@ -25,6 +26,7 @@ typedef struct {
     FactoryItemType output_item;
     uint32_t output_amount;
     uint32_t processing_ticks;
+    FactoryUnlockFlags required_unlock;
 } FactoryAssemblerRecipe;
 
 bool factory_assembler_recipe_get(

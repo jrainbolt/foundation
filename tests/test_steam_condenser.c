@@ -16,6 +16,14 @@ static int failures;
 
 static void submit(FactorySimulation *s, FactoryCommand command)
 {
+    if (command.type == FACTORY_COMMAND_PLACE_STEAM_CONDENSER)
+    {
+        s->research.completed_bits |=
+            (UINT64_C(1)<<FACTORY_TECHNOLOGY_BASIC_AUTOMATION)
+            |(UINT64_C(1)<<FACTORY_TECHNOLOGY_FLUID_HANDLING);
+        s->research.progress[0].completed_units=2U;
+        s->research.progress[1].completed_units=2U;
+    }
     if (command.type == FACTORY_COMMAND_PLACE_POWER_GENERATOR)
         s->fixture_initial_generator_fuel = GENERATOR_FUEL_QUANTITY;
     CHECK(factory_simulation_submit_command(s,&command)==FACTORY_RESULT_OK);

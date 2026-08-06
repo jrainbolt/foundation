@@ -1103,7 +1103,7 @@ static FactoryResult validate_simulation(
     for (index = 0U; index < simulation->result_count; ++index) {
         const FactoryCommandResult *value = &simulation->results[index];
         if (!snapshot_command_valid(&value->command)
-            || value->result > FACTORY_RESULT_RESEARCH_INVENTORY_OVERFLOW
+            || value->result > FACTORY_RESULT_TECHNOLOGY_LOCKED
             || value->entity_type > FACTORY_ENTITY_TYPE_STEAM_CONDENSER
             || value->previous_assembler_recipe
                 >= FACTORY_ASSEMBLER_RECIPE_COUNT

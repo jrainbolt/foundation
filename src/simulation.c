@@ -1390,6 +1390,9 @@ static FactoryResult set_assembler_recipe(
                 &(FactoryAssemblerRecipe){0}))) {
         return FACTORY_RESULT_INVALID_ARGUMENT;
     }
+    if (!factory_simulation_is_assembler_recipe_unlocked(simulation,recipe_id)) {
+        return FACTORY_RESULT_TECHNOLOGY_LOCKED;
+    }
     if (!factory_entity_is_valid(simulation->entities, id)) {
         return FACTORY_RESULT_ENTITY_NOT_FOUND;
     }
@@ -1551,6 +1554,11 @@ static void apply_commands(FactorySimulation *simulation)
             if (!factory_entity_construction_cost(
                     result->entity_type, &cost)) {
                 result->result = FACTORY_RESULT_UNSUPPORTED_ENTITY;
+                continue;
+            }
+            if (!factory_simulation_is_entity_unlocked(
+                    simulation,result->entity_type)) {
+                result->result=FACTORY_RESULT_TECHNOLOGY_LOCKED;
                 continue;
             }
             if (!factory_construction_inventory_can_spend(

@@ -32,6 +32,12 @@ static FactoryCommand select_recipe(
     };
 }
 
+static void unlock_legacy_recipe_fixture(FactorySimulation *simulation)
+{
+    simulation->research.completed_bits |=
+        UINT64_C(1)<<FACTORY_TECHNOLOGY_BASIC_AUTOMATION;
+}
+
 static void check_recipe(
     FactoryAssemblerRecipeId id,
     FactoryItemType input_0,
@@ -109,6 +115,7 @@ static void test_fifo_selection_and_safe_switching(void)
     FactoryWorld *world = factory_world_create(3U, 3U);
     FactorySimulation *simulation =
         factory_simulation_create_with_construction_units(world, UINT32_MAX);
+    unlock_legacy_recipe_fixture(simulation);
     FactoryCommand place = place_assembler(0, 0);
     FactoryCommand select = select_recipe(
         1U, FACTORY_ASSEMBLER_RECIPE_IRON_GEAR
@@ -182,6 +189,7 @@ static void run_recipe(
     FactoryWorld *world = factory_world_create(2U, 3U);
     FactorySimulation *simulation =
         factory_simulation_create_with_construction_units(world, UINT32_MAX);
+    unlock_legacy_recipe_fixture(simulation);
     FactoryCommand place = place_assembler(0, 0);
     FactoryCommand select = select_recipe(1U, recipe_id);
     FactoryLogisticsEndpoint input_0 = {

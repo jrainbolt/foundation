@@ -120,6 +120,8 @@ size_t factory_content_entity_definition_count(void);
 const FactoryEntityDefinition *factory_content_entity_definition_at(size_t index);
 const FactoryEntityDefinition *factory_content_entity_definition_get(
     FactoryEntityType entity_type);
+FactoryUnlockFlags factory_content_entity_unlock_requirement(FactoryEntityType entity_type);
+bool factory_simulation_is_entity_unlocked(const FactorySimulation *simulation,FactoryEntityType entity_type);
 
 size_t factory_content_refinery_recipe_count(void);
 const FactoryRefineryRecipeDefinition *factory_content_refinery_recipe_at(
@@ -131,6 +133,8 @@ size_t factory_content_assembler_recipe_count(void);
 const FactoryAssemblerRecipe *factory_content_assembler_recipe_at(size_t index);
 const FactoryAssemblerRecipe *factory_content_assembler_recipe_get(
     FactoryAssemblerRecipeId id);
+FactoryUnlockFlags factory_content_assembler_recipe_unlock_requirement(FactoryAssemblerRecipeId id);
+bool factory_simulation_is_assembler_recipe_unlocked(const FactorySimulation *simulation,FactoryAssemblerRecipeId id);
 
 size_t factory_content_technology_count(void);
 const FactoryTechnologyDefinition *factory_content_technology_at(size_t index);
