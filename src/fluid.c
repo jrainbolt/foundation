@@ -1,4 +1,5 @@
 #include "fluid_internal.h"
+#include "foundation/content.h"
 
 #include "foundation/command.h"
 #include "simulation_internal.h"
@@ -7,15 +8,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-static const FactoryFluidDefinition fluid_definitions[] = {
-    {FACTORY_FLUID_WATER, "water", FACTORY_FLUID_CLASS_AQUEOUS},
-    {FACTORY_FLUID_STEAM, "steam", FACTORY_FLUID_CLASS_VAPOR},
-    {FACTORY_FLUID_EXHAUST_STEAM, "exhaust steam", FACTORY_FLUID_CLASS_VAPOR}
-};
-
 size_t factory_fluid_definition_count(void)
 {
-    return sizeof(fluid_definitions) / sizeof(fluid_definitions[0]);
+    return factory_content_fluid_count();
 }
 
 bool factory_fluid_definition_is_valid(
@@ -32,20 +27,15 @@ bool factory_fluid_definition_is_valid(
 
 const FactoryFluidDefinition *factory_fluid_definition_at(size_t index)
 {
-    return index < factory_fluid_definition_count()
-        ? &fluid_definitions[index] : NULL;
+    return factory_content_fluid_at(index);
 }
 
 const FactoryFluidDefinition *factory_fluid_definition_get(
     FactoryFluidType fluid_type
 )
 {
-    size_t index;
-    for (index = 0U; index < factory_fluid_definition_count(); ++index)
-        if (fluid_definitions[index].fluid_type == fluid_type
-            && factory_fluid_definition_is_valid(&fluid_definitions[index]))
-            return &fluid_definitions[index];
-    return NULL;
+    const FactoryFluidDefinition *definition=factory_content_fluid_get(fluid_type);
+    return factory_fluid_definition_is_valid(definition)?definition:NULL;
 }
 
 const char *factory_fluid_name(FactoryFluidType fluid_type)

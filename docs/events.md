@@ -58,6 +58,9 @@ Every `FactoryEvent` is fully initialized. Unused fields are zero or their
 | `HEAT_PORT_DISCONNECTED` | port owner | unused | stable heat-port slot in `quantity` |
 | `HEAT_TRANSFERRED` | reactor source | exchanger destination | transferred heat in `quantity` |
 | `HEAT_EXCHANGER_CYCLE_COMPLETED` | exchanger | unused | heat in `quantity`, water in `related_quantity`, steam in `third_quantity` |
+| `RESEARCH_SELECTED` | unused | unused | `technology_id` |
+| `RESEARCH_UNIT_COMPLETED` | unused | unused | `technology_id`, science `item_type`/`quantity`, completed units in `related_quantity`, required units in `third_quantity` |
+| `TECHNOLOGY_COMPLETED` | unused | unused | `technology_id`, final units in `quantity` |
 
 Construction and demolition events appear only after successful transactional
 commands. Production events appear only when output is committed. Transfer
@@ -84,6 +87,6 @@ the normal authoritative update phases. Fluid command events occupy their FIFO
 command positions. There is no event sorting pass.
 
 Events and their allocation capacity are observer state. They are not encoded
-in version 12 snapshots and do not affect canonical bytes. A loaded simulation
+in version 16 snapshots and do not affect canonical bytes. A loaded simulation
 starts with an empty batch. Failed loads create no simulation and cannot alter
 an existing simulation or its visible batch.

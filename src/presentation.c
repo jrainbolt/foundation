@@ -9,6 +9,10 @@ struct FactoryPresentationSnapshot {
     uint64_t tick;
     uint64_t day;
     uint32_t time_of_day;
+    FactoryTechnologyId active_research;
+    uint32_t research_science_quantity;
+    uint32_t completed_technology_count;
+    FactoryTechnologyProgressInspection active_research_progress;
     FactoryPresentationEntity *entities;
     size_t entity_count;
     FactoryPresentationResource *resources;
@@ -272,6 +276,7 @@ static FactoryResult populate_entity(
         out->data.storage.item_quantities[6] = storage->copper_wire_amount;
         out->data.storage.item_quantities[7] =
             storage->biomass_pellet_amount;
+        out->data.storage.item_quantities[8] = storage->basic_science_amount;
         out->data.storage.total_capacity = storage->total_capacity;
         out->data.storage.configured_output_item =
             storage->configured_output_item;
@@ -602,6 +607,14 @@ FactoryResult factory_presentation_snapshot_rebuild(
     next.tick = simulation->clock.tick;
     next.day = simulation->clock.day;
     next.time_of_day = simulation->clock.time_of_day;
+    next.active_research=factory_simulation_get_active_research(simulation);
+    next.research_science_quantity=
+        factory_simulation_get_research_science_quantity(simulation);
+    next.completed_technology_count=
+        factory_simulation_get_completed_technology_count(simulation);
+    if (next.active_research!=FACTORY_TECHNOLOGY_NONE)
+        (void)factory_simulation_get_technology_progress(simulation,
+            next.active_research,&next.active_research_progress);
     next.entity_count = simulation->entities->count;
     next.power_edge_count = simulation->power.connection_count;
     width = factory_world_get_width(simulation->world);
@@ -702,6 +715,29 @@ uint32_t factory_presentation_snapshot_get_time_of_day(
     const FactoryPresentationSnapshot *snapshot)
 {
     return snapshot == NULL ? 0U : snapshot->time_of_day;
+}
+
+FactoryTechnologyId factory_presentation_snapshot_get_active_research(
+    const FactoryPresentationSnapshot *snapshot)
+{ return snapshot==NULL?FACTORY_TECHNOLOGY_NONE:snapshot->active_research; }
+
+uint32_t factory_presentation_snapshot_get_research_science_quantity(
+    const FactoryPresentationSnapshot *snapshot)
+{ return snapshot==NULL?0U:snapshot->research_science_quantity; }
+
+uint32_t factory_presentation_snapshot_get_completed_technology_count(
+    const FactoryPresentationSnapshot *snapshot)
+{ return snapshot==NULL?0U:snapshot->completed_technology_count; }
+
+FactoryResult factory_presentation_snapshot_get_active_research_progress(
+    const FactoryPresentationSnapshot *snapshot,
+    FactoryTechnologyProgressInspection *out)
+{
+    if (snapshot==NULL || out==NULL) return FACTORY_RESULT_INVALID_ARGUMENT;
+    if (snapshot->active_research==FACTORY_TECHNOLOGY_NONE)
+        return FACTORY_RESULT_TECHNOLOGY_INVALID;
+    *out=snapshot->active_research_progress;
+    return FACTORY_RESULT_OK;
 }
 
 size_t factory_presentation_snapshot_get_entity_count(

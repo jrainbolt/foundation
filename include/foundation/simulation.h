@@ -29,6 +29,7 @@
 #include "foundation/heat.h"
 #include "foundation/reactor.h"
 #include "foundation/heat_network.h"
+#include "foundation/research.h"
 
 typedef struct FactorySimulation FactorySimulation;
 

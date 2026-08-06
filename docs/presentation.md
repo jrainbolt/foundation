@@ -38,8 +38,8 @@ stable entity IDs. No synthetic IDs are invented.
 
 Every entity record contains its ID, type, grid position, integer direction,
 derived machine status, and powered flag. Its tagged union contains the active
-entity type's integer-only state. Storage uses eight fixed item quantities in
-`FactoryItemType` order from iron ore through biomass pellets. Generator
+entity type's integer-only state. Storage uses nine fixed item quantities in
+`FactoryItemType` order from iron ore through Basic Science. Generator
 presentation includes burner inventory, current fuel, total and remaining
 ticks, unreleased fuel energy, released available energy, and activity.
 Fluid-tank presentation contains fluid type, current integer quantity, and
@@ -70,6 +70,10 @@ committed steam-consumed/water-produced quantities, completed cycles, and
 activity.
 Progress is always a tick numerator and duration denominator; no percentage
 or interpolation value is calculated.
+
+Global research presentation copies the active technology ID, controller
+science quantity, completed-technology count, and active unit/work progress.
+It never evaluates prerequisites or unlock state.
 
 Machine-status precedence is:
 

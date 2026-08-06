@@ -51,6 +51,7 @@ add_library(factory_engine
     src/belt.c
     src/burner.c
     src/clock.c
+    src/content.c
     src/command.c
     src/construction.c
     src/construction_inventory.c
@@ -69,6 +70,7 @@ add_library(factory_engine
     src/recipe.c
     src/refinery.c
     src/reactor.c
+    src/research.c
     src/simulation.c
     src/solar.c
     src/snapshot.c
@@ -351,4 +353,14 @@ if(BUILD_TESTING)
         factory_tick_preflight_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(factory_tick_preflight_tests PRIVATE factory_engine)
     add_test(NAME factory_tick_preflight_tests COMMAND factory_tick_preflight_tests)
+
+    add_executable(factory_research_tests tests/test_research.c)
+    target_include_directories(
+        factory_research_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(factory_research_tests PRIVATE factory_engine)
+    add_test(NAME factory_research_tests COMMAND factory_research_tests)
+
+    add_executable(factory_content_tests tests/test_content.c)
+    target_link_libraries(factory_content_tests PRIVATE factory_engine)
+    add_test(NAME factory_content_tests COMMAND factory_content_tests)
 endif()

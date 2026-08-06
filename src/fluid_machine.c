@@ -1,4 +1,5 @@
 #include "fluid_machine_internal.h"
+#include "foundation/content.h"
 
 #include "burner_internal.h"
 #include "fluid_internal.h"
@@ -6,17 +7,9 @@
 
 #include <stdlib.h>
 
-static const FactoryFluidConversionRecipe recipes[] = {
-    {
-        FACTORY_FLUID_RECIPE_BOIL_WATER,
-        FACTORY_FLUID_WATER, 100U, 100U,
-        FACTORY_FLUID_STEAM, 100U
-    }
-};
-
 size_t factory_fluid_conversion_recipe_count(void)
 {
-    return sizeof(recipes) / sizeof(recipes[0]);
+    return factory_content_fluid_conversion_recipe_count();
 }
 
 bool factory_fluid_conversion_recipe_is_valid(
@@ -35,7 +28,7 @@ const FactoryFluidConversionRecipe *factory_fluid_conversion_recipe_get(
     FactoryFluidRecipeId id
 )
 {
-    return id == FACTORY_FLUID_RECIPE_BOIL_WATER ? &recipes[0] : NULL;
+    return factory_content_fluid_conversion_recipe_get(id);
 }
 
 static bool reserve(void **items, size_t *capacity, size_t count, size_t width)

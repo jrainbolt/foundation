@@ -32,6 +32,14 @@ func _initialize() -> void:
 		return
 	if not _require(simulation.get_power_edges().is_empty(), "initial edges"):
 		return
+	var initial_research: Dictionary = simulation.get_research()
+	if not _require(
+		initial_research.active_technology_id == 0
+		and initial_research.science_quantity == 0
+		and initial_research.completed_technology_count == 0,
+		"unsafe initial research state"
+	):
+		return
 	var empty_adapter: Object = ClassDB.instantiate("FoundationSimulation")
 	if not _require(empty_adapter != null, "empty adapter construction failed"):
 		return
@@ -40,6 +48,19 @@ func _initialize() -> void:
 	if not _require(result == 0, simulation.result_name(result)):
 		return
 	if not _require(simulation.get_tick() == 2, "unexpected reset tick"):
+		return
+	var research: Dictionary = simulation.get_research()
+	if not _require(
+		research.active_technology_id == 1
+		and research.science_quantity == 2
+		and research.completed_technology_count == 0
+		and research.completed_units == 0
+		and research.required_units == 2
+		and research.work_ticks == 2
+		and research.work_ticks_per_unit == 3
+		and research.science_committed,
+		"research presentation parity: %s" % research
+	):
 		return
 	var entities: Array = simulation.get_entities()
 	var resources: Array = simulation.get_resources()

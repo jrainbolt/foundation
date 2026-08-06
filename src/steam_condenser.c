@@ -1,4 +1,5 @@
 #include "steam_condenser_internal.h"
+#include "foundation/content.h"
 
 #include "fluid_internal.h"
 #include "simulation_internal.h"
@@ -6,36 +7,21 @@
 
 #include <stdlib.h>
 
-static const FactorySteamCondenserDefinition definitions[] = {{
-    FACTORY_STEAM_CONDENSER_DEFINITION_BASIC,
-    FACTORY_FLUID_EXHAUST_STEAM,
-    FACTORY_FLUID_WATER,
-    100U,
-    100U,
-    50U,
-    1U,
-    FACTORY_STEAM_CONDENSER_STEAM_CAPACITY,
-    FACTORY_STEAM_CONDENSER_WATER_CAPACITY,
-    FACTORY_CONSTRUCTION_COST_STEAM_CONDENSER
-}};
-
 size_t factory_steam_condenser_definition_count(void)
 {
-    return sizeof(definitions) / sizeof(definitions[0]);
+    return factory_content_steam_condenser_count();
 }
 
 const FactorySteamCondenserDefinition *factory_steam_condenser_definition_at(
     size_t index)
 {
-    return index < factory_steam_condenser_definition_count()
-        ? &definitions[index] : NULL;
+    return factory_content_steam_condenser_at(index);
 }
 
 const FactorySteamCondenserDefinition *factory_steam_condenser_definition_get(
     FactorySteamCondenserDefinitionId id)
 {
-    return id == FACTORY_STEAM_CONDENSER_DEFINITION_BASIC
-        ? &definitions[0] : NULL;
+    return factory_content_steam_condenser_get(id);
 }
 
 bool factory_steam_condenser_definition_is_valid(

@@ -1,83 +1,14 @@
 #include "foundation/construction.h"
+#include "foundation/content.h"
 
 bool factory_entity_construction_cost(
     FactoryEntityType entity_type,
     FactoryConstructionMaterial *out_cost
 )
 {
-    FactoryConstructionMaterial cost;
-
-    if (out_cost == NULL) {
-        return false;
-    }
-    switch (entity_type) {
-        case FACTORY_ENTITY_TYPE_EXTRACTOR:
-            cost = FACTORY_CONSTRUCTION_COST_EXTRACTOR;
-            break;
-        case FACTORY_ENTITY_TYPE_BELT:
-            cost = FACTORY_CONSTRUCTION_COST_BELT;
-            break;
-        case FACTORY_ENTITY_TYPE_STORAGE:
-            cost = FACTORY_CONSTRUCTION_COST_STORAGE;
-            break;
-        case FACTORY_ENTITY_TYPE_REFINERY:
-            cost = FACTORY_CONSTRUCTION_COST_REFINERY;
-            break;
-        case FACTORY_ENTITY_TYPE_ASSEMBLER:
-            cost = FACTORY_CONSTRUCTION_COST_ASSEMBLER;
-            break;
-        case FACTORY_ENTITY_TYPE_SPLITTER:
-            cost = FACTORY_CONSTRUCTION_COST_SPLITTER;
-            break;
-        case FACTORY_ENTITY_TYPE_INSERTER:
-            cost = FACTORY_CONSTRUCTION_COST_INSERTER;
-            break;
-        case FACTORY_ENTITY_TYPE_POWER_POLE:
-            cost = FACTORY_CONSTRUCTION_COST_POWER_POLE;
-            break;
-        case FACTORY_ENTITY_TYPE_POWER_GENERATOR:
-            cost = FACTORY_CONSTRUCTION_COST_POWER_GENERATOR;
-            break;
-        case FACTORY_ENTITY_TYPE_FLUID_TANK:
-            cost = FACTORY_CONSTRUCTION_COST_FLUID_TANK;
-            break;
-        case FACTORY_ENTITY_TYPE_PIPE:
-            cost = FACTORY_CONSTRUCTION_COST_PIPE;
-            break;
-        case FACTORY_ENTITY_TYPE_WATER_EXTRACTOR:
-            cost = FACTORY_CONSTRUCTION_COST_WATER_EXTRACTOR;
-            break;
-        case FACTORY_ENTITY_TYPE_BOILER:
-            cost = FACTORY_CONSTRUCTION_COST_BOILER;
-            break;
-        case FACTORY_ENTITY_TYPE_STEAM_ENGINE:
-            cost = FACTORY_CONSTRUCTION_COST_STEAM_ENGINE;
-            break;
-        case FACTORY_ENTITY_TYPE_SOLAR_GENERATOR:
-            cost = FACTORY_CONSTRUCTION_COST_SOLAR_GENERATOR;
-            break;
-        case FACTORY_ENTITY_TYPE_ACCUMULATOR:
-            cost = FACTORY_CONSTRUCTION_COST_ACCUMULATOR;
-            break;
-        case FACTORY_ENTITY_TYPE_REACTOR_CORE:
-            cost = FACTORY_CONSTRUCTION_COST_REACTOR_CORE;
-            break;
-        case FACTORY_ENTITY_TYPE_HEAT_CONDUCTOR:
-            cost = FACTORY_CONSTRUCTION_COST_HEAT_CONDUCTOR;
-            break;
-        case FACTORY_ENTITY_TYPE_HEAT_EXCHANGER:
-            cost = FACTORY_CONSTRUCTION_COST_HEAT_EXCHANGER;
-            break;
-        case FACTORY_ENTITY_TYPE_STEAM_TURBINE:
-            cost = FACTORY_CONSTRUCTION_COST_STEAM_TURBINE;
-            break;
-        case FACTORY_ENTITY_TYPE_STEAM_CONDENSER:
-            cost = FACTORY_CONSTRUCTION_COST_STEAM_CONDENSER;
-            break;
-        case FACTORY_ENTITY_TYPE_NONE:
-        default:
-            return false;
-    }
-    *out_cost = cost;
+    const FactoryEntityDefinition *definition=
+        factory_content_entity_definition_get(entity_type);
+    if (out_cost==NULL || definition==NULL) return false;
+    *out_cost=definition->construction_cost;
     return true;
 }

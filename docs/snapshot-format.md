@@ -1,4 +1,7 @@
-# Snapshot format version 15
+# Snapshot format version 16
+
+Version 16 adds bounded authoritative research state to metadata and Basic
+Science to storage records. Older snapshot versions remain strictly rejected.
 
 Version 15 gives each Steam Turbine a second fluid storage/port pair for its
 exhaust output (`FACTORY_FLUID_STORAGE_STEAM_TURBINE_OUTPUT`), alongside the
@@ -43,11 +46,11 @@ Each section starts with four 32-bit fields:
 | Record count | Number of fixed-width records |
 | Payload size | Bytes following the section header |
 
-Version 15 requires each section exactly once in this order:
+Version 16 requires each section exactly once in this order:
 
 | Type | Section | Record width |
 |---:|---|---:|
-| 1 | Metadata | one 16-byte payload |
+| 1 | Metadata | one 64-byte payload |
 | 2 | Entity manager | 4 bytes per live ID plus 8-byte prefix |
 | 3 | World tiles | 16 bytes plus 8-byte dimensions |
 | 4 | Extractors | 36 |
@@ -56,7 +59,7 @@ Version 15 requires each section exactly once in this order:
 | 7 | Refineries | 48 |
 | 8 | Assemblers | 64 |
 | 9 | Inserters | 48 |
-| 10 | Storage | 60 |
+| 10 | Storage | 64 |
 | 11 | Power poles | 12 |
 | 12 | Power generators and optional burner payload | 44 |
 | 13 | Fluid storages | 32 |
@@ -83,8 +86,10 @@ row-major. Commands use a type plus five explicit 32-bit payload fields; unused
 fields are zero. Results contain that command encoding followed by result,
 entity, position, construction, assembler-recipe, and storage-output fields.
 
-Storage records include all eight counters, capacity, output configuration,
-buffer item, and occupancy. Assembler records include recipe, both generic
+Metadata contains tick, construction units, active research, research science,
+completed bits, and two fixed progress records. Storage records include all
+nine item counters, capacity, output configuration, buffer item, and occupancy.
+Assembler records include recipe, both generic
 counted slots, processing fields, and counted output. Inserter records include
 the complete state-machine state and source/destination coordinates.
 

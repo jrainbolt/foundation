@@ -1,18 +1,10 @@
 #include "reactor_internal.h"
+#include "foundation/content.h"
 
 #include "event_internal.h"
 #include "simulation_internal.h"
 
 #include <stdlib.h>
-
-static const FactoryNuclearFuelDefinition nuclear_fuels[] = {
-    {
-        FACTORY_NUCLEAR_FUEL_BASIC_ROD,
-        UINT64_C(10000),
-        100U,
-        FACTORY_REACTOR_MAX_HEAT_OUTPUT_PER_TICK
-    }
-};
 
 static uint32_t remaining_ticks(
     const FactoryNuclearFuelDefinition *definition,
@@ -27,23 +19,19 @@ static uint32_t remaining_ticks(
 
 size_t factory_nuclear_fuel_definition_count(void)
 {
-    return sizeof(nuclear_fuels) / sizeof(nuclear_fuels[0]);
+    return factory_content_nuclear_fuel_count();
 }
 
 const FactoryNuclearFuelDefinition *factory_nuclear_fuel_definition_at(
     size_t index)
 {
-    return index < factory_nuclear_fuel_definition_count()
-        ? &nuclear_fuels[index] : NULL;
+    return factory_content_nuclear_fuel_at(index);
 }
 
 const FactoryNuclearFuelDefinition *factory_nuclear_fuel_definition_get(
     FactoryNuclearFuelId fuel_id)
 {
-    for (size_t i = 0U; i < factory_nuclear_fuel_definition_count(); ++i)
-        if (nuclear_fuels[i].fuel_id == fuel_id)
-            return &nuclear_fuels[i];
-    return NULL;
+    return factory_content_nuclear_fuel_get(fuel_id);
 }
 
 void factory_reactor_store_destroy(FactoryReactorStore *store)

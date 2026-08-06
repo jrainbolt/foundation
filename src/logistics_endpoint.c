@@ -6,7 +6,7 @@
 static bool item_is_valid(FactoryItemType item)
 {
     return item > FACTORY_ITEM_NONE
-        && item <= FACTORY_ITEM_BIOMASS_PELLET;
+        && item <= FACTORY_ITEM_BASIC_SCIENCE;
 }
 
 bool factory_logistics_endpoint_equal(
@@ -438,8 +438,10 @@ static void insert_unchecked(
         ++storage->iron_gear_amount;
     } else if (item == FACTORY_ITEM_COPPER_WIRE) {
         ++storage->copper_wire_amount;
-    } else {
+    } else if (item == FACTORY_ITEM_BIOMASS_PELLET) {
         ++storage->biomass_pellet_amount;
+    } else {
+        ++storage->basic_science_amount;
     }
 }
 

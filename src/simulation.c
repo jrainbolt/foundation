@@ -1,4 +1,5 @@
 #include "foundation/simulation.h"
+#include "foundation/content.h"
 
 #include <stdlib.h>
 
@@ -74,7 +75,7 @@ FactorySimulation *factory_simulation_create_with_construction_units(
 {
     FactorySimulation *simulation;
 
-    if (world == NULL) {
+    if (world == NULL || !factory_content_validate()) {
         return NULL;
     }
     simulation = calloc(1U, sizeof(*simulation));
@@ -1499,7 +1500,7 @@ static FactoryResult set_storage_output(
     FactoryStorage *storage;
 
     if (item < FACTORY_ITEM_NONE
-        || item > FACTORY_ITEM_BIOMASS_PELLET) {
+        || item > FACTORY_ITEM_BASIC_SCIENCE) {
         return FACTORY_RESULT_INVALID_ARGUMENT;
     }
     if (!factory_entity_is_valid(simulation->entities, id)) {
@@ -1704,6 +1705,14 @@ static void apply_commands(FactorySimulation *simulation)
             case FACTORY_COMMAND_PLACE_STEAM_CONDENSER:
                 result->result=place_steam_condenser(
                     simulation,&result->command,&result->entity_id);
+                break;
+            case FACTORY_COMMAND_SELECT_RESEARCH:
+                result->result=factory_research_select(simulation,
+                    result->command.data.select_research.technology_id);
+                break;
+            case FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE:
+                result->result=factory_research_insert_science(simulation,
+                    result->command.data.insert_research_science.quantity);
                 break;
             case FACTORY_COMMAND_FLUID_INSERT:
             case FACTORY_COMMAND_FLUID_REMOVE:
@@ -2601,10 +2610,10 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     }
     possible_entities =
         simulation->entities->count + simulation->command_count;
-    if (possible_entities > (SIZE_MAX - 1U) / 8U) {
+    if (possible_entities > (SIZE_MAX - 4U) / 8U) {
         return FACTORY_RESULT_POWER_OVERFLOW;
     }
-    event_limit = possible_entities * 8U + 1U;
+    event_limit = possible_entities * 8U + 4U;
     if (!factory_event_batch_reserve(&simulation->events, event_limit)) {
         return FACTORY_RESULT_OUT_OF_MEMORY;
     }
@@ -2645,6 +2654,7 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     update_belt_transfers(simulation);
     factory_refinery_store_update(&simulation->refineries, simulation);
     factory_assembler_store_update(&simulation->assemblers, simulation);
+    factory_research_update(simulation);
     factory_storage_store_update(&simulation->storages);
     update_inserters(simulation);
     simulation->events.recording = false;

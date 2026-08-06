@@ -27,6 +27,7 @@
 #include "reactor_internal.h"
 #include "heat_network_internal.h"
 #include "tick_preflight_internal.h"
+#include "research_internal.h"
 
 struct FactorySimulation {
     FactorySimulationClock clock;
@@ -60,6 +61,7 @@ struct FactorySimulation {
     FactoryHeatExchangerStore heat_exchangers;
     FactoryHeatNetworkState heat_networks;
     FactoryTickPreflight tick_preflight;
+    FactoryResearchState research;
     /* Test-fixture setup only; production simulations leave this zero. */
     uint32_t fixture_initial_generator_fuel;
     FactoryPowerState power;

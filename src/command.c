@@ -52,7 +52,7 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
             return command->data.set_storage_output.item
                 >= FACTORY_ITEM_NONE
                 && command->data.set_storage_output.item
-                    <= FACTORY_ITEM_BIOMASS_PELLET;
+                    <= FACTORY_ITEM_BASIC_SCIENCE;
         case FACTORY_COMMAND_PLACE_POWER_POLE:
         case FACTORY_COMMAND_PLACE_POWER_GENERATOR:
         case FACTORY_COMMAND_PLACE_FLUID_TANK:
@@ -72,6 +72,11 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
             return command->data.insert_reactor_fuel.reactor_entity_id != 0U
                 && factory_nuclear_fuel_definition_get(
                     command->data.insert_reactor_fuel.fuel_id) != NULL;
+        case FACTORY_COMMAND_SELECT_RESEARCH:
+            return command->data.select_research.technology_id
+                != FACTORY_TECHNOLOGY_NONE;
+        case FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE:
+            return command->data.insert_research_science.quantity!=0U;
         case FACTORY_COMMAND_FLUID_INSERT:
             return command->data.fluid_insert.destination_entity_id != 0U
                 && factory_fluid_definition_get(

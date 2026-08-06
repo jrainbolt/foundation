@@ -8,7 +8,7 @@
 #include "foundation/simulation.h"
 
 #define FACTORY_PRESENTATION_DIRECTION_NONE (-1)
-#define FACTORY_PRESENTATION_STORAGE_ITEM_COUNT 8U
+#define FACTORY_PRESENTATION_STORAGE_ITEM_COUNT 9U
 
 typedef enum {
     FACTORY_PRESENTATION_MACHINE_STATUS_NONE = 0,
@@ -317,6 +317,15 @@ uint64_t factory_presentation_snapshot_get_day(
 uint32_t factory_presentation_snapshot_get_time_of_day(
     const FactoryPresentationSnapshot *snapshot
 );
+FactoryTechnologyId factory_presentation_snapshot_get_active_research(
+    const FactoryPresentationSnapshot *snapshot);
+uint32_t factory_presentation_snapshot_get_research_science_quantity(
+    const FactoryPresentationSnapshot *snapshot);
+uint32_t factory_presentation_snapshot_get_completed_technology_count(
+    const FactoryPresentationSnapshot *snapshot);
+FactoryResult factory_presentation_snapshot_get_active_research_progress(
+    const FactoryPresentationSnapshot *snapshot,
+    FactoryTechnologyProgressInspection *out_progress);
 size_t factory_presentation_snapshot_get_entity_count(
     const FactoryPresentationSnapshot *snapshot
 );

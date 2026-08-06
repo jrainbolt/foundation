@@ -20,6 +20,8 @@
 - [x] Deterministic Factorio-style power networks
 - [x] Deterministic transient simulation event stream
 - [x] Deterministic renderer-neutral presentation snapshots
+- [x] Deterministic research and technology progression infrastructure
+- [x] Unified deterministic immutable content definitions
 - [ ] Inserter variants, filters, and longer arms
 
 Godot bindings, incremental synchronization, and other frontend integrations

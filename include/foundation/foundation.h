@@ -10,6 +10,8 @@ extern "C" {
 #endif
 
 #include "foundation/presentation.h"
+#include "foundation/research.h"
+#include "foundation/content.h"
 
 #ifdef __cplusplus
 }

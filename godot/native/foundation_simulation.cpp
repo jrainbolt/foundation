@@ -152,6 +152,13 @@ const char *result_name_c(FactoryResult result)
         return "fuel inventory full";
     case FACTORY_RESULT_HEAT_NETWORK_NOT_FOUND:
         return "heat network not found";
+    case FACTORY_RESULT_TECHNOLOGY_INVALID: return "technology invalid";
+    case FACTORY_RESULT_TECHNOLOGY_ALREADY_COMPLETED:
+        return "technology already completed";
+    case FACTORY_RESULT_TECHNOLOGY_PREREQUISITES_MISSING:
+        return "technology prerequisites missing";
+    case FACTORY_RESULT_RESEARCH_INVENTORY_OVERFLOW:
+        return "research inventory overflow";
     }
     return "unknown result";
 }
@@ -187,6 +194,9 @@ void FoundationSimulation::_bind_methods()
     ClassDB::bind_method(D_METHOD("get_day"), &FoundationSimulation::get_day);
     ClassDB::bind_method(
         D_METHOD("get_time_of_day"), &FoundationSimulation::get_time_of_day
+    );
+    ClassDB::bind_method(
+        D_METHOD("get_research"), &FoundationSimulation::get_research
     );
     ClassDB::bind_method(
         D_METHOD("get_entities"), &FoundationSimulation::get_entities
@@ -301,6 +311,17 @@ FactoryResult FoundationSimulation::build_demo()
         if (result != FACTORY_RESULT_OK)
             return result;
     }
+    FactoryCommand research_science = {};
+    research_science.type = FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE;
+    research_science.data.insert_research_science.quantity = 4U;
+    result = submit(research_science);
+    if (result != FACTORY_RESULT_OK) return result;
+    FactoryCommand select_research = {};
+    select_research.type = FACTORY_COMMAND_SELECT_RESEARCH;
+    select_research.data.select_research.technology_id =
+        FACTORY_TECHNOLOGY_BASIC_AUTOMATION;
+    result = submit(select_research);
+    if (result != FACTORY_RESULT_OK) return result;
     result = factory_simulation_tick(simulation_);
     if (result != FACTORY_RESULT_OK)
         return result;
@@ -571,6 +592,28 @@ int64_t FoundationSimulation::get_time_of_day() const
 {
     return simulation_ == nullptr
         ? 0 : (int64_t)factory_simulation_clock_get_time_of_day(simulation_);
+}
+
+Dictionary FoundationSimulation::get_research() const
+{
+    Dictionary value;
+    if (presentation_ == nullptr) return value;
+    value["active_technology_id"]=(int64_t)
+        factory_presentation_snapshot_get_active_research(presentation_);
+    value["science_quantity"]=(int64_t)
+        factory_presentation_snapshot_get_research_science_quantity(presentation_);
+    value["completed_technology_count"]=(int64_t)
+        factory_presentation_snapshot_get_completed_technology_count(presentation_);
+    FactoryTechnologyProgressInspection progress={};
+    if (factory_presentation_snapshot_get_active_research_progress(
+            presentation_,&progress)==FACTORY_RESULT_OK) {
+        value["completed_units"]=(int64_t)progress.completed_units;
+        value["required_units"]=(int64_t)progress.required_units;
+        value["work_ticks"]=(int64_t)progress.work_ticks_in_current_unit;
+        value["work_ticks_per_unit"]=(int64_t)progress.work_ticks_per_unit;
+        value["science_committed"]=progress.science_committed_for_current_unit;
+    }
+    return value;
 }
 
 void FoundationSimulation::set_conversion_error(
@@ -1082,6 +1125,7 @@ Array FoundationSimulation::get_events() const
             (int64_t)event->related_fluid_type;
         value["nuclear_fuel_id"] =
             (int64_t)event->nuclear_fuel_id;
+        value["technology_id"]=(int64_t)event->technology_id;
         value["quantity"] = (int64_t)event->quantity;
         value["related_quantity"] =
             (int64_t)event->related_quantity;

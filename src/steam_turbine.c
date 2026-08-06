@@ -1,4 +1,5 @@
 #include "steam_turbine_internal.h"
+#include "foundation/content.h"
 
 #include "fluid_internal.h"
 #include "simulation_internal.h"
@@ -6,37 +7,21 @@
 
 #include <stdlib.h>
 
-static const FactorySteamTurbineDefinition definitions[] = {{
-    FACTORY_STEAM_TURBINE_DEFINITION_BASIC,
-    FACTORY_FLUID_STEAM,
-    FACTORY_FLUID_EXHAUST_STEAM,
-    100U,
-    100U,
-    200U,
-    1U,
-    FACTORY_STEAM_TURBINE_MAX_OUTPUT,
-    FACTORY_STEAM_TURBINE_STORAGE_CAPACITY,
-    FACTORY_STEAM_TURBINE_STORAGE_CAPACITY,
-    FACTORY_CONSTRUCTION_COST_STEAM_TURBINE
-}};
-
 size_t factory_steam_turbine_definition_count(void)
 {
-    return sizeof(definitions) / sizeof(definitions[0]);
+    return factory_content_steam_turbine_count();
 }
 
 const FactorySteamTurbineDefinition *factory_steam_turbine_definition_at(
     size_t index)
 {
-    return index < factory_steam_turbine_definition_count()
-        ? &definitions[index] : NULL;
+    return factory_content_steam_turbine_at(index);
 }
 
 const FactorySteamTurbineDefinition *factory_steam_turbine_definition_get(
     FactorySteamTurbineDefinitionId id)
 {
-    return id == FACTORY_STEAM_TURBINE_DEFINITION_BASIC
-        ? &definitions[0] : NULL;
+    return factory_content_steam_turbine_get(id);
 }
 
 bool factory_steam_turbine_definition_is_valid(

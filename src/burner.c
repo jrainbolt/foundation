@@ -1,28 +1,19 @@
 #include "burner_internal.h"
+#include "foundation/content.h"
 
 #include "event_internal.h"
 #include "simulation_internal.h"
 
 #include <stdlib.h>
 
-static const FactoryFuelDefinition fuel_definitions[] = {
-    {
-        FACTORY_ITEM_BIOMASS_PELLET,
-        1000U,
-        100000U,
-        FACTORY_FUEL_CLASS_SOLID
-    }
-};
-
 size_t factory_fuel_definition_count(void)
 {
-    return sizeof(fuel_definitions) / sizeof(fuel_definitions[0]);
+    return factory_content_fuel_count();
 }
 
 const FactoryFuelDefinition *factory_fuel_definition_at(size_t index)
 {
-    return index < factory_fuel_definition_count()
-        ? &fuel_definitions[index] : NULL;
+    return factory_content_fuel_at(index);
 }
 
 bool factory_fuel_definition_is_valid(
@@ -42,12 +33,8 @@ const FactoryFuelDefinition *factory_fuel_definition_get(
     FactoryItemType item
 )
 {
-    size_t index;
-    for (index = 0U; index < factory_fuel_definition_count(); ++index)
-        if (fuel_definitions[index].item_type == item
-            && factory_fuel_definition_is_valid(&fuel_definitions[index]))
-            return &fuel_definitions[index];
-    return NULL;
+    const FactoryFuelDefinition *definition=factory_content_fuel_get(item);
+    return factory_fuel_definition_is_valid(definition)?definition:NULL;
 }
 
 void factory_burner_store_destroy(FactoryBurnerStore *store)

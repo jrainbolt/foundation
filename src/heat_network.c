@@ -1,4 +1,5 @@
 #include "heat_network_internal.h"
+#include "foundation/content.h"
 
 #include "event_internal.h"
 #include "fluid_internal.h"
@@ -8,15 +9,10 @@
 
 #include <stdlib.h>
 
-static const FactoryHeatExchangeRecipe heat_exchange_recipe = {
-    FACTORY_HEAT_EXCHANGE_RECIPE_WATER_TO_STEAM, UINT64_C(100),
-    100U, 100U, 1U};
-
 const FactoryHeatExchangeRecipe *factory_heat_exchange_recipe_get(
     uint32_t recipe_id)
 {
-    return recipe_id==heat_exchange_recipe.recipe_id
-        ? &heat_exchange_recipe:NULL;
+    return factory_content_heat_exchange_recipe_get(recipe_id);
 }
 
 static bool adjacent(int32_t ax, int32_t ay, int32_t bx, int32_t by)
@@ -312,7 +308,8 @@ static FactoryHeatPortInspection *port_for(
 
 void factory_heat_exchangers_update(FactorySimulation *simulation)
 {
-    const FactoryHeatExchangeRecipe *recipe=&heat_exchange_recipe;
+    const FactoryHeatExchangeRecipe *recipe=factory_content_heat_exchange_recipe_get(
+        FACTORY_HEAT_EXCHANGE_RECIPE_WATER_TO_STEAM);
     for (size_t pi=0U;pi<simulation->heat_networks.port_count;++pi) {
         FactoryHeatPortInspection *consumer=&simulation->heat_networks.ports[pi];
         FactoryHeatExchanger *e;

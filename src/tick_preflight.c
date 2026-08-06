@@ -79,6 +79,8 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
         case FACTORY_COMMAND_FLUID_REMOVE:
         case FACTORY_COMMAND_FLUID_TRANSFER:
         case FACTORY_COMMAND_INSERT_REACTOR_FUEL:
+        case FACTORY_COMMAND_SELECT_RESEARCH:
+        case FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE:
             break;
         default:
             ++additions;

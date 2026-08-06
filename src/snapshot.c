@@ -185,7 +185,7 @@ static bool read_u64(SnapshotReader *reader, uint64_t *out_value)
 
 static bool item_valid_or_none(uint32_t value)
 {
-    return value <= (uint32_t)FACTORY_ITEM_BIOMASS_PELLET;
+    return value <= (uint32_t)FACTORY_ITEM_BASIC_SCIENCE;
 }
 
 static bool item_valid(uint32_t value)
@@ -210,6 +210,9 @@ static bool snapshot_command_valid(const FactoryCommand *command)
             && command->data.set_refinery_recipe.recipe_id
                 <= FACTORY_RECIPE_COPPER_PLATE;
     }
+    if (command->type==FACTORY_COMMAND_SELECT_RESEARCH)
+        return factory_technology_definition_get(
+            command->data.select_research.technology_id)!=NULL;
     return true;
 }
 
@@ -255,7 +258,7 @@ static FactoryResult snapshot_size_unvalidated(
     }
     tiles = (size_t)simulation->world->width
         * (size_t)simulation->world->height;
-    if (!checked_add(&size, 16U)
+    if (!checked_add(&size, 64U)
         || !checked_add(&size, 8U)
         || !checked_records(
             &size, simulation->entities->count, 4U)
@@ -267,7 +270,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_records(&size, simulation->refineries.count, 48U)
         || !checked_records(&size, simulation->assemblers.count, 64U)
         || !checked_records(&size, simulation->inserters.count, 48U)
-        || !checked_records(&size, simulation->storages.count, 60U)
+        || !checked_records(&size, simulation->storages.count, 64U)
         || !checked_records(&size, simulation->power_poles.count, 12U)
         || !checked_records(&size, simulation->power_generators.count, 44U)
         || !checked_records(&size, simulation->fluid_storages.count, 32U)
@@ -730,7 +733,8 @@ static FactoryResult validate_simulation(
             + value->iron_plate_amount + value->copper_ore_amount
             + value->copper_plate_amount
             + value->electronic_component_amount + value->iron_gear_amount
-            + value->copper_wire_amount + value->biomass_pellet_amount;
+            + value->copper_wire_amount + value->biomass_pellet_amount
+            + value->basic_science_amount;
         if (total > value->total_capacity
             || value->total_capacity != FACTORY_STORAGE_CAPACITY
             || !item_valid_or_none(
@@ -1094,10 +1098,12 @@ static FactoryResult validate_simulation(
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
         }
     }
+    if (!factory_research_state_valid(&simulation->research))
+        return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     for (index = 0U; index < simulation->result_count; ++index) {
         const FactoryCommandResult *value = &simulation->results[index];
         if (!snapshot_command_valid(&value->command)
-            || value->result > FACTORY_RESULT_HEAT_NETWORK_NOT_FOUND
+            || value->result > FACTORY_RESULT_RESEARCH_INVENTORY_OVERFLOW
             || value->entity_type > FACTORY_ENTITY_TYPE_STEAM_CONDENSER
             || value->previous_assembler_recipe
                 >= FACTORY_ASSEMBLER_RECIPE_COUNT
@@ -1250,6 +1256,12 @@ static void write_command(
             fields[0]=(uint32_t)command->data.place_steam_condenser.x;
             fields[1]=(uint32_t)command->data.place_steam_condenser.y;
             break;
+        case FACTORY_COMMAND_SELECT_RESEARCH:
+            fields[0]=command->data.select_research.technology_id;
+            break;
+        case FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE:
+            fields[0]=command->data.insert_research_science.quantity;
+            break;
     }
     write_u32(writer, (uint32_t)command->type);
     for (index = 0U; index < 5U; ++index) {
@@ -1272,7 +1284,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             return false;
         }
     }
-    if (type > FACTORY_COMMAND_PLACE_STEAM_CONDENSER) {
+    if (type > FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE) {
         return false;
     }
     command->type = (FactoryCommandType)type;
@@ -1315,6 +1327,8 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
                 break;
             case FACTORY_COMMAND_DEMOLISH_ENTITY:
             case FACTORY_COMMAND_GRANT_CONSTRUCTION_UNITS:
+            case FACTORY_COMMAND_SELECT_RESEARCH:
+            case FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE:
                 used = 1U;
                 break;
         }
@@ -1463,6 +1477,12 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             command->data.place_steam_condenser.x=(int32_t)fields[0];
             command->data.place_steam_condenser.y=(int32_t)fields[1];
             break;
+        case FACTORY_COMMAND_SELECT_RESEARCH:
+            command->data.select_research.technology_id=fields[0];
+            break;
+        case FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE:
+            command->data.insert_research_science.quantity=fields[0];
+            break;
     }
     return snapshot_command_valid(command);
 }
@@ -1486,10 +1506,19 @@ static void write_snapshot(
     write_u32(writer, SNAPSHOT_SECTION_COUNT);
     write_u32(writer, 0U);
 
-    write_section_header(writer, SNAPSHOT_SECTION_METADATA, 1U, 16U);
+    write_section_header(writer, SNAPSHOT_SECTION_METADATA, 1U, 64U);
     write_u64(writer, simulation->clock.tick);
     write_u32(writer, simulation->construction_inventory.units);
     write_u32(writer, 0U);
+    write_u32(writer,simulation->research.active);
+    write_u32(writer,simulation->research.science_quantity);
+    write_u64(writer,simulation->research.completed_bits);
+    for (index=0U;index<FACTORY_TECHNOLOGY_COUNT;++index) {
+        write_u32(writer,simulation->research.progress[index].completed_units);
+        write_u64(writer,simulation->research.progress[index].work_ticks);
+        write_u32(writer,simulation->research.progress[index].science_committed
+            ?1U:0U);
+    }
 
     write_section_header(
         writer, SNAPSHOT_SECTION_ENTITIES,
@@ -1620,7 +1649,7 @@ static void write_snapshot(
 
     write_section_header(
         writer, SNAPSHOT_SECTION_STORAGES,
-        simulation->storages.count, simulation->storages.count * 60U
+        simulation->storages.count, simulation->storages.count * 64U
     );
     for (index = 0U; index < simulation->storages.count; ++index) {
         const FactoryStorage *value = &simulation->storages.items[index];
@@ -1634,6 +1663,7 @@ static void write_snapshot(
         write_u32(writer, value->iron_gear_amount);
         write_u32(writer, value->copper_wire_amount);
         write_u32(writer, value->biomass_pellet_amount);
+        write_u32(writer, value->basic_science_amount);
         write_u32(writer, value->total_capacity);
         write_u32(writer, value->configured_output_item);
         write_u32(writer, value->output_item);
@@ -2060,13 +2090,22 @@ static bool load_sections(
     size_t index;
 
     if (!read_section_header(
-            reader, SNAPSHOT_SECTION_METADATA, 0U, 16U, &count)
+            reader, SNAPSHOT_SECTION_METADATA, 0U, 64U, &count)
         || count != 1U
         || !read_u64(reader, &tick)
         || !read_u32(reader, &simulation->construction_inventory.units)
         || !read_u32(reader, &reserved)
-        || reserved != 0U) {
+        || reserved != 0U
+        || !read_u32(reader,&simulation->research.active)
+        || !read_u32(reader,&simulation->research.science_quantity)
+        || !read_u64(reader,&simulation->research.completed_bits)) {
         return false;
+    }
+    for (index=0U;index<FACTORY_TECHNOLOGY_COUNT;++index) {
+        FactoryTechnologyProgress *p=&simulation->research.progress[index];
+        if (!read_u32(reader,&p->completed_units)
+            || !read_u64(reader,&p->work_ticks)
+            || !read_bool32(reader,&p->science_committed)) return false;
     }
     factory_simulation_clock_set(&simulation->clock, tick);
 
@@ -2229,7 +2268,7 @@ static bool load_sections(
             || !read_i32(reader, &v->destination_y)) return false;
     }
 
-    LOAD_STORE(SNAPSHOT_SECTION_STORAGES, storages, FactoryStorage, 60U);
+    LOAD_STORE(SNAPSHOT_SECTION_STORAGES, storages, FactoryStorage, 64U);
     for (index = 0U; index < count; ++index) {
         FactoryStorage *v = &simulation->storages.items[index];
         if (!read_u32(reader, &v->entity_id)
@@ -2242,6 +2281,7 @@ static bool load_sections(
             || !read_u32(reader, &v->iron_gear_amount)
             || !read_u32(reader, &v->copper_wire_amount)
             || !read_u32(reader, &v->biomass_pellet_amount)
+            || !read_u32(reader, &v->basic_science_amount)
             || !read_u32(reader, &v->total_capacity)
             || !read_u32(reader, &value)) return false;
         v->configured_output_item = (FactoryItemType)value;

@@ -1,21 +1,14 @@
 #include "steam_engine_internal.h"
+#include "foundation/content.h"
 
 #include "fluid_internal.h"
 #include "simulation_internal.h"
 
 #include <stdlib.h>
 
-static const FactorySteamGenerationRecipe recipes[] = {{
-    FACTORY_STEAM_GENERATION_RECIPE_BASIC,
-    FACTORY_FLUID_STEAM,
-    100U,
-    100U,
-    FACTORY_STEAM_ENGINE_MAX_OUTPUT
-}};
-
 size_t factory_steam_generation_recipe_count(void)
 {
-    return sizeof(recipes) / sizeof(recipes[0]);
+    return factory_content_steam_recipe_count();
 }
 
 bool factory_steam_generation_recipe_is_valid(
@@ -35,7 +28,7 @@ const FactorySteamGenerationRecipe *factory_steam_generation_recipe_get(
     FactorySteamGenerationRecipeId id
 )
 {
-    return id == FACTORY_STEAM_GENERATION_RECIPE_BASIC ? &recipes[0] : NULL;
+    return factory_content_steam_recipe_get(id);
 }
 
 static bool reserve(FactorySteamEngineStore *store)

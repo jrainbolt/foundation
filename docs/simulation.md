@@ -86,3 +86,10 @@ After commands, power topology and allocation are rebuilt before extraction.
 The resulting powered flags govern extractors, refineries, assemblers, and both
 inserter phases for that tick. Passive transfers retain their established
 relative order and require no power.
+
+Research selection commands apply in the same FIFO command phase. The global
+controller then consumes a complete Basic Science cost when starting a unit
+and advances one integer work tick after powered production, but before storage
+output and inserter logistics. Items delivered during logistics are therefore
+usable by research only on a later tick. Preflight reserves possible research
+events before any command or progress mutation.

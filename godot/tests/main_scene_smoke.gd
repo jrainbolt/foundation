@@ -25,6 +25,11 @@ func _run() -> void:
 	if initial_tick != 2 or canvas.entity_nodes.size() != 48:
 		_fail("deterministic demo or entity visuals are incorrect")
 		return
+	var research: Dictionary = main.simulation.get_research()
+	if int(research.get("active_technology_id", 0)) != 1 \
+			or int(research.get("work_ticks", 0)) != 2:
+		_fail("deterministic demo research state is incorrect")
+		return
 	var tank_count := 0
 	var filled_tank_count := 0
 	for entity_id: int in canvas.entity_nodes:

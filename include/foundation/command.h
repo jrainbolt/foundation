@@ -10,6 +10,7 @@
 #include "foundation/reactor.h"
 #include <foundation/world.h>
 #include "foundation/recipe.h"
+#include "foundation/research.h"
 
 #define FACTORY_COMMAND_QUEUE_CAPACITY 32U
 
@@ -50,7 +51,9 @@ typedef enum {
     FACTORY_COMMAND_PLACE_HEAT_CONDUCTOR,
     FACTORY_COMMAND_PLACE_HEAT_EXCHANGER,
     FACTORY_COMMAND_PLACE_STEAM_TURBINE,
-    FACTORY_COMMAND_PLACE_STEAM_CONDENSER
+    FACTORY_COMMAND_PLACE_STEAM_CONDENSER,
+    FACTORY_COMMAND_SELECT_RESEARCH,
+    FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE
 } FactoryCommandType;
 
 typedef struct {
@@ -153,6 +156,8 @@ typedef struct {
         struct { int32_t x; int32_t y; } place_heat_exchanger;
         struct { int32_t x; int32_t y; } place_steam_turbine;
         struct { int32_t x; int32_t y; } place_steam_condenser;
+        struct { FactoryTechnologyId technology_id; } select_research;
+        struct { uint32_t quantity; } insert_research_science;
     } data;
 } FactoryCommand;
 

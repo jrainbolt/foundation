@@ -7,6 +7,7 @@
 #include "foundation/entity.h"
 #include "foundation/item.h"
 #include "foundation/fluid.h"
+#include "foundation/research.h"
 
 typedef struct FactorySimulation FactorySimulation;
 
@@ -45,7 +46,10 @@ typedef enum {
     FACTORY_EVENT_HEAT_TRANSFERRED,
     FACTORY_EVENT_HEAT_EXCHANGER_CYCLE_COMPLETED,
     FACTORY_EVENT_STEAM_TURBINE_CYCLE_COMPLETED,
-    FACTORY_EVENT_STEAM_CONDENSER_CYCLE_COMPLETED
+    FACTORY_EVENT_STEAM_CONDENSER_CYCLE_COMPLETED,
+    FACTORY_EVENT_RESEARCH_SELECTED,
+    FACTORY_EVENT_RESEARCH_UNIT_COMPLETED,
+    FACTORY_EVENT_TECHNOLOGY_COMPLETED
 } FactoryEventType;
 
 /*
@@ -86,6 +90,12 @@ typedef enum {
  * condenser cycle: entity_id is the condenser; fluid_type/quantity are the
  * consumed steam and related_fluid_type/related_quantity are the produced
  * water.
+ * research selected: technology_id identifies the new active selection.
+ * research unit completed: technology_id and item_type/quantity identify the
+ * unit and committed science; related_quantity is completed units and
+ * third_quantity is required units. The global-controller model has no lab ID.
+ * technology completed: technology_id identifies the technology and quantity
+ * is its final completed-unit count.
  *
  * tick is the simulation tick at the start of the step that emitted the
  * event. Item-transfer quantity is currently one.
@@ -100,6 +110,7 @@ typedef struct {
     FactoryFluidType fluid_type;
     FactoryFluidType related_fluid_type;
     uint32_t nuclear_fuel_id;
+    FactoryTechnologyId technology_id;
     uint32_t quantity;
     uint32_t related_quantity;
     uint32_t third_quantity;

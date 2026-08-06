@@ -106,3 +106,14 @@ transactional full rebuild reads simulation internals without borrowing
 pointers, orders real entities by stable ID, copies deposits in row-major
 order, and reuses the canonical derived power-edge order. Presentation status
 and progress never flow back into authoritative state.
+
+The simulation also owns a fixed global research controller. Immutable
+technology definitions remain static content; active selection, science
+inventory, per-technology progress, and completed bits are authoritative and
+snapshot-backed. Unlock and presentation queries derive only from that state.
+
+All immutable gameplay metadata now has one architectural home in the content
+definition layer. Subsystems retain their historical lookup APIs as wrappers,
+while simulation components store stable IDs and authoritative quantities only.
+Central validation checks every table and cross-reference before simulation
+initialization. See `content-definitions.md`.
