@@ -21,9 +21,11 @@ git clone --branch godot-4.5-stable --depth 1 \
 export GODOT_CPP_DIR="$(cd ../godot-cpp-4.5 && pwd)"
 ```
 
-The exact required tag and commit are recorded in `GODOT_CPP_VERSION` and
-`GODOT_CPP_COMMIT`. The build wrapper refuses an untagged or mismatched
-checkout. These bindings officially target Godot 4.5; the adapter is also
+The expected tag and exact required commit are recorded in `GODOT_CPP_VERSION`
+and `GODOT_CPP_COMMIT`. The build wrapper verifies the commit as authoritative,
+reports the tag when locally available, and rejects every mismatched checkout;
+a detached checkout or missing local tag object is accepted only at that exact
+commit. These bindings officially target Godot 4.5; the adapter is also
 runtime-tested against the forward-compatible Godot 4.7.1 GDExtension API.
 
 ## Build and run

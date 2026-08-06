@@ -383,7 +383,7 @@ FactoryResult FoundationSimulation::build_demo()
     configuration[2].type = FACTORY_COMMAND_SET_ASSEMBLER_RECIPE;
     configuration[2].data.set_assembler_recipe = {
         assembler->entity_id,
-        FACTORY_ASSEMBLER_RECIPE_ELECTRONIC_COMPONENT
+        FACTORY_ASSEMBLER_RECIPE_COPPER_WIRE
     };
     configuration[3].type = FACTORY_COMMAND_SET_STORAGE_OUTPUT;
     configuration[3].data.set_storage_output = {

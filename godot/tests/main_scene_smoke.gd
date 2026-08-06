@@ -22,12 +22,12 @@ func _run() -> void:
 		return
 	var initial_tick := int(main.simulation.get_tick())
 	var canvas: Node = main.canvas
-	if initial_tick != 2 or canvas.entity_nodes.size() != 48:
+	if initial_tick != 11 or canvas.entity_nodes.size() != 48:
 		_fail("deterministic demo or entity visuals are incorrect")
 		return
 	var research: Dictionary = main.simulation.get_research()
-	if int(research.get("active_technology_id", 0)) != 1 \
-			or int(research.get("work_ticks", 0)) != 2:
+	if int(research.get("active_technology_id", -1)) != 0 \
+			or int(research.get("completed_technology_count", 0)) != 2:
 		_fail("deterministic demo research state is incorrect")
 		return
 	var tank_count := 0
@@ -66,9 +66,13 @@ func _run() -> void:
 	var heat_exchanger_count := 0
 	var steam_turbine_count := 0
 	var steam_condenser_count := 0
+	var gated_assembler_count := 0
 	for entity_id: int in canvas.entity_nodes:
 		var visual: FoundationEntityVisual = canvas.entity_nodes[entity_id]
-		if int(visual.state.get("type", 0)) == 12:
+		if int(visual.state.get("type", 0)) == 4:
+			if int(visual.state.get("recipe", 0)) == 3:
+				gated_assembler_count += 1
+		elif int(visual.state.get("type", 0)) == 12:
 			water_extractor_count += 1
 			if int(visual.state.get("stored_water", -1)) != 0 \
 					or int(visual.state.get("output_capacity", 0)) != 1000:
@@ -135,7 +139,7 @@ func _run() -> void:
 					or int(visual.state.get("stored_water", -1)) != 0:
 				_fail("steam condenser visual has incorrect fields")
 				return
-	if water_extractor_count != 1 or boiler_count != 1 \
+	if gated_assembler_count != 1 or water_extractor_count != 1 or boiler_count != 1 \
 			or steam_engine_count != 1 or solar_generator_count != 1 \
 			or accumulator_count != 1 or reactor_count != 1 \
 			or heat_conductor_count != 3 or heat_exchanger_count != 1 \
@@ -145,7 +149,7 @@ func _run() -> void:
 	if canvas.resources.size() != 2 or canvas.edges.is_empty():
 		_fail("resource or power-edge visuals are missing")
 		return
-	if not main.tick_label.text.contains("2"):
+	if not main.tick_label.text.contains("11"):
 		_fail("debug tick panel did not update")
 		return
 

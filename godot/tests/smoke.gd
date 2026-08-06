@@ -47,18 +47,13 @@ func _initialize() -> void:
 	var result: int = simulation.reset_demo()
 	if not _require(result == 0, simulation.result_name(result)):
 		return
-	if not _require(simulation.get_tick() == 2, "unexpected reset tick"):
+	if not _require(simulation.get_tick() == 11, "unexpected reset tick"):
 		return
 	var research: Dictionary = simulation.get_research()
 	if not _require(
-		research.active_technology_id == 1
-		and research.science_quantity == 2
-		and research.completed_technology_count == 0
-		and research.completed_units == 0
-		and research.required_units == 2
-		and research.work_ticks == 2
-		and research.work_ticks_per_unit == 3
-		and research.science_committed,
+		research.active_technology_id == 0
+		and research.science_quantity == 0
+		and research.completed_technology_count == 2,
 		"research presentation parity: %s" % research
 	):
 		return
@@ -71,6 +66,12 @@ func _initialize() -> void:
 		entities.size() == 48,
 		"missing presentation entities: got %d" % entities.size()
 	):
+		return
+	var gated_assembler_found := false
+	for entity: Dictionary in entities:
+		if int(entity.type) == 4 and int(entity.recipe) == 3:
+			gated_assembler_found = true
+	if not _require(gated_assembler_found, "Copper Wire was not selected after Basic Automation"):
 		return
 	var expected_types := [
 		1, 2, 3, 2, 2, 2, 1, 2, 3, 2, 2, 2, 4, 2,
@@ -336,7 +337,7 @@ func _initialize() -> void:
 		return
 	if not _require(second.reset_demo() == 0, "second reset failed"):
 		return
-	if not _require(second.get_tick() == 2, "second adapter tick"):
+	if not _require(second.get_tick() == 11, "second adapter tick"):
 		return
 	if not _require(simulation.get_tick() == tick_before, "adapter interference"):
 		return
