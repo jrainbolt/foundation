@@ -165,6 +165,8 @@ const char *result_name_c(FactoryResult result)
         return "technology prerequisites missing";
     case FACTORY_RESULT_TECHNOLOGY_LOCKED:
         return "technology locked";
+    case FACTORY_RESULT_TERRAIN_BLOCKED:
+        return "terrain blocked";
     }
     return "unknown result";
 }
@@ -233,6 +235,9 @@ void FoundationSimulation::_bind_methods()
         D_METHOD("get_resources"), &FoundationSimulation::get_resources
     );
     ClassDB::bind_method(
+        D_METHOD("get_terrain"), &FoundationSimulation::get_terrain
+    );
+    ClassDB::bind_method(
         D_METHOD("get_power_edges"), &FoundationSimulation::get_power_edges
     );
     ClassDB::bind_method(
@@ -286,6 +291,16 @@ FactoryResult FoundationSimulation::build_demo()
     world_ = factory_world_create(DEMO_WIDTH, DEMO_HEIGHT);
     if (world_ == nullptr)
         return FACTORY_RESULT_OUT_OF_MEMORY;
+    for (int32_t x=0;x<3;++x) {
+        result=factory_world_initialize_terrain(
+            world_,x,7,FACTORY_TERRAIN_WATER);
+        if(result!=FACTORY_RESULT_OK)return result;
+    }
+    for (int32_t x=6;x<9;++x) {
+        result=factory_world_initialize_terrain(
+            world_,x,7,FACTORY_TERRAIN_ROCK);
+        if(result!=FACTORY_RESULT_OK)return result;
+    }
     result = factory_world_add_resource(
         world_, 0, 2, FACTORY_RESOURCE_IRON, 500U
     );
@@ -1321,6 +1336,25 @@ Array FoundationSimulation::get_resources() const
                 "resource.occupying_entity_id"
             ))
             return Array();
+        values.append(value);
+    }
+    return values;
+}
+
+Array FoundationSimulation::get_terrain() const
+{
+    Array values;
+    if(presentation_==nullptr)return values;
+    const size_t count=factory_presentation_snapshot_get_terrain_count(presentation_);
+    for(size_t index=0;index<count;++index){
+        const FactoryPresentationTerrain *terrain=
+            factory_presentation_snapshot_get_terrain(presentation_,index);
+        if(terrain==nullptr)continue;
+        Dictionary value;
+        value["x"]=(int64_t)terrain->x;
+        value["y"]=(int64_t)terrain->y;
+        value["type"]=(int64_t)terrain->terrain_type;
+        value["buildable"]=terrain->buildable;
         values.append(value);
     }
     return values;

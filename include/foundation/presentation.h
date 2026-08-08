@@ -304,6 +304,13 @@ typedef struct {
 } FactoryPresentationResource;
 
 typedef struct {
+    int32_t x;
+    int32_t y;
+    FactoryTerrainType terrain_type;
+    bool buildable;
+} FactoryPresentationTerrain;
+
+typedef struct {
     FactoryEntityId pole_a;
     FactoryEntityId pole_b;
 } FactoryPresentationPowerEdge;
@@ -350,6 +357,10 @@ size_t factory_presentation_snapshot_get_resource_count(
 const FactoryPresentationResource *factory_presentation_snapshot_get_resource(
     const FactoryPresentationSnapshot *snapshot, size_t index
 );
+size_t factory_presentation_snapshot_get_terrain_count(
+    const FactoryPresentationSnapshot *snapshot);
+const FactoryPresentationTerrain *factory_presentation_snapshot_get_terrain(
+    const FactoryPresentationSnapshot *snapshot,size_t index);
 size_t factory_presentation_snapshot_get_power_edge_count(
     const FactoryPresentationSnapshot *snapshot
 );

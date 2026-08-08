@@ -1,4 +1,5 @@
 #include "foundation/snapshot.h"
+#include "foundation/content.h"
 
 #include "assembler_recipe_internal.h"
 #include "simulation_internal.h"
@@ -263,7 +264,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_add(&size, 8U)
         || !checked_records(
             &size, simulation->entities->count, 4U)
-        || !checked_add(&size, 8U)
+        || !checked_add(&size, 16U)
         || !checked_records(&size, tiles, 16U)
         || !checked_records(&size, simulation->extractors.count, 36U)
         || !checked_records(&size, simulation->belts.count, 24U)
@@ -315,7 +316,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !size_to_u32(simulation->research_labs.count)
         || !section_size_valid(
             simulation->entities->count, 4U, 8U)
-        || !section_size_valid(tiles, 16U, 8U)
+        || !section_size_valid(tiles, 16U, 16U)
         || !section_size_valid(simulation->extractors.count, 36U, 0U)
         || !section_size_valid(simulation->belts.count, 24U, 0U)
         || !section_size_valid(simulation->splitters.count, 24U, 0U)
@@ -611,8 +612,11 @@ static FactoryResult validate_simulation(
             const FactoryTile *tile = &simulation->world->tiles[index];
             int32_t entity_x;
             int32_t entity_y;
-            if (tile->terrain != FACTORY_TERRAIN_GROUND
+            if (factory_content_terrain_definition_get(tile->terrain)==NULL
                 || tile->resource > FACTORY_RESOURCE_COPPER
+                || (tile->resource!=FACTORY_RESOURCE_NONE
+                    && !factory_content_terrain_allows_resource(
+                        tile->terrain,tile->resource))
                 || (tile->resource == FACTORY_RESOURCE_NONE
                     && tile->resource_amount != 0U)
                 || (tile->occupying_entity != 0U
@@ -1118,7 +1122,7 @@ static FactoryResult validate_simulation(
     for (index = 0U; index < simulation->result_count; ++index) {
         const FactoryCommandResult *value = &simulation->results[index];
         if (!snapshot_command_valid(&value->command)
-            || value->result > FACTORY_RESULT_TECHNOLOGY_LOCKED
+            || value->result > FACTORY_RESULT_TERRAIN_BLOCKED
             || value->entity_type > FACTORY_ENTITY_TYPE_RESEARCH_LAB
             || value->previous_assembler_recipe
                 >= FACTORY_ASSEMBLER_RECIPE_COUNT
@@ -1548,8 +1552,9 @@ static void write_snapshot(
     }
 
     write_section_header(
-        writer, SNAPSHOT_SECTION_WORLD, tile_count, 8U + tile_count * 16U
+        writer, SNAPSHOT_SECTION_WORLD, tile_count, 16U + tile_count * 16U
     );
+    write_u64(writer,simulation->world->seed);
     write_u32(writer, simulation->world->width);
     write_u32(writer, simulation->world->height);
     for (index = 0U; index < tile_count; ++index) {
@@ -2152,7 +2157,8 @@ static bool load_sections(
     }
 
     if (!read_section_header(
-            reader, SNAPSHOT_SECTION_WORLD, 16U, 8U, &count)
+            reader, SNAPSHOT_SECTION_WORLD, 16U, 16U, &count)
+        || !read_u64(reader,&simulation->world->seed)
         || !read_u32(reader, &simulation->world->width)
         || !read_u32(reader, &simulation->world->height)
         || simulation->world->width == 0U

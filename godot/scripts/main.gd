@@ -103,6 +103,7 @@ func _synchronize() -> bool:
 	simulation.clear_error()
 	var entities: Array = simulation.get_entities()
 	var resources: Array = simulation.get_resources()
+	var terrain: Array = simulation.get_terrain()
 	var power_edges: Array = simulation.get_power_edges()
 	var tick: int = simulation.get_tick()
 	var day: int = simulation.get_day()
@@ -110,7 +111,7 @@ func _synchronize() -> bool:
 	if simulation.has_error():
 		status_label.text = "Status: %s" % simulation.get_last_error()
 		return false
-	canvas.synchronize(entities, resources, power_edges)
+	canvas.synchronize(entities, resources, power_edges, terrain)
 	world_controller.refresh_selection()
 	world_controller.set_hovered_grid(world_controller.hovered_grid)
 	build_toolbar.refresh(simulation)

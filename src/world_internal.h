@@ -4,10 +4,14 @@
 #include <foundation/world.h>
 
 struct FactoryWorld {
+    FactoryWorldSeed seed;
     uint32_t width;
     uint32_t height;
     FactoryTile *tiles;
+    bool sealed;
 };
+
+void factory_world_seal(FactoryWorld *world);
 
 FactoryResult factory_world_set_occupying_entity(
     FactoryWorld *world,

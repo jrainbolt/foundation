@@ -90,6 +90,7 @@ FactorySimulation *factory_simulation_create_with_construction_units(
     simulation->world = world;
     simulation->owns_world = false;
     simulation->construction_inventory.units = construction_units;
+    factory_world_seal(world);
     return simulation;
 }
 
@@ -1382,6 +1383,19 @@ static bool placement_type(
     }
 }
 
+static FactoryResult validate_placement_footprint(
+    const FactorySimulation *simulation,const FactoryCommand *command,
+    FactoryEntityType entity_type)
+{
+    const FactoryEntityDefinition *definition=
+        factory_content_entity_definition_get(entity_type);
+    if(definition==NULL)return FACTORY_RESULT_UNSUPPORTED_ENTITY;
+    /* Every placement payload begins with the same int32 x/y common sequence. */
+    return factory_world_validate_buildable_footprint(simulation->world,
+        command->data.place_extractor.x,command->data.place_extractor.y,
+        definition->footprint_width,definition->footprint_height);
+}
+
 static FactoryResult grant_construction_units(
     FactorySimulation *simulation,
     FactoryConstructionMaterial amount
@@ -1589,6 +1603,9 @@ static void apply_commands(FactorySimulation *simulation)
                 result->result=FACTORY_RESULT_TECHNOLOGY_LOCKED;
                 continue;
             }
+            result->result=validate_placement_footprint(
+                simulation,&result->command,result->entity_type);
+            if(result->result!=FACTORY_RESULT_OK)continue;
             if (!factory_construction_inventory_can_spend(
                     &simulation->construction_inventory, cost)) {
                 result->result =

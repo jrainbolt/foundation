@@ -67,6 +67,7 @@ public:
     Dictionary get_research() const;
     Array get_entities() const;
     Array get_resources() const;
+    Array get_terrain() const;
     Array get_power_edges() const;
     Array get_events() const;
     void clear_events();

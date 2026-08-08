@@ -1,5 +1,13 @@
 #include "foundation/content.h"
 
+#define RESOURCE_BIT(resource) (UINT32_C(1) << (uint32_t)(resource))
+static const FactoryTerrainDefinition terrains[] = {
+    {FACTORY_TERRAIN_GROUND,true,
+        RESOURCE_BIT(FACTORY_RESOURCE_IRON)|RESOURCE_BIT(FACTORY_RESOURCE_COPPER)},
+    {FACTORY_TERRAIN_WATER,false,0U},
+    {FACTORY_TERRAIN_ROCK,false,0U}
+};
+
 static const FactoryEntityDefinition entities[] = {
     {FACTORY_ENTITY_TYPE_EXTRACTOR,FACTORY_CONSTRUCTION_COST_EXTRACTOR,1U,1U,0,0U,FACTORY_CONTENT_RECIPE_FAMILY_NONE,1U,0U,0U},
     {FACTORY_ENTITY_TYPE_BELT,FACTORY_CONSTRUCTION_COST_BELT,1U,1U,0,0U,FACTORY_CONTENT_RECIPE_FAMILY_NONE,0U,0U,0U},
@@ -93,7 +101,7 @@ static const FactoryContentView content={
     fluid_conversion_recipes,COUNT(fluid_conversion_recipes),
     heat_exchange_recipes,COUNT(heat_exchange_recipes),
     steam_turbines,COUNT(steam_turbines),
-    steam_condensers,COUNT(steam_condensers)};
+    steam_condensers,COUNT(steam_condensers),terrains,COUNT(terrains)};
 
 const FactoryContentView *factory_content_get(void) { return &content; }
 #define LOOKUPS(NAME,TYPE,FIELD,IDTYPE,ARRAY) \
@@ -116,6 +124,8 @@ LOOKUPS(steam_turbine,FactorySteamTurbineDefinition,definition_id,
     FactorySteamTurbineDefinitionId,steam_turbines)
 LOOKUPS(steam_condenser,FactorySteamCondenserDefinition,definition_id,
     FactorySteamCondenserDefinitionId,steam_condensers)
+LOOKUPS(terrain_definition,FactoryTerrainDefinition,terrain_type,
+    FactoryTerrainType,terrains)
 #undef LOOKUPS
 
 FactoryUnlockFlags factory_content_entity_unlock_requirement(FactoryEntityType id)
@@ -126,6 +136,11 @@ FactoryUnlockFlags factory_content_assembler_recipe_unlock_requirement(FactoryAs
 {if(id==FACTORY_ASSEMBLER_RECIPE_NONE)return 0U;const FactoryAssemblerRecipe*d=factory_content_assembler_recipe_get(id);return d!=NULL?d->required_unlock:FACTORY_UNLOCK_ALL;}
 bool factory_simulation_is_assembler_recipe_unlocked(const FactorySimulation*s,FactoryAssemblerRecipeId id)
 {if(id==FACTORY_ASSEMBLER_RECIPE_NONE)return true;const FactoryAssemblerRecipe*d=factory_content_assembler_recipe_get(id);return d!=NULL&&(d->required_unlock==0U||factory_simulation_has_unlock(s,d->required_unlock));}
+bool factory_content_terrain_allows_resource(FactoryTerrainType terrain,
+    FactoryResourceType resource)
+{const FactoryTerrainDefinition*d=factory_content_terrain_definition_get(terrain);
+return d!=NULL&&resource>FACTORY_RESOURCE_NONE&&resource<=FACTORY_RESOURCE_COPPER
+    &&(d->allowed_resource_mask&(UINT32_C(1)<<(uint32_t)resource))!=0U;}
 
 static bool item_valid(FactoryItemType item)
 { return item>FACTORY_ITEM_NONE && item<=FACTORY_ITEM_BASIC_SCIENCE; }
@@ -143,12 +158,17 @@ bool factory_content_validate_view(const FactoryContentView *v)
         ||v->steam_recipe_count==0U
         ||v->fluid_conversion_recipe_count==0U
         ||v->heat_exchange_recipe_count==0U||v->steam_turbine_count==0U
-        ||v->steam_condenser_count==0U
+        ||v->steam_condenser_count==0U||v->terrain_count!=3U
         ||v->assembler_recipes==NULL||v->technologies==NULL||v->fuels==NULL
         ||v->fluids==NULL||v->nuclear_fuels==NULL||v->steam_recipes==NULL
         ||v->fluid_conversion_recipes==NULL||v->heat_exchange_recipes==NULL
-        ||v->steam_turbines==NULL||v->steam_condensers==NULL)
+        ||v->steam_turbines==NULL||v->steam_condensers==NULL||v->terrains==NULL)
         return false;
+    for(size_t i=0U;i<v->terrain_count;++i){const FactoryTerrainDefinition*d=&v->terrains[i];
+        if(d->terrain_type<FACTORY_TERRAIN_GROUND||d->terrain_type>FACTORY_TERRAIN_ROCK
+            ||(d->allowed_resource_mask&~(RESOURCE_BIT(FACTORY_RESOURCE_IRON)|RESOURCE_BIT(FACTORY_RESOURCE_COPPER)))!=0U)return false;
+        for(size_t j=i+1U;j<v->terrain_count;++j)
+            if(d->terrain_type==v->terrains[j].terrain_type)return false;}
     for(size_t i=0U;i<v->entity_count;++i){const FactoryEntityDefinition*d=&v->entities[i];
         if(d->entity_type<=FACTORY_ENTITY_TYPE_NONE
             ||d->entity_type>FACTORY_ENTITY_TYPE_RESEARCH_LAB
@@ -209,5 +229,7 @@ CATEGORY_VALIDATOR(nuclear_fuels,FactoryNuclearFuelDefinition,
     nuclear_fuels,nuclear_fuel_count)
 CATEGORY_VALIDATOR(steam_recipes,FactorySteamGenerationRecipe,
     steam_recipes,steam_recipe_count)
+CATEGORY_VALIDATOR(terrain_definitions,FactoryTerrainDefinition,
+    terrains,terrain_count)
 #undef CATEGORY_VALIDATOR
 #undef COUNT

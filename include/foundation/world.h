@@ -7,8 +7,14 @@
 #include "foundation/entity.h"
 
 typedef enum {
-    FACTORY_TERRAIN_GROUND = 0
+    FACTORY_TERRAIN_NONE = 0,
+    FACTORY_TERRAIN_GROUND,
+    FACTORY_TERRAIN_WATER,
+    FACTORY_TERRAIN_ROCK
 } FactoryTerrainType;
+
+typedef uint64_t FactoryWorldSeed;
+#define FACTORY_WORLD_DEFAULT_SEED UINT64_C(0x464F554E44415449)
 
 typedef enum {
     FACTORY_RESOURCE_NONE = 0,
@@ -77,7 +83,8 @@ typedef enum {
     FACTORY_RESULT_TECHNOLOGY_INVALID,
     FACTORY_RESULT_TECHNOLOGY_ALREADY_COMPLETED,
     FACTORY_RESULT_TECHNOLOGY_PREREQUISITES_MISSING,
-    FACTORY_RESULT_TECHNOLOGY_LOCKED
+    FACTORY_RESULT_TECHNOLOGY_LOCKED,
+    FACTORY_RESULT_TERRAIN_BLOCKED
 } FactoryResult;
 
 /*
@@ -87,6 +94,8 @@ typedef enum {
  * overflow, or allocation failure.
  */
 FactoryWorld *factory_world_create(uint32_t width, uint32_t height);
+FactoryWorld *factory_world_create_with_seed(
+    uint32_t width,uint32_t height,FactoryWorldSeed seed);
 
 /* Destroys a world and its tiles. Passing NULL is safe. */
 void factory_world_destroy(FactoryWorld *world);
@@ -94,6 +103,8 @@ void factory_world_destroy(FactoryWorld *world);
 /* Return zero when world is NULL. */
 uint32_t factory_world_get_width(const FactoryWorld *world);
 uint32_t factory_world_get_height(const FactoryWorld *world);
+FactoryWorldSeed factory_world_get_seed(const FactoryWorld *world);
+bool factory_world_validate(const FactoryWorld *world);
 
 /* Returns false for a NULL world or coordinates outside the world. */
 bool factory_world_is_in_bounds(const FactoryWorld *world, int32_t x, int32_t y);
@@ -108,6 +119,17 @@ const FactoryTile *factory_world_get_tile(
     int32_t x,
     int32_t y
 );
+
+/* Terrain may be configured only before the world is attached to a simulation. */
+FactoryResult factory_world_initialize_terrain(
+    FactoryWorld *world,int32_t x,int32_t y,FactoryTerrainType terrain);
+FactoryTerrainType factory_world_get_terrain(
+    const FactoryWorld *world,int32_t x,int32_t y);
+
+/* Validates the complete row-major rectangular footprint transactionally. */
+FactoryResult factory_world_validate_buildable_footprint(
+    const FactoryWorld *world,int32_t x,int32_t y,
+    uint32_t width,uint32_t height);
 
 /* Copies finite deposit state without exposing mutable world storage. */
 FactoryResult factory_world_get_resource_deposit(

@@ -1,4 +1,9 @@
-# Snapshot format version 17
+# Snapshot format version 18
+
+Version 18 adds the authoritative 64-bit world seed to the world section.
+Terrain was already stored per tile; the section now explicitly restores the
+seed plus terrain without invoking generation. The world prefix is 16 bytes:
+seed, width, and height.
 
 Version 17 adds the authoritative Research Lab component section. Each record
 stores entity ID, grid position, and Basic Science quantity. Power topology,
@@ -28,7 +33,7 @@ timestamp, or process-specific value enters the format.
 | Offset | Width | Field |
 |---:|---:|---|
 | 0 | 8 | Magic bytes `FOUNDATN` |
-| 8 | 4 | Version (`17`) |
+| 8 | 4 | Version (`18`) |
 | 12 | 4 | Header size (`48`) |
 | 16 | 8 | Total snapshot size |
 | 24 | 8 | Payload size |
@@ -51,13 +56,13 @@ Each section starts with four 32-bit fields:
 | Record count | Number of fixed-width records |
 | Payload size | Bytes following the section header |
 
-Version 17 requires each section exactly once in this order:
+Version 18 requires each section exactly once in this order:
 
 | Type | Section | Record width |
 |---:|---|---:|
 | 1 | Metadata | one 60-byte payload |
 | 2 | Entity manager | 4 bytes per live ID plus 8-byte prefix |
-| 3 | World tiles | 16 bytes plus 8-byte dimensions |
+| 3 | World tiles | 16 bytes plus 16-byte seed/dimensions prefix |
 | 4 | Extractors | 36 |
 | 5 | Belts | 24 |
 | 6 | Splitters | 24 |

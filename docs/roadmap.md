@@ -23,9 +23,10 @@
 - [x] Deterministic research and technology progression infrastructure
 - [x] Deterministic Research Labs and physical science logistics
 - [x] Finite resource deposits, depletion, and conservation
+- [x] Seeded deterministic procedural world model and authoritative terrain
 
-Finite deposits are the prerequisite for deterministic procedural terrain and
-resource patches, remote mining outposts, rail infrastructure, and eventually
+Finite deposits and seeded authoritative terrain are prerequisites for
+deterministic resource patches, remote mining outposts, rail infrastructure, and eventually
 deterministic trains, routing, reservations, and stations.
 - [x] Unified deterministic immutable content definitions
 - [ ] Inserter variants, filters, and longer arms

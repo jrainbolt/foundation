@@ -18,6 +18,13 @@
 #include "foundation/steam_engine.h"
 #include "foundation/steam_turbine.h"
 #include "foundation/steam_condenser.h"
+#include "foundation/world.h"
+
+typedef struct {
+    FactoryTerrainType terrain_type;
+    bool buildable;
+    uint32_t allowed_resource_mask;
+} FactoryTerrainDefinition;
 
 typedef enum {
     FACTORY_CONTENT_RECIPE_FAMILY_NONE = 0,
@@ -95,6 +102,8 @@ typedef struct {
     size_t steam_turbine_count;
     const FactorySteamCondenserDefinition *steam_condensers;
     size_t steam_condenser_count;
+    const FactoryTerrainDefinition *terrains;
+    size_t terrain_count;
 } FactoryContentView;
 
 const FactoryContentView *factory_content_get(void);
@@ -116,6 +125,15 @@ bool factory_content_nuclear_fuels_validate(
     const FactoryNuclearFuelDefinition *definitions,size_t count);
 bool factory_content_steam_recipes_validate(
     const FactorySteamGenerationRecipe *definitions,size_t count);
+bool factory_content_terrain_definitions_validate(
+    const FactoryTerrainDefinition *definitions,size_t count);
+
+size_t factory_content_terrain_definition_count(void);
+const FactoryTerrainDefinition *factory_content_terrain_definition_at(size_t index);
+const FactoryTerrainDefinition *factory_content_terrain_definition_get(
+    FactoryTerrainType type);
+bool factory_content_terrain_allows_resource(
+    FactoryTerrainType terrain,FactoryResourceType resource);
 
 size_t factory_content_entity_definition_count(void);
 const FactoryEntityDefinition *factory_content_entity_definition_at(size_t index);

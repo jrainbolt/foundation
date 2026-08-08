@@ -1,6 +1,7 @@
 #include "presentation_internal.h"
 
 #include "assembler_recipe_internal.h"
+#include "foundation/content.h"
 #include "simulation_internal.h"
 
 #include <stdlib.h>
@@ -16,6 +17,8 @@ struct FactoryPresentationSnapshot {
     size_t entity_count;
     FactoryPresentationResource *resources;
     size_t resource_count;
+    FactoryPresentationTerrain *terrains;
+    size_t terrain_count;
     FactoryPresentationPowerEdge *power_edges;
     size_t power_edge_count;
 };
@@ -40,6 +43,7 @@ static void *presentation_calloc(size_t count, size_t width)
 static void release_contents(FactoryPresentationSnapshot *snapshot)
 {
     free(snapshot->power_edges);
+    free(snapshot->terrains);
     free(snapshot->resources);
     free(snapshot->entities);
     *snapshot = (FactoryPresentationSnapshot){0};
@@ -639,6 +643,7 @@ FactoryResult factory_presentation_snapshot_rebuild(
     if (width > INT32_MAX || height > INT32_MAX
         || (height != 0U && width > SIZE_MAX / height))
         return FACTORY_RESULT_SNAPSHOT_SIZE_OVERFLOW;
+    next.terrain_count=(size_t)width*(size_t)height;
     for (uint32_t y = 0U; y < height; ++y)
         for (uint32_t x = 0U; x < width; ++x) {
             const FactoryTile *tile = factory_world_get_tile(
@@ -653,6 +658,9 @@ FactoryResult factory_presentation_snapshot_rebuild(
         || (next.resource_count != 0U
             && (next.resources = presentation_calloc(
                 next.resource_count, sizeof(*next.resources))) == NULL)
+        || (next.terrain_count != 0U
+            && (next.terrains=presentation_calloc(
+                next.terrain_count,sizeof(*next.terrains)))==NULL)
         || (next.power_edge_count != 0U
             && (next.power_edges = presentation_calloc(
                 next.power_edge_count, sizeof(*next.power_edges))) == NULL)) {
@@ -682,6 +690,11 @@ FactoryResult factory_presentation_snapshot_rebuild(
             const FactoryTile *tile = factory_world_get_tile(
                 simulation->world, (int32_t)x, (int32_t)y
             );
+            const FactoryTerrainDefinition *terrain=
+                factory_content_terrain_definition_get(tile->terrain);
+            next.terrains[(size_t)y*(size_t)width+x]=
+                (FactoryPresentationTerrain){(int32_t)x,(int32_t)y,
+                    tile->terrain,terrain!=NULL&&terrain->buildable};
             if (tile != NULL && tile->resource != FACTORY_RESOURCE_NONE)
                 next.resources[resource_index++] =
                     (FactoryPresentationResource){
@@ -715,6 +728,13 @@ FactoryResult factory_presentation_snapshot_rebuild(
     *snapshot = next;
     return FACTORY_RESULT_OK;
 }
+
+size_t factory_presentation_snapshot_get_terrain_count(
+    const FactoryPresentationSnapshot *snapshot)
+{return snapshot==NULL?0U:snapshot->terrain_count;}
+const FactoryPresentationTerrain *factory_presentation_snapshot_get_terrain(
+    const FactoryPresentationSnapshot *snapshot,size_t index)
+{return snapshot==NULL||index>=snapshot->terrain_count?NULL:&snapshot->terrains[index];}
 
 uint64_t factory_presentation_snapshot_get_tick(
     const FactoryPresentationSnapshot *snapshot

@@ -7,9 +7,17 @@ const CELL := 76.0
 var entity_nodes: Dictionary = {}
 var resources: Array = []
 var edges: Array = []
+var terrain: Array = []
+
+func terrain_is_buildable(grid: Vector2i) -> bool:
+	for cell: Dictionary in terrain:
+		if int(cell.x) == grid.x and int(cell.y) == grid.y:
+			return bool(cell.buildable)
+	return false
 
 func synchronize(
-	entities: Array, next_resources: Array, next_edges: Array
+	entities: Array, next_resources: Array, next_edges: Array,
+	next_terrain: Array
 	) -> void:
 	var live_ids := {}
 	var resource_by_entity := {}
@@ -37,9 +45,16 @@ func synchronize(
 			entity_nodes.erase(entity_id)
 	resources = next_resources.duplicate(true)
 	edges = next_edges.duplicate(true)
+	terrain = next_terrain.duplicate(true)
 	queue_redraw()
 
 func _draw() -> void:
+	for cell: Dictionary in terrain:
+		var terrain_type := int(cell.type)
+		var color := Color("#243229")
+		if terrain_type == 2: color = Color("#18394a")
+		elif terrain_type == 3: color = Color("#353941")
+		draw_rect(Rect2(float(cell.x)*CELL,float(cell.y)*CELL,CELL,CELL),color)
 	for resource: Dictionary in resources:
 		var color := Color("#984f35") if int(resource.type) == 1 else Color("#b87333")
 		var remaining := int(resource.remaining)

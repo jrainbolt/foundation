@@ -1,4 +1,5 @@
 #include <foundation/world.h>
+#include <foundation/content.h>
 #include "world_internal.h"
 
 #include <stdint.h>
@@ -32,6 +33,13 @@ static FactoryTile *factory_world_get_mutable_tile(
 
 FactoryWorld *factory_world_create(uint32_t width, uint32_t height)
 {
+    return factory_world_create_with_seed(
+        width,height,FACTORY_WORLD_DEFAULT_SEED);
+}
+
+FactoryWorld *factory_world_create_with_seed(
+    uint32_t width,uint32_t height,FactoryWorldSeed seed)
+{
     FactoryWorld *world = NULL;
     size_t tile_count = 0U;
     size_t index = 0U;
@@ -59,8 +67,10 @@ FactoryWorld *factory_world_create(uint32_t width, uint32_t height)
         return NULL;
     }
 
+    world->seed = seed;
     world->width = width;
     world->height = height;
+    world->sealed = false;
     for (index = 0U; index < tile_count; ++index) {
         world->tiles[index].terrain = FACTORY_TERRAIN_GROUND;
         world->tiles[index].resource = FACTORY_RESOURCE_NONE;
@@ -89,6 +99,77 @@ uint32_t factory_world_get_width(const FactoryWorld *world)
 uint32_t factory_world_get_height(const FactoryWorld *world)
 {
     return world == NULL ? 0U : world->height;
+}
+
+FactoryWorldSeed factory_world_get_seed(const FactoryWorld *world)
+{
+    return world == NULL ? 0U : world->seed;
+}
+
+bool factory_world_validate(const FactoryWorld *world)
+{
+    size_t count,index;
+    if(world==NULL||world->width==0U||world->height==0U||world->tiles==NULL
+        ||(size_t)world->width>SIZE_MAX/(size_t)world->height)return false;
+    count=(size_t)world->width*(size_t)world->height;
+    for(index=0U;index<count;++index){const FactoryTile *tile=&world->tiles[index];
+        if(factory_content_terrain_definition_get(tile->terrain)==NULL
+            ||tile->resource>FACTORY_RESOURCE_COPPER
+            ||(tile->resource==FACTORY_RESOURCE_NONE&&tile->resource_amount!=0U)
+            ||(tile->resource!=FACTORY_RESOURCE_NONE
+                &&!factory_content_terrain_allows_resource(
+                    tile->terrain,tile->resource)))return false;
+    }
+    return true;
+}
+
+void factory_world_seal(FactoryWorld *world)
+{
+    if (world != NULL) world->sealed = true;
+}
+
+FactoryResult factory_world_initialize_terrain(FactoryWorld *world,
+    int32_t x,int32_t y,FactoryTerrainType terrain)
+{
+    FactoryTile *tile;
+    if (world==NULL||factory_content_terrain_definition_get(terrain)==NULL)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    if (world->sealed) return FACTORY_RESULT_INVALID_STATE;
+    tile=factory_world_get_mutable_tile(world,x,y);
+    if(tile==NULL)return FACTORY_RESULT_OUT_OF_BOUNDS;
+    if(tile->resource!=FACTORY_RESOURCE_NONE||tile->occupying_entity!=0U)
+        return FACTORY_RESULT_TILE_OCCUPIED;
+    tile->terrain=terrain;
+    return FACTORY_RESULT_OK;
+}
+
+FactoryTerrainType factory_world_get_terrain(const FactoryWorld *world,
+    int32_t x,int32_t y)
+{
+    const FactoryTile *tile=factory_world_get_tile(world,x,y);
+    return tile==NULL?FACTORY_TERRAIN_NONE:tile->terrain;
+}
+
+FactoryResult factory_world_validate_buildable_footprint(
+    const FactoryWorld *world,int32_t x,int32_t y,uint32_t width,uint32_t height)
+{
+    uint32_t dx,dy;
+    if(world==NULL||width==0U||height==0U)return FACTORY_RESULT_INVALID_ARGUMENT;
+    if(x<0||y<0||(uint64_t)(uint32_t)x+width>world->width
+        ||(uint64_t)(uint32_t)y+height>world->height)
+        return FACTORY_RESULT_OUT_OF_BOUNDS;
+    for(dy=0U;dy<height;++dy)for(dx=0U;dx<width;++dx){
+        const FactoryTile *tile=factory_world_get_tile(world,
+            x+(int32_t)dx,y+(int32_t)dy);
+        const FactoryTerrainDefinition *definition=
+            factory_content_terrain_definition_get(tile->terrain);
+        if(definition==NULL||!definition->buildable)
+            return FACTORY_RESULT_TERRAIN_BLOCKED;
+    }
+    for(dy=0U;dy<height;++dy)for(dx=0U;dx<width;++dx)
+        if(factory_world_get_tile(world,x+(int32_t)dx,y+(int32_t)dy)
+            ->occupying_entity!=0U)return FACTORY_RESULT_TILE_OCCUPIED;
+    return FACTORY_RESULT_OK;
 }
 
 bool factory_world_is_in_bounds(const FactoryWorld *world, int32_t x, int32_t y)
@@ -141,7 +222,7 @@ FactoryResult factory_world_add_resource(
     if (tile->resource != FACTORY_RESOURCE_NONE) {
         return FACTORY_RESULT_TILE_OCCUPIED;
     }
-    if (tile->terrain != FACTORY_TERRAIN_GROUND) {
+    if (!factory_content_terrain_allows_resource(tile->terrain,resource)) {
         return FACTORY_RESULT_INVALID_ARGUMENT;
     }
 

@@ -44,7 +44,9 @@ func rotate_build() -> void:
 		queue_redraw()
 
 func preview_is_advisably_valid() -> bool:
-	return mode == InteractionMode.BUILD and pick_grid(hovered_grid) == 0
+	return mode == InteractionMode.BUILD \
+		and canvas.terrain_is_buildable(hovered_grid) \
+		and pick_grid(hovered_grid) == 0
 
 func set_hovered_grid(grid_position: Vector2i) -> void:
 	hovered_grid = grid_position
