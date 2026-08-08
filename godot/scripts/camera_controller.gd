@@ -9,8 +9,8 @@ var dragging := false
 var drag_distance := 0.0
 
 func _ready() -> void:
-	position = Vector2(416, 288)
-	zoom = Vector2.ONE
+	position = Vector2(494, 304)
+	zoom = Vector2(0.72, 0.72)
 
 func _process(delta: float) -> void:
 	var axis := Input.get_vector("camera_left", "camera_right", "camera_up", "camera_down")

@@ -238,3 +238,18 @@ live-steam network at (11, 5) to sitting directly on the turbine's exhaust
 network at (11, 0). The full `--editor` launch and `tests/capture_visual.gd`
 were not re-run in this pass; only the headless smoke tests and a non-
 editor game-mode launch were.
+
+## Presentation readability
+
+The visualizer uses a 76-pixel logical grid while Foundation presentation
+coordinates remain integer grid cells. Entity cards use separate title,
+abbreviation, and single-status tiers; detailed values stay in the inspector.
+Power, fluid, and heat connections use distinct yellow, cyan, and magenta
+strokes behind entity labels. Hover and selection are independent visual
+states.
+
+When no entity is selected, the inspector summarizes only already-exported
+presentation data: time, entity and powered counts, power links, construction
+inventory, completed research count, and frontend interaction mode. The
+sidebar, top controls, and build panel derive their widths from the logical
+viewport, so high-DPI and larger windows retain the same information hierarchy.

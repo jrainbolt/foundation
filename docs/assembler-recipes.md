@@ -1,7 +1,7 @@
 # Assembler recipes
 
 Assemblers use one of three immutable recipes from the authoritative table in
-`src/assembler_recipe.c`.
+the unified immutable content layer.
 
 | Identifier | Input slot 0 | Input slot 1 | Output | Ticks |
 |---|---:|---:|---:|---:|
@@ -14,12 +14,17 @@ New assemblers select `NONE`. They accept no input and do no work until a
 before logistics and processing. Placement followed by selection in one command
 phase therefore succeeds; the reverse order fails for an invalid entity.
 
-A selection, including clearing to `NONE` or reselecting the current recipe, is
-allowed only while the assembler is completely empty and idle. That means both
-input counts and the output count are zero, processing is false, and progress is
-zero. A rejected change returns `FACTORY_RESULT_ASSEMBLER_NOT_EMPTY` without
-mutating the assembler or construction inventory. A valid same-recipe selection
-is a state-preserving success.
+Changing to a different recipe, including clearing to `NONE`, is allowed only
+while the assembler is completely empty and idle. Both input counts and the
+output count must be zero, processing must be false, and progress must be zero.
+A rejected change returns `FACTORY_RESULT_ASSEMBLER_NOT_EMPTY` without mutation.
+Reselecting the current recipe is a state-preserving success regardless of
+buffer state and emits no event.
+
+An actual committed change emits
+`FACTORY_EVENT_ASSEMBLER_RECIPE_CHANGED` with the assembler ID and stable old
+and new recipe IDs. The event is observational and transient. Recipe state and
+pending configuration commands are canonical snapshot state; events are not.
 
 Each public `FactoryAssembler` inspection contains two bounded generic input
 slots. A slot reports its required item, current count, and capacity. Unused
@@ -36,6 +41,7 @@ belts, inserters, and storage otherwise transport gears and wire generically.
 Recipe selection and processing do not consume construction units. Every
 assembler still costs and refunds the same fixed 20 construction units.
 
-Limitations remain deliberate: recipes cannot be created at runtime, queued,
-unlocked, modified, or loaded from files; assemblers cannot run multiple recipes
-simultaneously; and storage has no output behavior.
+Clients request changes through the public FIFO command API and inspect normal
+command results and rebuilt presentation records. They never mutate an
+assembler directly. Recipes cannot be created or modified at runtime and an
+assembler cannot run multiple recipes simultaneously.

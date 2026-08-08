@@ -180,10 +180,20 @@ void FoundationSimulation::_bind_methods()
     ClassDB::bind_method(
         D_METHOD("queue_demolish_entity","entity_id"),
         &FoundationSimulation::queue_demolish_entity);
+    ClassDB::bind_method(
+        D_METHOD("queue_set_assembler_recipe","entity_id","recipe_id"),
+        &FoundationSimulation::queue_set_assembler_recipe);
+    ClassDB::bind_method(
+        D_METHOD("queue_set_storage_output","entity_id","item_type"),
+        &FoundationSimulation::queue_set_storage_output);
     ClassDB::bind_method(D_METHOD("get_command_results"),
         &FoundationSimulation::get_command_results);
     ClassDB::bind_method(D_METHOD("get_build_catalog"),
         &FoundationSimulation::get_build_catalog);
+    ClassDB::bind_method(D_METHOD("get_assembler_recipe_catalog"),
+        &FoundationSimulation::get_assembler_recipe_catalog);
+    ClassDB::bind_method(D_METHOD("get_item_catalog"),
+        &FoundationSimulation::get_item_catalog);
     ClassDB::bind_method(D_METHOD("get_construction_units"),
         &FoundationSimulation::get_construction_units);
     ClassDB::bind_method(
@@ -587,6 +597,35 @@ int64_t FoundationSimulation::queue_demolish_entity(int64_t entity_id)
     return factory_simulation_submit_command(simulation_,&command);
 }
 
+int64_t FoundationSimulation::queue_set_assembler_recipe(
+    int64_t entity_id,int64_t recipe_id)
+{
+    if (simulation_==nullptr || entity_id<=0 || entity_id>UINT32_MAX
+        || recipe_id<FACTORY_ASSEMBLER_RECIPE_NONE
+        || recipe_id>=FACTORY_ASSEMBLER_RECIPE_COUNT)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};
+    command.type=FACTORY_COMMAND_SET_ASSEMBLER_RECIPE;
+    command.data.set_assembler_recipe.assembler_entity=
+        (FactoryEntityId)entity_id;
+    command.data.set_assembler_recipe.recipe_id=
+        (FactoryAssemblerRecipeId)recipe_id;
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
+int64_t FoundationSimulation::queue_set_storage_output(
+    int64_t entity_id,int64_t item_type)
+{
+    if (simulation_==nullptr || entity_id<=0 || entity_id>UINT32_MAX
+        || item_type<FACTORY_ITEM_NONE || item_type>FACTORY_ITEM_BASIC_SCIENCE)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};
+    command.type=FACTORY_COMMAND_SET_STORAGE_OUTPUT;
+    command.data.set_storage_output.storage_entity=(FactoryEntityId)entity_id;
+    command.data.set_storage_output.item=(FactoryItemType)item_type;
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
 Array FoundationSimulation::get_command_results() const
 {
     Array values;
@@ -609,6 +648,52 @@ Array FoundationSimulation::get_command_results() const
             return Array();
         value["entity_type"]=(int64_t)r->entity_type;
         value["x"]=(int64_t)r->x; value["y"]=(int64_t)r->y;
+        value["previous_assembler_recipe"]=
+            (int64_t)r->previous_assembler_recipe;
+        value["new_assembler_recipe"]=(int64_t)r->new_assembler_recipe;
+        value["previous_storage_output"]=
+            (int64_t)r->previous_storage_output;
+        value["new_storage_output"]=(int64_t)r->new_storage_output;
+        values.append(value);
+    }
+    return values;
+}
+
+Array FoundationSimulation::get_assembler_recipe_catalog() const
+{
+    Array values;
+    Dictionary none;
+    none["recipe_id"]=(int64_t)FACTORY_ASSEMBLER_RECIPE_NONE;
+    none["name"]="None";
+    none["required_unlock"]=(int64_t)0;
+    none["unlocked"]=true;
+    values.append(none);
+    for (size_t i=0;i<factory_content_assembler_recipe_count();++i) {
+        const FactoryAssemblerRecipe *recipe=
+            factory_content_assembler_recipe_at(i);
+        if (recipe==nullptr) continue;
+        Dictionary value;
+        value["recipe_id"]=(int64_t)recipe->recipe_id;
+        value["name"]=String(factory_item_name(recipe->output_item));
+        value["output_item"]=(int64_t)recipe->output_item;
+        value["output_amount"]=(int64_t)recipe->output_amount;
+        value["required_unlock"]=(int64_t)recipe->required_unlock;
+        value["unlocked"]=simulation_!=nullptr
+            && factory_simulation_is_assembler_recipe_unlocked(
+                simulation_,recipe->recipe_id);
+        values.append(value);
+    }
+    return values;
+}
+
+Array FoundationSimulation::get_item_catalog() const
+{
+    Array values;
+    for (int item=FACTORY_ITEM_NONE;item<=FACTORY_ITEM_BASIC_SCIENCE;++item) {
+        Dictionary value;
+        value["item_type"]=(int64_t)item;
+        value["name"]=item==FACTORY_ITEM_NONE
+            ? String("None") : String(factory_item_name((FactoryItemType)item));
         values.append(value);
     }
     return values;

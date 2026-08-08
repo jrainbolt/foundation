@@ -50,8 +50,12 @@ func _initialize() -> void:
 	if not _require(
 		simulation.has_method("queue_place_entity")
 		and simulation.has_method("queue_demolish_entity")
+		and simulation.has_method("queue_set_assembler_recipe")
+		and simulation.has_method("queue_set_storage_output")
 		and simulation.has_method("get_command_results")
 		and simulation.get_build_catalog().size() == 21
+		and simulation.get_assembler_recipe_catalog().size() == 4
+		and simulation.get_item_catalog().size() == 10
 		and simulation.get_construction_units() >= 0,
 		"construction command bridge"
 	):

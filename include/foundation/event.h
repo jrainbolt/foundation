@@ -49,7 +49,9 @@ typedef enum {
     FACTORY_EVENT_STEAM_CONDENSER_CYCLE_COMPLETED,
     FACTORY_EVENT_RESEARCH_SELECTED,
     FACTORY_EVENT_RESEARCH_UNIT_COMPLETED,
-    FACTORY_EVENT_TECHNOLOGY_COMPLETED
+    FACTORY_EVENT_TECHNOLOGY_COMPLETED,
+    FACTORY_EVENT_ASSEMBLER_RECIPE_CHANGED,
+    FACTORY_EVENT_STORAGE_OUTPUT_CHANGED
 } FactoryEventType;
 
 /*
@@ -96,9 +98,14 @@ typedef enum {
  * third_quantity is required units. The global-controller model has no lab ID.
  * technology completed: technology_id identifies the technology and quantity
  * is its final completed-unit count.
+ * assembler recipe changed: entity_id identifies the assembler, quantity is
+ * the new recipe ID, and related_quantity is the previous recipe ID.
+ * storage output changed: entity_id identifies the storage, item_type is the
+ * new configured output item, and related_quantity is the previous item.
  *
  * tick is the simulation tick at the start of the step that emitted the
- * event. Item-transfer quantity is currently one.
+ * event. Item-transfer quantity is currently one. Successful requests for an
+ * already-active configuration emit no event.
  */
 typedef struct {
     FactoryEventType type;

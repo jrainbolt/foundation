@@ -94,9 +94,51 @@ static void test_combined_batch_is_all_or_nothing(void)
     factory_simulation_destroy(s); factory_world_destroy(world);
 }
 
+static void test_configuration_batch_failure_and_retry(void)
+{
+    FactoryWorld *world;
+    FactorySimulation *s=make(&world);
+    FactorySnapshotBuffer before={0},after={0};
+    FactoryAssembler assembler;
+    FactoryStorage storage;
+    queue(s,(FactoryCommand){FACTORY_COMMAND_PLACE_ASSEMBLER,
+        {.place_assembler={0,0,FACTORY_DIRECTION_EAST}}});
+    queue(s,(FactoryCommand){FACTORY_COMMAND_PLACE_STORAGE,
+        {.place_storage={1,0}}});
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    queue(s,(FactoryCommand){FACTORY_COMMAND_SET_ASSEMBLER_RECIPE,
+        {.set_assembler_recipe={1U,FACTORY_ASSEMBLER_RECIPE_IRON_GEAR}}});
+    queue(s,(FactoryCommand){FACTORY_COMMAND_SET_STORAGE_OUTPUT,
+        {.set_storage_output={2U,FACTORY_ITEM_IRON_GEAR}}});
+    CHECK(factory_simulation_create_snapshot(s,&before)==FACTORY_RESULT_OK);
+    factory_tick_preflight_test_fail_allocations_after(0U);
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OUT_OF_MEMORY);
+    factory_tick_preflight_test_fail_allocations_after(SIZE_MAX);
+    CHECK(factory_simulation_get_tick(s)==1U);
+    CHECK(factory_simulation_get_pending_command_count(s)==2U);
+    CHECK(factory_simulation_get_assembler(s,1U,&assembler)
+        && assembler.recipe_id==FACTORY_ASSEMBLER_RECIPE_NONE);
+    CHECK(factory_simulation_get_storage(s,2U,&storage)
+        && storage.configured_output_item==FACTORY_ITEM_NONE);
+    CHECK(factory_simulation_create_snapshot(s,&after)==FACTORY_RESULT_OK);
+    CHECK(before.size==after.size
+        && memcmp(before.data,after.data,before.size)==0);
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_command_result_count(s)==2U);
+    CHECK(factory_simulation_get_event_count(s)==2U);
+    CHECK(factory_simulation_get_event(s,0U)->type
+        ==FACTORY_EVENT_ASSEMBLER_RECIPE_CHANGED);
+    CHECK(factory_simulation_get_event(s,1U)->type
+        ==FACTORY_EVENT_STORAGE_OUTPUT_CHANGED);
+    factory_snapshot_buffer_destroy(&before);
+    factory_snapshot_buffer_destroy(&after);
+    factory_simulation_destroy(s); factory_world_destroy(world);
+}
+
 int main(void)
 {
     test_each_topology_failure();
     test_combined_batch_is_all_or_nothing();
+    test_configuration_batch_failure_and_retry();
     return failures==0?0:1;
 }

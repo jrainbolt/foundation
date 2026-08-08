@@ -142,8 +142,22 @@ static void test_fifo_selection_and_safe_switching(void)
     CHECK(state.input_slots[0].capacity == 2U);
     CHECK(state.input_slots[1].item == FACTORY_ITEM_NONE);
     CHECK(state.input_slots[1].capacity == 0U);
+    CHECK(factory_simulation_get_event_count(simulation) == 2U);
+    CHECK(factory_simulation_get_event(simulation, 1U)->type
+        == FACTORY_EVENT_ASSEMBLER_RECIPE_CHANGED);
+    CHECK(factory_simulation_get_event(simulation, 1U)->entity_id == 1U);
+    CHECK(factory_simulation_get_event(simulation, 1U)->quantity
+        == FACTORY_ASSEMBLER_RECIPE_IRON_GEAR);
+    CHECK(factory_simulation_get_event(simulation, 1U)->related_quantity
+        == FACTORY_ASSEMBLER_RECIPE_NONE);
 
     simulation->assemblers.items[0].input_slots[0].count = 1U;
+	CHECK(factory_simulation_submit_command(simulation, &select)
+		== FACTORY_RESULT_OK);
+	factory_simulation_tick(simulation);
+	CHECK(factory_simulation_get_command_result(simulation, 0U)->result
+		== FACTORY_RESULT_OK);
+	CHECK(factory_simulation_get_event_count(simulation) == 0U);
     select = select_recipe(1U, FACTORY_ASSEMBLER_RECIPE_COPPER_WIRE);
     CHECK(factory_simulation_submit_command(simulation, &select)
         == FACTORY_RESULT_OK);
@@ -281,6 +295,54 @@ static void test_storage_new_items(void)
     CHECK(factory_storage_get_total_amount(&storage) == 7U);
 }
 
+static void test_configuration_demolition_fifo(void)
+{
+    FactoryWorld *world=factory_world_create(2U,2U);
+    FactorySimulation *simulation=
+        factory_simulation_create_with_construction_units(world,UINT32_MAX);
+    FactoryCommand place=place_assembler(0,0);
+    FactoryCommand select=select_recipe(
+        1U,FACTORY_ASSEMBLER_RECIPE_IRON_GEAR);
+    FactoryCommand demolish={FACTORY_COMMAND_DEMOLISH_ENTITY,
+        {.demolish_entity={1U}}};
+    CHECK(factory_simulation_submit_command(simulation,&place)
+        ==FACTORY_RESULT_OK);
+    factory_simulation_tick(simulation);
+    CHECK(factory_simulation_submit_command(simulation,&select)
+        ==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_submit_command(simulation,&demolish)
+        ==FACTORY_RESULT_OK);
+    factory_simulation_tick(simulation);
+    CHECK(factory_simulation_get_command_result(simulation,0U)->result
+        ==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_command_result(simulation,1U)->result
+        ==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_event(simulation,0U)->type
+        ==FACTORY_EVENT_ASSEMBLER_RECIPE_CHANGED);
+    CHECK(factory_simulation_get_event(simulation,1U)->type
+        ==FACTORY_EVENT_ENTITY_DEMOLISHED);
+    CHECK(!factory_simulation_entity_is_valid(simulation,1U));
+    CHECK(factory_simulation_submit_command(simulation,&place)
+        ==FACTORY_RESULT_OK);
+    factory_simulation_tick(simulation);
+    demolish.data.demolish_entity.entity_id=2U;
+    select.data.set_assembler_recipe.assembler_entity=2U;
+    CHECK(factory_simulation_submit_command(simulation,&demolish)
+        ==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_submit_command(simulation,&select)
+        ==FACTORY_RESULT_OK);
+    factory_simulation_tick(simulation);
+    CHECK(factory_simulation_get_command_result(simulation,0U)->result
+        ==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_command_result(simulation,1U)->result
+        ==FACTORY_RESULT_ENTITY_NOT_FOUND);
+    CHECK(factory_simulation_get_event_count(simulation)==1U);
+    CHECK(factory_simulation_get_event(simulation,0U)->type
+        ==FACTORY_EVENT_ENTITY_DEMOLISHED);
+    factory_simulation_destroy(simulation);
+    factory_world_destroy(world);
+}
+
 int main(void)
 {
     test_recipe_catalog();
@@ -304,6 +366,7 @@ int main(void)
         FACTORY_ITEM_COPPER_WIRE, 2U
     );
     test_storage_new_items();
+    test_configuration_demolition_fifo();
 
     if (failures != 0) {
         return 1;

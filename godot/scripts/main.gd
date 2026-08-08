@@ -25,6 +25,9 @@ var event_lines: Array[String] = []
 
 func _ready() -> void:
 	call_deferred("_position_interface")
+	var event_font := SystemFont.new()
+	event_font.font_names = PackedStringArray(["Menlo", "Monaco", "Monospace"])
+	event_log.add_theme_font_override("normal_font", event_font)
 	if not ClassDB.class_exists("FoundationSimulation"):
 		status_label.text = "Status: native extension failed to load"
 		set_physics_process(false)
@@ -35,8 +38,12 @@ func _ready() -> void:
 	world_controller.placement_requested.connect(_on_placement_requested)
 	world_controller.demolition_requested.connect(_on_demolition_requested)
 	world_controller.interaction_mode_changed.connect(_on_interaction_mode_changed)
+	inspector.assembler_recipe_requested.connect(_on_assembler_recipe_requested)
+	inspector.storage_output_requested.connect(_on_storage_output_requested)
 	_reset_demo()
 	build_toolbar.configure(simulation)
+	inspector.configure_catalogs(
+		simulation.get_assembler_recipe_catalog(),simulation.get_item_catalog())
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED and is_node_ready():
@@ -48,8 +55,13 @@ func _position_interface() -> void:
 		viewport_size = Vector2(
 			float(ProjectSettings.get_setting("display/window/size/viewport_width",1100)),
 			float(ProjectSettings.get_setting("display/window/size/viewport_height",720)))
-	build_panel.position = Vector2(12.0,viewport_size.y - 106.0)
-	build_panel.size = Vector2(maxf(360.0,viewport_size.x - 324.0),96.0)
+	var sidebar_width := clampf(viewport_size.x * 0.27, 288.0, 420.0)
+	sidebar.position = Vector2(viewport_size.x - sidebar_width - 10.0, 10.0)
+	sidebar.size = Vector2(sidebar_width, viewport_size.y - 20.0)
+	top_toolbar.position = Vector2(12.0, 10.0)
+	top_toolbar.size = Vector2(viewport_size.x - sidebar_width - 34.0, 44.0)
+	build_panel.position = Vector2(12.0, viewport_size.y - 122.0)
+	build_panel.size = Vector2(maxf(360.0, viewport_size.x - sidebar_width - 34.0), 112.0)
 
 func _physics_process(delta: float) -> void:
 	if not running:
@@ -100,23 +112,40 @@ func _synchronize() -> bool:
 		return false
 	canvas.synchronize(entities, resources, power_edges)
 	world_controller.refresh_selection()
+	world_controller.set_hovered_grid(world_controller.hovered_grid)
 	build_toolbar.refresh(simulation)
 	construction_label.text = "Construction: %d units" % int(simulation.get_construction_units())
 	tick_label.text = "Tick: %d  Day: %d  Time: %d" % [
 		tick, day, time_of_day
 	]
+	if world_controller.selected_entity_id == 0:
+		var research: Dictionary = simulation.get_research()
+		var powered_count := 0
+		for entity: Dictionary in entities:
+			if bool(entity.get("powered", false)): powered_count += 1
+		inspector.show_overview({
+			"tick": tick,
+			"day": day,
+			"construction_units": simulation.get_construction_units(),
+			"entity_count": entities.size(),
+			"powered_count": powered_count,
+			"power_edge_count": power_edges.size(),
+			"completed_technology_count": research.get("completed_technology_count", 0),
+			"active_mode": _mode_name(world_controller.mode),
+		})
 	event_log.text = "\n".join(event_lines)
 	return true
 
 func _append_events(events: Array) -> void:
 	for event: Dictionary in events:
-		event_lines.append(
-			"t%-4d type=%d entity=%d related=%d item=%d qty=%d" % [
+		var row := "t%-4d  type=%-2d  entity=%-3d\n     related=%-3d  item=%-2d  qty=%d" % [
 				int(event.tick), int(event.type), int(event.entity_id),
 				int(event.related_entity_id), int(event.item_type),
 				int(event.quantity)
 			]
-		)
+		var background := "#18202a" if event_lines.size() % 2 == 0 else "#202935"
+		var accent := "#65d3e7" if int(event.type) >= 20 else "#e5c85a"
+		event_lines.append("[bgcolor=%s][color=%s]▎[/color][font_size=12] %s [/font_size][/bgcolor]" % [background, accent, row])
 	while event_lines.size() > MAX_EVENT_LINES:
 		event_lines.pop_front()
 
@@ -147,6 +176,13 @@ func _on_interaction_mode_changed(mode: int,entity_type: int) -> void:
 		mode_label.text = "Mode: Demolish — Esc cancels"
 	else:
 		mode_label.text = "Mode: Select"
+	if world_controller.selected_entity_id == 0 and simulation != null:
+		_synchronize()
+
+func _mode_name(mode: int) -> String:
+	if mode == 1: return "Build"
+	if mode == 2: return "Demolish"
+	return "Select"
 
 func _on_placement_requested(entity_type: int,grid: Vector2i,direction: int) -> void:
 	var queued: int = simulation.queue_place_entity(entity_type,grid.x,grid.y,direction)
@@ -161,6 +197,20 @@ func _on_demolition_requested(entity_id: int) -> void:
 		status_label.text = "Status: %s" % simulation.result_name(queued)
 		return
 	_execute_queued_command("Demolished entity #%d" % entity_id)
+
+func _on_assembler_recipe_requested(entity_id: int,recipe_id: int) -> void:
+	var queued: int = simulation.queue_set_assembler_recipe(entity_id,recipe_id)
+	if queued != 0:
+		status_label.text = "Status: %s" % simulation.result_name(queued)
+		return
+	_execute_queued_command("Assembler recipe updated")
+
+func _on_storage_output_requested(entity_id: int,item_type: int) -> void:
+	var queued: int = simulation.queue_set_storage_output(entity_id,item_type)
+	if queued != 0:
+		status_label.text = "Status: %s" % simulation.result_name(queued)
+		return
+	_execute_queued_command("Storage output updated")
 
 func _execute_queued_command(success_message: String) -> void:
 	if not _advance(1): return

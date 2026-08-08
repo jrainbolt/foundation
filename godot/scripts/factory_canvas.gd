@@ -2,7 +2,7 @@ class_name FoundationFactoryCanvas
 extends Node2D
 
 const EntityVisual := preload("res://scripts/entity_visual.gd")
-const CELL := 64.0
+const CELL := 76.0
 
 var entity_nodes: Dictionary = {}
 var resources: Array = []
@@ -46,17 +46,18 @@ func _draw() -> void:
 			(float(resource.x) + 0.5) * CELL,
 			(float(resource.y) + 0.5) * CELL
 		)
-		draw_circle(center, 25.0, color.darkened(0.35))
+		draw_circle(center, 28.0, color.darkened(0.45))
 		draw_string(
-			ThemeDB.fallback_font, center + Vector2(-25, 4),
-			"%d" % int(resource.remaining), HORIZONTAL_ALIGNMENT_CENTER, 50, 11
+			ThemeDB.fallback_font, center + Vector2(-28, 4),
+			"%d" % int(resource.remaining), HORIZONTAL_ALIGNMENT_CENTER, 56, 11,
+			Color("#f2e6dd")
 		)
 	for edge: Dictionary in edges:
 		var a: FoundationEntityVisual = entity_nodes.get(int(edge.a))
 		var b: FoundationEntityVisual = entity_nodes.get(int(edge.b))
 		if a != null and b != null:
 			draw_line(
-				a.position + Vector2(32, 32),
-				b.position + Vector2(32, 32),
-				Color("#f1d55c", 0.75), 3.0
+				a.position + Vector2(38, 38),
+				b.position + Vector2(38, 38),
+				Color("#f2d95c", 0.9), 4.0
 			)

@@ -7,7 +7,7 @@ signal placement_requested(entity_type: int,grid_position: Vector2i,direction: i
 signal demolition_requested(entity_id: int)
 signal interaction_mode_changed(mode: int,entity_type: int)
 enum InteractionMode { SELECT, BUILD, DEMOLISH }
-const CELL := 64.0
+const CELL := 76.0
 @export var canvas_path: NodePath
 @export var inspector_path: NodePath
 @onready var canvas: FoundationFactoryCanvas = get_node(canvas_path)
@@ -17,6 +17,7 @@ var hovered_grid := Vector2i.ZERO
 var mode := InteractionMode.SELECT
 var build_entity_type := 0
 var build_direction := 0
+var hovered_entity_id := 0
 
 func enter_select_mode() -> void:
 	mode = InteractionMode.SELECT
@@ -44,6 +45,18 @@ func rotate_build() -> void:
 
 func preview_is_advisably_valid() -> bool:
 	return mode == InteractionMode.BUILD and pick_grid(hovered_grid) == 0
+
+func set_hovered_grid(grid_position: Vector2i) -> void:
+	hovered_grid = grid_position
+	var next_entity := pick_grid(hovered_grid)
+	if hovered_entity_id != next_entity:
+		if canvas.entity_nodes.has(hovered_entity_id):
+			canvas.entity_nodes[hovered_entity_id].set_hovered(false)
+		hovered_entity_id = next_entity
+		if canvas.entity_nodes.has(hovered_entity_id):
+			canvas.entity_nodes[hovered_entity_id].set_hovered(true)
+	hovered_grid_changed.emit(hovered_grid)
+	queue_redraw()
 
 func world_to_grid(world_position: Vector2) -> Vector2i:
 	return Vector2i(floori(world_position.x / CELL), floori(world_position.y / CELL))
@@ -99,9 +112,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion:
 		var next_grid := world_to_grid(get_global_mouse_position())
 		if next_grid != hovered_grid:
-			hovered_grid = next_grid
-			hovered_grid_changed.emit(hovered_grid)
-			queue_redraw()
+			set_hovered_grid(next_grid)
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		var grid := world_to_grid(get_global_mouse_position())
 		var picked := pick_grid(grid)

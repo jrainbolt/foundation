@@ -11,6 +11,11 @@ buffer must be empty. Selecting the current item is a state-preserving success
 even while the buffer is occupied. Selecting `NONE` disables export without
 altering inventory and requires an empty buffer when it changes configuration.
 
+An actual committed change emits `FACTORY_EVENT_STORAGE_OUTPUT_CHANGED` with
+the storage ID and stable old/new item values. Reselecting the current value is
+a successful no-op with no event. Configuration itself never transfers an item;
+the normal storage-output phase later in the same tick may fill an empty buffer.
+
 During each tick, storage updates after assemblers and before inserters. If a
 configured item is available and the buffer is empty, exactly one inventory
 item moves into the buffer. An idle inserter can begin its pickup state that
@@ -30,6 +35,9 @@ Demolition requires both inventory and output buffer to be empty. Conservation
 counts inventory, the output buffer, and any later inserter-held item as
 separate ownership locations.
 
-Known limitations are intentional: there is one configured output, no automatic
+Clients request configuration through the same public FIFO queue used by other
+commands. The configured value and pending command are canonical snapshot state;
+the observational event is transient. Known limitations are intentional: there
+is one configured output, no automatic
 selection or priorities, no direct inventory pickup, no belt extraction, and no
 direct storage-to-belt transfer.

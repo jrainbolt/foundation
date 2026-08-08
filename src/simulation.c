@@ -1405,6 +1405,9 @@ static FactoryResult set_assembler_recipe(
     *out_previous = assembler->recipe_id;
     *out_new = recipe_id;
     *out_id = id;
+    if (assembler->recipe_id == recipe_id) {
+        return FACTORY_RESULT_OK;
+    }
     if (assembler->processing
         || assembler->processing_progress != 0U
         || assembler->input_slots[0].count != 0U
@@ -1412,9 +1415,6 @@ static FactoryResult set_assembler_recipe(
         || assembler->output_item != FACTORY_ITEM_NONE
         || assembler->output_amount != 0U) {
         return FACTORY_RESULT_ASSEMBLER_NOT_EMPTY;
-    }
-    if (assembler->recipe_id == recipe_id) {
-        return FACTORY_RESULT_OK;
     }
     return factory_assembler_configure_recipe(assembler, recipe_id)
         ? FACTORY_RESULT_OK : FACTORY_RESULT_INVALID_ARGUMENT;
@@ -1758,6 +1758,28 @@ static void apply_commands(FactorySimulation *simulation)
                     .type = FACTORY_EVENT_ENTITY_DEMOLISHED,
                     .entity_id = result->entity_id,
                     .entity_type = result->entity_type
+                });
+            } else if (result->command.type
+                    == FACTORY_COMMAND_SET_ASSEMBLER_RECIPE
+                && result->previous_assembler_recipe
+                    != result->new_assembler_recipe) {
+                factory_simulation_emit_event(simulation, (FactoryEvent){
+                    .type = FACTORY_EVENT_ASSEMBLER_RECIPE_CHANGED,
+                    .entity_id = result->entity_id,
+                    .quantity = (uint32_t)result->new_assembler_recipe,
+                    .related_quantity =
+                        (uint32_t)result->previous_assembler_recipe
+                });
+            } else if (result->command.type
+                    == FACTORY_COMMAND_SET_STORAGE_OUTPUT
+                && result->previous_storage_output
+                    != result->new_storage_output) {
+                factory_simulation_emit_event(simulation, (FactoryEvent){
+                    .type = FACTORY_EVENT_STORAGE_OUTPUT_CHANGED,
+                    .entity_id = result->entity_id,
+                    .item_type = result->new_storage_output,
+                    .related_quantity =
+                        (uint32_t)result->previous_storage_output
                 });
             }
         }

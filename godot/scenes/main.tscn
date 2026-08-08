@@ -59,7 +59,7 @@ offset_bottom = 50.0
 grow_horizontal = 2
 
 [node name="Controls" type="HBoxContainer" parent="Interface/Toolbar"]
-theme_override_constants/separation = 10
+theme_override_constants/separation = 12
 
 [node name="ResetButton" type="Button" parent="Interface/Toolbar/Controls"]
 text = "Reset Demo"
@@ -98,6 +98,7 @@ size_flags_vertical = 3
 [node name="LogLabel" type="Label" parent="Interface/Sidebar"]
 layout_mode = 2
 text = "Recent simulation events"
+theme_override_font_sizes/font_size = 15
 
 [node name="EventLog" type="RichTextLabel" parent="Interface/Sidebar"]
 unique_name_in_owner = true
@@ -114,7 +115,7 @@ offset_right = 788.0
 offset_bottom = 710.0
 
 [node name="Layout" type="VBoxContainer" parent="Interface/BuildPanel"]
-theme_override_constants/separation = 4
+theme_override_constants/separation = 7
 
 [node name="StatusRow" type="HBoxContainer" parent="Interface/BuildPanel/Layout"]
 layout_mode = 2
@@ -123,10 +124,12 @@ theme_override_constants/separation = 18
 [node name="ModeLabel" type="Label" parent="Interface/BuildPanel/Layout/StatusRow"]
 unique_name_in_owner = true
 text = "Mode: Select"
+theme_override_font_sizes/font_size = 14
 
 [node name="ConstructionLabel" type="Label" parent="Interface/BuildPanel/Layout/StatusRow"]
 unique_name_in_owner = true
 text = "Construction: 0 units"
+theme_override_font_sizes/font_size = 14
 
 [node name="BuildScroll" type="ScrollContainer" parent="Interface/BuildPanel/Layout"]
 layout_mode = 2
@@ -136,7 +139,7 @@ vertical_scroll_mode = 0
 [node name="BuildToolbar" type="HBoxContainer" parent="Interface/BuildPanel/Layout/BuildScroll"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_constants/separation = 9
 script = ExtResource("7")
 
 [connection signal="pressed" from="Interface/Toolbar/Controls/ResetButton" to="." method="_on_reset_pressed"]

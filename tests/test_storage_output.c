@@ -81,6 +81,14 @@ static void test_configuration_and_buffer(void)
     CHECK(state.copper_plate_amount == 3U);
     CHECK(state.output_occupied);
     CHECK(state.output_item == FACTORY_ITEM_IRON_PLATE);
+    CHECK(factory_simulation_get_event_count(simulation) == 1U);
+    CHECK(factory_simulation_get_event(simulation, 0U)->type
+        == FACTORY_EVENT_STORAGE_OUTPUT_CHANGED);
+    CHECK(factory_simulation_get_event(simulation, 0U)->entity_id == 1U);
+    CHECK(factory_simulation_get_event(simulation, 0U)->item_type
+        == FACTORY_ITEM_IRON_PLATE);
+    CHECK(factory_simulation_get_event(simulation, 0U)->related_quantity
+        == FACTORY_ITEM_NONE);
 
     submit(simulation, set_output(1U, FACTORY_ITEM_IRON_PLATE));
     factory_simulation_tick(simulation);
