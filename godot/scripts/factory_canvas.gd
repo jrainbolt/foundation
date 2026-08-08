@@ -40,10 +40,6 @@ func synchronize(
 	queue_redraw()
 
 func _draw() -> void:
-	for x in range(13):
-		draw_line(Vector2(x * CELL, 0), Vector2(x * CELL, 8 * CELL), Color("#303846"))
-	for y in range(9):
-		draw_line(Vector2(0, y * CELL), Vector2(12 * CELL, y * CELL), Color("#303846"))
 	for resource: Dictionary in resources:
 		var color := Color("#984f35") if int(resource.type) == 1 else Color("#b87333")
 		var center := Vector2(

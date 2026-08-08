@@ -56,11 +56,31 @@ number of integer simulation steps at a 12 Hz cadence; frame delta is never
 passed into Foundation. The event panel retains only the latest 80 copied
 event lines.
 
+## Read-only interaction
+
+Move the camera with WASD or the arrow keys, drag with the middle mouse button,
+and zoom with the mouse wheel. Camera motion and zoom are frontend state and
+continue to work while simulation stepping is paused. The procedural grid and
+cursor tile share the renderer's 64-pixel Foundation-grid conversion.
+
+Left-click an entity to select its stable Foundation entity ID. Left-clicking
+empty world clears selection; UI controls consume their clicks before world
+picking. If visuals overlap, the lowest stable entity ID wins deterministically.
+Selection survives presentation refreshes while that ID exists. Reset clears
+selection deliberately because reset creates a new simulation instance.
+
+The right-side inspector reads only the copied presentation dictionary. It
+shows identity, status, process, storage, network, and latest-activity fields
+when those fields exist for the selected entity. No selection, camera, or
+inspector state enters Foundation snapshots, events, presentation records, or
+the native adapter. Styling is intentionally provisional and technical.
+
 For a headless integration smoke test after building:
 
 ```sh
 godot --headless --path . --script tests/smoke.gd
 godot --headless --path . --script tests/main_scene_smoke.gd
+godot --headless --path . --script tests/interaction_smoke.gd
 ```
 
 The first test checks native-class loading, safe uninitialized access,

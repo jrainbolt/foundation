@@ -34,6 +34,16 @@ const NAMES := {
 }
 
 var state: Dictionary = {}
+var selected := false
+var hovered := false
+
+func set_selected(value: bool) -> void:
+	selected = value
+	queue_redraw()
+
+func set_hovered(value: bool) -> void:
+	hovered = value
+	queue_redraw()
 
 func apply(next_state: Dictionary) -> void:
 	state = next_state.duplicate(true)
@@ -47,6 +57,12 @@ func _draw() -> void:
 		color = color.darkened(0.55)
 	draw_rect(Rect2(4, 4, 56, 56), color, true)
 	draw_rect(Rect2(4, 4, 56, 56), Color("#1d2430"), false, 2.0)
+	if hovered:
+		draw_rect(Rect2(2, 2, 60, 60), Color("#b9ddf5", 0.8), false, 2.0)
+	if selected:
+		draw_rect(Rect2(1, 1, 62, 62), Color("#fff176"), false, 4.0)
+		for corner in [Vector2(1, 1), Vector2(63, 1), Vector2(63, 63), Vector2(1, 63)]:
+			draw_circle(corner, 4.0, Color("#fff176"))
 	draw_string(
 		ThemeDB.fallback_font, Vector2(7, 24),
 		NAMES.get(entity_type, "?"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12

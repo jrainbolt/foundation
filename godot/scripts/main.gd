@@ -8,6 +8,8 @@ const STEPS_PER_SECOND := 12.0
 @onready var status_label: Label = %StatusLabel
 @onready var event_log: RichTextLabel = %EventLog
 @onready var run_button: Button = %RunButton
+@onready var world_controller: Node = %WorldController
+@onready var inspector: Control = %EntityInspector
 
 var simulation: Object
 var running := false
@@ -39,6 +41,8 @@ func _reset_demo() -> void:
 	run_button.text = "Run"
 	cadence_accumulator = 0.0
 	event_lines.clear()
+	if is_instance_valid(world_controller):
+		world_controller.clear_selection()
 	var result: int = simulation.reset_demo()
 	_show_result(result)
 	_synchronize()
@@ -67,6 +71,7 @@ func _synchronize() -> bool:
 		status_label.text = "Status: %s" % simulation.get_last_error()
 		return false
 	canvas.synchronize(entities, resources, power_edges)
+	world_controller.refresh_selection()
 	tick_label.text = "Tick: %d  Day: %d  Time: %d" % [
 		tick, day, time_of_day
 	]

@@ -20,6 +20,11 @@ func _run() -> void:
 	if main.simulation == null:
 		_fail("main scene did not construct adapter")
 		return
+	if main.world_controller == null or main.inspector == null \
+			or main.get_node_or_null("World/Camera2D") == null \
+			or main.get_node_or_null("World/Grid") == null:
+		_fail("interactive frontend nodes are missing")
+		return
 	var initial_tick := int(main.simulation.get_tick())
 	var canvas: Node = main.canvas
 	if initial_tick != 11 or canvas.entity_nodes.size() != 48:
