@@ -1314,6 +1314,7 @@ Array FoundationSimulation::get_resources() const
         value["y"] = (int64_t)resource->y;
         value["type"] = (int64_t)resource->resource_type;
         value["remaining"] = (int64_t)resource->remaining_quantity;
+        value["depleted"] = resource->depleted;
         if (!set_unsigned(
                 &value, "occupying_entity_id",
                 resource->occupying_entity_id,
@@ -1387,6 +1388,9 @@ Array FoundationSimulation::get_events() const
         value["related_quantity"] =
             (int64_t)event->related_quantity;
         value["third_quantity"] = (int64_t)event->third_quantity;
+        value["resource_type"] = (int64_t)event->resource_type;
+        value["x"] = (int64_t)event->x;
+        value["y"] = (int64_t)event->y;
         values.append(value);
     }
     return values;

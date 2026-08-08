@@ -302,18 +302,24 @@ static void test_multiple_transfer_order(void)
     submit(simulation, generator(1, 4));                    /* 6 */
     for (uint32_t step = 0U; step < 20U; ++step)
         factory_simulation_tick(simulation);
-    CHECK(factory_simulation_get_event_count(simulation) == 4U);
+    CHECK(factory_simulation_get_event_count(simulation) == 6U);
     event = factory_simulation_get_event(simulation, 0U);
     CHECK(event != NULL && event->type
         == FACTORY_EVENT_PRODUCTION_COMPLETED && event->entity_id == 1U);
     event = factory_simulation_get_event(simulation, 1U);
+    CHECK(event != NULL && event->type==FACTORY_EVENT_RESOURCE_DEPLETED
+        && event->entity_id==1U&&event->x==0&&event->y==0);
+    event = factory_simulation_get_event(simulation, 2U);
     CHECK(event != NULL && event->type
         == FACTORY_EVENT_PRODUCTION_COMPLETED && event->entity_id == 3U);
-    event = factory_simulation_get_event(simulation, 2U);
+    event = factory_simulation_get_event(simulation, 3U);
+    CHECK(event != NULL && event->type==FACTORY_EVENT_RESOURCE_DEPLETED
+        && event->entity_id==3U&&event->x==0&&event->y==2);
+    event = factory_simulation_get_event(simulation, 4U);
     CHECK(event != NULL && event->type == FACTORY_EVENT_ITEM_TRANSFERRED);
     CHECK(event != NULL && event->entity_id == 1U
         && event->related_entity_id == 2U);
-    event = factory_simulation_get_event(simulation, 3U);
+    event = factory_simulation_get_event(simulation, 5U);
     CHECK(event != NULL && event->type == FACTORY_EVENT_ITEM_TRANSFERRED);
     CHECK(event != NULL && event->entity_id == 3U
         && event->related_entity_id == 4U);

@@ -150,6 +150,13 @@ void factory_extractor_store_update(
                     .item_type = extractor->produced_item,
                     .quantity = 1U
                 });
+                if (factory_resource_deposit_is_depleted(
+                        world,extractor->x,extractor->y))
+                    factory_simulation_emit_event(simulation,(FactoryEvent){
+                        .type=FACTORY_EVENT_RESOURCE_DEPLETED,
+                        .entity_id=extractor->entity_id,
+                        .resource_type=extractor->resource_type,
+                        .x=extractor->x,.y=extractor->y});
             }
         }
     }

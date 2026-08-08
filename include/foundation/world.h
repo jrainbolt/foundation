@@ -16,6 +16,18 @@ typedef enum {
     FACTORY_RESOURCE_COPPER
 } FactoryResourceType;
 
+typedef uint32_t FactoryResourceQuantity;
+#define FACTORY_RESOURCE_QUANTITY_MAX UINT32_MAX
+
+typedef struct {
+    int32_t x;
+    int32_t y;
+    FactoryResourceType resource_type;
+    FactoryResourceQuantity remaining_quantity;
+    FactoryEntityId occupying_entity_id;
+    bool depleted;
+} FactoryResourceDepositInspection;
+
 typedef struct {
     FactoryTerrainType terrain;
     FactoryResourceType resource;
@@ -96,6 +108,13 @@ const FactoryTile *factory_world_get_tile(
     int32_t x,
     int32_t y
 );
+
+/* Copies finite deposit state without exposing mutable world storage. */
+FactoryResult factory_world_get_resource_deposit(
+    const FactoryWorld *world,int32_t x,int32_t y,
+    FactoryResourceDepositInspection *out_deposit);
+bool factory_resource_deposit_is_depleted(
+    const FactoryWorld *world,int32_t x,int32_t y);
 
 /*
  * Adds a finite resource deposit to an empty ground tile. Returns

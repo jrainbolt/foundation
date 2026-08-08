@@ -367,6 +367,14 @@ if(BUILD_TESTING)
     target_link_libraries(factory_research_lab_tests PRIVATE factory_engine)
     add_test(NAME factory_research_lab_tests COMMAND factory_research_lab_tests)
 
+    add_executable(factory_resource_depletion_tests
+        tests/test_resource_depletion.c)
+    target_include_directories(factory_resource_depletion_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(factory_resource_depletion_tests PRIVATE factory_engine)
+    add_test(NAME factory_resource_depletion_tests
+        COMMAND factory_resource_depletion_tests)
+
     add_executable(factory_content_tests tests/test_content.c)
     target_link_libraries(factory_content_tests PRIVATE factory_engine)
     add_test(NAME factory_content_tests COMMAND factory_content_tests)

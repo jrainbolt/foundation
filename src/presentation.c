@@ -82,9 +82,10 @@ static FactoryPresentationMachineStatus extractor_status(
     if (!powered) return FACTORY_PRESENTATION_MACHINE_STATUS_UNPOWERED;
     if (extractor->output_amount != 0U)
         return FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_OUTPUT;
-    if (tile == NULL || tile->resource != extractor->resource_type
-        || tile->resource_amount == 0U)
+    if (tile == NULL || tile->resource != extractor->resource_type)
         return FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_INPUT;
+    if (tile->resource_amount == 0U)
+        return FACTORY_PRESENTATION_MACHINE_STATUS_DEPLETED_RESOURCE;
     return FACTORY_PRESENTATION_MACHINE_STATUS_WORKING;
 }
 
@@ -685,7 +686,8 @@ FactoryResult factory_presentation_snapshot_rebuild(
                 next.resources[resource_index++] =
                     (FactoryPresentationResource){
                         (int32_t)x, (int32_t)y, tile->resource,
-                        tile->resource_amount, tile->occupying_entity
+                        tile->resource_amount, tile->occupying_entity,
+                        tile->resource_amount==0U
                     };
         }
     for (i = 0U; i < next.power_edge_count; ++i) {

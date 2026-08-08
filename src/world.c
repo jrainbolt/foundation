@@ -150,6 +150,28 @@ FactoryResult factory_world_add_resource(
     return FACTORY_RESULT_OK;
 }
 
+FactoryResult factory_world_get_resource_deposit(const FactoryWorld *world,
+    int32_t x,int32_t y,FactoryResourceDepositInspection *out)
+{
+    const FactoryTile *tile;
+    if(world==NULL||out==NULL)return FACTORY_RESULT_INVALID_ARGUMENT;
+    tile=factory_world_get_tile(world,x,y);
+    if(tile==NULL)return FACTORY_RESULT_OUT_OF_BOUNDS;
+    if(tile->resource==FACTORY_RESOURCE_NONE)return FACTORY_RESULT_NO_RESOURCE;
+    *out=(FactoryResourceDepositInspection){x,y,tile->resource,
+        tile->resource_amount,tile->occupying_entity,
+        tile->resource_amount==0U};
+    return FACTORY_RESULT_OK;
+}
+
+bool factory_resource_deposit_is_depleted(const FactoryWorld *world,
+    int32_t x,int32_t y)
+{
+    FactoryResourceDepositInspection deposit;
+    return factory_world_get_resource_deposit(world,x,y,&deposit)
+        ==FACTORY_RESULT_OK&&deposit.depleted;
+}
+
 FactoryResult factory_world_set_occupying_entity(
     FactoryWorld *world,
     int32_t x,

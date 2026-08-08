@@ -90,3 +90,10 @@ Events and their allocation capacity are observer state. They are not encoded
 in version 16 snapshots and do not affect canonical bytes. A loaded simulation
 starts with an empty batch. Failed loads create no simulation and cannot alter
 an existing simulation or its visible batch.
+# Resource depletion
+
+`FACTORY_EVENT_RESOURCE_DEPLETED` is emitted once when successful extraction
+changes a deposit from positive quantity to zero. It follows that cycle's
+`FACTORY_EVENT_PRODUCTION_COMPLETED`; `entity_id` is the extractor,
+`resource_type` is the deposit type, and `x`/`y` are world coordinates.
+Deposits have no synthetic entity IDs.

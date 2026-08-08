@@ -42,14 +42,20 @@ func synchronize(
 func _draw() -> void:
 	for resource: Dictionary in resources:
 		var color := Color("#984f35") if int(resource.type) == 1 else Color("#b87333")
+		var remaining := int(resource.remaining)
+		var radius := 28.0 if remaining >= 100 else (22.0 if remaining > 0 else 18.0)
+		if bool(resource.get("depleted", false)): color = Color("#39414a")
 		var center := Vector2(
 			(float(resource.x) + 0.5) * CELL,
 			(float(resource.y) + 0.5) * CELL
 		)
-		draw_circle(center, 28.0, color.darkened(0.45))
+		draw_circle(center, radius, color.darkened(0.45))
+		if remaining == 0:
+			draw_line(center + Vector2(-10,-10),center + Vector2(10,10),Color("#9ba4ad"),3.0)
+			draw_line(center + Vector2(10,-10),center + Vector2(-10,10),Color("#9ba4ad"),3.0)
 		draw_string(
 			ThemeDB.fallback_font, center + Vector2(-28, 4),
-			"%d" % int(resource.remaining), HORIZONTAL_ALIGNMENT_CENTER, 56, 11,
+			"%d" % remaining, HORIZONTAL_ALIGNMENT_CENTER, 56, 11,
 			Color("#f2e6dd")
 		)
 	for edge: Dictionary in edges:

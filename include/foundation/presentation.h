@@ -17,7 +17,8 @@ typedef enum {
     FACTORY_PRESENTATION_MACHINE_STATUS_WORKING,
     FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_INPUT,
     FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_OUTPUT,
-    FACTORY_PRESENTATION_MACHINE_STATUS_UNPOWERED
+    FACTORY_PRESENTATION_MACHINE_STATUS_UNPOWERED,
+    FACTORY_PRESENTATION_MACHINE_STATUS_DEPLETED_RESOURCE
 } FactoryPresentationMachineStatus;
 
 typedef struct {
@@ -299,6 +300,7 @@ typedef struct {
     FactoryResourceType resource_type;
     uint32_t remaining_quantity;
     FactoryEntityId occupying_entity_id;
+    bool depleted;
 } FactoryPresentationResource;
 
 typedef struct {

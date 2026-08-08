@@ -22,6 +22,11 @@
 - [x] Deterministic renderer-neutral presentation snapshots
 - [x] Deterministic research and technology progression infrastructure
 - [x] Deterministic Research Labs and physical science logistics
+- [x] Finite resource deposits, depletion, and conservation
+
+Finite deposits are the prerequisite for deterministic procedural terrain and
+resource patches, remote mining outposts, rail infrastructure, and eventually
+deterministic trains, routing, reservations, and stations.
 - [x] Unified deterministic immutable content definitions
 - [ ] Inserter variants, filters, and longer arms
 

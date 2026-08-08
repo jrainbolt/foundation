@@ -8,6 +8,7 @@
 #include "foundation/item.h"
 #include "foundation/fluid.h"
 #include "foundation/research.h"
+#include <foundation/world.h>
 
 typedef struct FactorySimulation FactorySimulation;
 
@@ -51,7 +52,8 @@ typedef enum {
     FACTORY_EVENT_RESEARCH_UNIT_COMPLETED,
     FACTORY_EVENT_TECHNOLOGY_COMPLETED,
     FACTORY_EVENT_ASSEMBLER_RECIPE_CHANGED,
-    FACTORY_EVENT_STORAGE_OUTPUT_CHANGED
+    FACTORY_EVENT_STORAGE_OUTPUT_CHANGED,
+    FACTORY_EVENT_RESOURCE_DEPLETED
 } FactoryEventType;
 
 /*
@@ -95,13 +97,17 @@ typedef enum {
  * research selected: technology_id identifies the new active selection.
  * research unit completed: technology_id and item_type/quantity identify the
  * unit and committed science; related_quantity is completed units and
- * third_quantity is required units. The global-controller model has no lab ID.
+ * third_quantity is required units; entity_id is the lab contributing the
+ * completion tick, which need not be the lab that supplied the science.
  * technology completed: technology_id identifies the technology and quantity
  * is its final completed-unit count.
  * assembler recipe changed: entity_id identifies the assembler, quantity is
  * the new recipe ID, and related_quantity is the previous recipe ID.
  * storage output changed: entity_id identifies the storage, item_type is the
  * new configured output item, and related_quantity is the previous item.
+ * resource depleted: x/y identify the deposit, entity_id identifies the
+ * occupying extractor, and resource_type identifies the resource. It follows
+ * the final production-completed event and is emitted exactly once.
  *
  * tick is the simulation tick at the start of the step that emitted the
  * event. Item-transfer quantity is currently one. Successful requests for an
@@ -118,9 +124,12 @@ typedef struct {
     FactoryFluidType related_fluid_type;
     uint32_t nuclear_fuel_id;
     FactoryTechnologyId technology_id;
+    FactoryResourceType resource_type;
     uint32_t quantity;
     uint32_t related_quantity;
     uint32_t third_quantity;
+    int32_t x;
+    int32_t y;
 } FactoryEvent;
 
 /*
