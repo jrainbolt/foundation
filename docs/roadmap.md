@@ -21,6 +21,7 @@
 - [x] Deterministic transient simulation event stream
 - [x] Deterministic renderer-neutral presentation snapshots
 - [x] Deterministic research and technology progression infrastructure
+- [x] Deterministic Research Labs and physical science logistics
 - [x] Unified deterministic immutable content definitions
 - [ ] Inserter variants, filters, and longer arms
 

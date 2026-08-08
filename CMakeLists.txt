@@ -71,6 +71,7 @@ add_library(factory_engine
     src/refinery.c
     src/reactor.c
     src/research.c
+    src/research_lab.c
     src/simulation.c
     src/solar.c
     src/snapshot.c
@@ -360,10 +361,18 @@ if(BUILD_TESTING)
     target_link_libraries(factory_research_tests PRIVATE factory_engine)
     add_test(NAME factory_research_tests COMMAND factory_research_tests)
 
+    add_executable(factory_research_lab_tests tests/test_research_lab.c)
+    target_include_directories(
+        factory_research_lab_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(factory_research_lab_tests PRIVATE factory_engine)
+    add_test(NAME factory_research_lab_tests COMMAND factory_research_lab_tests)
+
     add_executable(factory_content_tests tests/test_content.c)
     target_link_libraries(factory_content_tests PRIVATE factory_engine)
     add_test(NAME factory_content_tests COMMAND factory_content_tests)
     add_executable(factory_unlock_enforcement_tests tests/test_unlock_enforcement.c)
+    target_include_directories(factory_unlock_enforcement_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(factory_unlock_enforcement_tests PRIVATE factory_engine)
     add_test(NAME factory_unlock_enforcement_tests COMMAND factory_unlock_enforcement_tests)
 endif()

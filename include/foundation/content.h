@@ -14,6 +14,7 @@
 #include "foundation/reactor.h"
 #include "foundation/recipe.h"
 #include "foundation/research.h"
+#include "foundation/research_lab.h"
 #include "foundation/steam_engine.h"
 #include "foundation/steam_turbine.h"
 #include "foundation/steam_condenser.h"

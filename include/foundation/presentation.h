@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "foundation/simulation.h"
+#include "foundation/research_lab.h"
 
 #define FACTORY_PRESENTATION_DIRECTION_NONE (-1)
 #define FACTORY_PRESENTATION_STORAGE_ITEM_COUNT 9U
@@ -249,6 +250,16 @@ typedef struct {
 } FactoryPresentationSteamCondenser;
 
 typedef struct {
+    uint32_t science_quantity;
+    uint32_t science_capacity;
+    FactoryPowerNetworkId power_network_id;
+    bool connected;
+    FactoryResearchLabActivity activity;
+    uint32_t science_consumed_last_tick;
+    uint32_t work_contributed_last_tick;
+} FactoryPresentationResearchLab;
+
+typedef struct {
     FactoryEntityId entity_id;
     FactoryEntityType entity_type;
     int32_t x;
@@ -278,6 +289,7 @@ typedef struct {
         FactoryPresentationHeatExchanger heat_exchanger;
         FactoryPresentationSteamTurbine steam_turbine;
         FactoryPresentationSteamCondenser steam_condenser;
+        FactoryPresentationResearchLab research_lab;
     } data;
 } FactoryPresentationEntity;
 
@@ -318,8 +330,6 @@ uint32_t factory_presentation_snapshot_get_time_of_day(
     const FactoryPresentationSnapshot *snapshot
 );
 FactoryTechnologyId factory_presentation_snapshot_get_active_research(
-    const FactoryPresentationSnapshot *snapshot);
-uint32_t factory_presentation_snapshot_get_research_science_quantity(
     const FactoryPresentationSnapshot *snapshot);
 uint32_t factory_presentation_snapshot_get_completed_technology_count(
     const FactoryPresentationSnapshot *snapshot);

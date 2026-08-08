@@ -12,15 +12,11 @@ typedef struct {
 typedef struct {
     FactoryTechnologyId active;
     uint64_t completed_bits;
-    uint32_t science_quantity;
     FactoryTechnologyProgress progress[FACTORY_TECHNOLOGY_COUNT];
 } FactoryResearchState;
 
 FactoryResult factory_research_select(struct FactorySimulation *simulation,
     FactoryTechnologyId id);
-FactoryResult factory_research_insert_science(struct FactorySimulation *simulation,
-    uint32_t quantity);
-void factory_research_update(struct FactorySimulation *simulation);
 bool factory_research_state_valid(const FactoryResearchState *state);
 
 #endif

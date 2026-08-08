@@ -80,7 +80,6 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
         case FACTORY_COMMAND_FLUID_TRANSFER:
         case FACTORY_COMMAND_INSERT_REACTOR_FUEL:
         case FACTORY_COMMAND_SELECT_RESEARCH:
-        case FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE:
             break;
         default:
             ++additions;
@@ -127,6 +126,7 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
     RESERVE_STORE(s->heat_conductors,1U);
     RESERVE_STORE(s->heat_ports,1U);
     RESERVE_STORE(s->heat_exchangers,1U);
+    RESERVE_STORE(s->research_labs,1U);
 #undef RESERVE_STORE
     ADD_BOUND(poles,s->power_poles.count,1U);
     ADD_BOUND(generators,s->power_generators.count,1U);
@@ -137,6 +137,7 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
         || !add_size(&consumers,s->assemblers.count)
         || !add_size(&consumers,s->inserters.count)
         || !add_size(&consumers,s->steam_condensers.count)
+        || !add_size(&consumers,s->research_labs.count)
         || !add_size(&consumers,q)) goto overflow;
     connections=0U;
     if (poles>1U) {

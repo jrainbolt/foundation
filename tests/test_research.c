@@ -4,6 +4,7 @@
 #include "logistics_endpoint_internal.h"
 #include "simulation_internal.h"
 #include "tick_preflight_internal.h"
+#include "power_fixture.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -52,12 +53,17 @@ static void test_selection_progress_completion_and_prerequisites(void)
     CHECK(factory_simulation_get_completed_technology_count(s)==0U);
     CHECK(factory_simulation_get_technology_progress(s,99U,&progress)
         ==FACTORY_RESULT_TECHNOLOGY_INVALID);
+    submit(s,(FactoryCommand){FACTORY_COMMAND_PLACE_RESEARCH_LAB,
+        {.place_research_lab={1,1}}});
+    CHECK(factory_test_submit_power_pair(s,2,1,2,2));
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    for(size_t i=0U;i<4U;++i) CHECK(factory_logistics_endpoint_insert(s,
+        (FactoryLogisticsEndpoint){1U,FACTORY_LOGISTICS_SLOT_RESEARCH_LAB_INPUT},
+        FACTORY_ITEM_BASIC_SCIENCE)==FACTORY_LOGISTICS_RESULT_OK);
     submit(s,(FactoryCommand){FACTORY_COMMAND_SELECT_RESEARCH,
         {.select_research={99U}}});
     submit(s,(FactoryCommand){FACTORY_COMMAND_SELECT_RESEARCH,
         {.select_research={FACTORY_TECHNOLOGY_FLUID_HANDLING}}});
-    submit(s,(FactoryCommand){FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE,
-        {.insert_research_science={4U}}});
     submit(s,(FactoryCommand){FACTORY_COMMAND_SELECT_RESEARCH,
         {.select_research={FACTORY_TECHNOLOGY_BASIC_AUTOMATION}}});
     CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
@@ -65,12 +71,11 @@ static void test_selection_progress_completion_and_prerequisites(void)
         ==FACTORY_RESULT_TECHNOLOGY_INVALID);
     CHECK(factory_simulation_get_command_result(s,1U)->result
         ==FACTORY_RESULT_TECHNOLOGY_PREREQUISITES_MISSING);
-    CHECK(factory_simulation_get_command_result(s,3U)->result==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_command_result(s,2U)->result==FACTORY_RESULT_OK);
     CHECK(factory_simulation_get_event_count(s)==1U);
     CHECK(factory_simulation_get_event(s,0U)->type==FACTORY_EVENT_RESEARCH_SELECTED);
     CHECK(factory_simulation_get_event(s,0U)->technology_id
         ==FACTORY_TECHNOLOGY_BASIC_AUTOMATION);
-    CHECK(factory_simulation_get_research_science_quantity(s)==2U);
     CHECK(factory_simulation_get_technology_progress(s,
         FACTORY_TECHNOLOGY_BASIC_AUTOMATION,&progress)==FACTORY_RESULT_OK);
     CHECK(progress.work_ticks_in_current_unit==1U
@@ -82,7 +87,6 @@ static void test_selection_progress_completion_and_prerequisites(void)
             ==FACTORY_EVENT_RESEARCH_UNIT_COMPLETED);
     CHECK(factory_simulation_get_event(s,0U)->related_quantity==1U);
     CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
-    CHECK(factory_simulation_get_research_science_quantity(s)==0U);
     CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
     CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
     CHECK(factory_simulation_get_event_count(s)==2U);
@@ -111,13 +115,17 @@ static void test_item_logistics_snapshot_presentation_and_continuation(void)
     FactorySnapshotBuffer snapshot={0}; FactoryPresentationSnapshot *view;
     submit(a,(FactoryCommand){FACTORY_COMMAND_PLACE_STORAGE,
         {.place_storage={1,1}}});
+    submit(a,(FactoryCommand){FACTORY_COMMAND_PLACE_RESEARCH_LAB,
+        {.place_research_lab={2,1}}});
+    CHECK(factory_test_submit_power_pair(a,3,1,3,2));
     CHECK(factory_simulation_tick(a)==FACTORY_RESULT_OK);
     CHECK(factory_logistics_endpoint_insert(a,
         (FactoryLogisticsEndpoint){1U,FACTORY_LOGISTICS_SLOT_STORAGE_INPUT},
         FACTORY_ITEM_BASIC_SCIENCE)==FACTORY_LOGISTICS_RESULT_OK);
     CHECK(a->storages.items[0].basic_science_amount==1U);
-    submit(a,(FactoryCommand){FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE,
-        {.insert_research_science={4U}}});
+    for(size_t i=0U;i<4U;++i) CHECK(factory_logistics_endpoint_insert(a,
+        (FactoryLogisticsEndpoint){2U,FACTORY_LOGISTICS_SLOT_RESEARCH_LAB_INPUT},
+        FACTORY_ITEM_BASIC_SCIENCE)==FACTORY_LOGISTICS_RESULT_OK);
     submit(a,(FactoryCommand){FACTORY_COMMAND_SELECT_RESEARCH,
         {.select_research={FACTORY_TECHNOLOGY_BASIC_AUTOMATION}}});
     CHECK(factory_simulation_tick(a)==FACTORY_RESULT_OK);
@@ -140,7 +148,6 @@ static void test_item_logistics_snapshot_presentation_and_continuation(void)
     view=factory_presentation_snapshot_create();
     CHECK(factory_presentation_snapshot_rebuild(view,b)==FACTORY_RESULT_OK);
     CHECK(factory_presentation_snapshot_get_completed_technology_count(view)==1U);
-    CHECK(factory_presentation_snapshot_get_research_science_quantity(view)==0U);
     factory_presentation_snapshot_destroy(view);
     factory_snapshot_buffer_destroy(&snapshot);
     factory_simulation_destroy(b); factory_simulation_destroy(a);
@@ -151,10 +158,12 @@ static void test_preflight_preserves_research_commands(void)
 {
     FactoryWorld *world; FactorySimulation *s=make(&world);
     FactorySnapshotBuffer before={0},after={0};
-    submit(s,(FactoryCommand){FACTORY_COMMAND_PLACE_POWER_POLE,
-        {.place_power_pole={1,1}}});
-    submit(s,(FactoryCommand){FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE,
-        {.insert_research_science={4U}}});
+    FactoryConstructionMaterial units=factory_simulation_construction_units(s);
+    size_t entities=factory_simulation_get_entity_count(s);
+    size_t events=factory_simulation_get_event_count(s);
+    submit(s,(FactoryCommand){FACTORY_COMMAND_PLACE_RESEARCH_LAB,
+        {.place_research_lab={1,1}}});
+    CHECK(factory_test_submit_power_pair(s,2,1,2,2));
     submit(s,(FactoryCommand){FACTORY_COMMAND_SELECT_RESEARCH,
         {.select_research={FACTORY_TECHNOLOGY_BASIC_AUTOMATION}}});
     CHECK(factory_simulation_create_snapshot(s,&before)==FACTORY_RESULT_OK);
@@ -162,14 +171,18 @@ static void test_preflight_preserves_research_commands(void)
     CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OUT_OF_MEMORY);
     factory_tick_preflight_test_fail_allocations_after(SIZE_MAX);
     CHECK(factory_simulation_get_tick(s)==0U
-        && factory_simulation_get_pending_command_count(s)==3U
+        && factory_simulation_get_pending_command_count(s)==4U
         && factory_simulation_get_active_research(s)==FACTORY_TECHNOLOGY_NONE
-        && factory_simulation_get_research_science_quantity(s)==0U);
+        && factory_simulation_construction_units(s)==units
+        && factory_simulation_get_entity_count(s)==entities
+        && factory_simulation_get_event_count(s)==events);
     CHECK(factory_simulation_create_snapshot(s,&after)==FACTORY_RESULT_OK);
     CHECK(before.size==after.size && memcmp(before.data,after.data,before.size)==0);
     CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
     CHECK(factory_simulation_get_active_research(s)
         ==FACTORY_TECHNOLOGY_BASIC_AUTOMATION);
+    CHECK(factory_simulation_get_research_lab(s,1U,
+        &(FactoryResearchLabInspection){0})==FACTORY_RESULT_OK);
     factory_snapshot_buffer_destroy(&before); factory_snapshot_buffer_destroy(&after);
     factory_simulation_destroy(s); factory_world_destroy(world);
 }

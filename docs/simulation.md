@@ -27,9 +27,11 @@ settled before its recipe is attempted.
 9. Update extractor production and commit existing producer outputs
 10. Advance belts and commit belt transfers
 11. Update refinery and assembler processing
-12. Fill storage outputs
-13. Plan and commit inserter drops, then pickups
-14. Increment the clock tick
+12. Select the lowest-ID eligible powered Research Lab and advance global
+    research by at most one work tick
+13. Fill storage outputs
+14. Plan and commit inserter drops, then pickups
+15. Increment the clock tick
 ```
 
 Events append at these authoritative commits without controlling them. A
@@ -87,9 +89,9 @@ The resulting powered flags govern extractors, refineries, assemblers, and both
 inserter phases for that tick. Passive transfers retain their established
 relative order and require no power.
 
-Research selection commands apply in the same FIFO command phase. The global
-controller then consumes a complete Basic Science cost when starting a unit
-and advances one integer work tick after powered production, but before storage
-output and inserter logistics. Items delivered during logistics are therefore
-usable by research only on a later tick. Preflight reserves possible research
-events before any command or progress mutation.
+Research selection commands apply in the same FIFO command phase. A selected
+powered Research Lab consumes a complete Basic Science cost when starting a
+unit and advances global progress by one integer work tick after powered
+production, but before storage output and inserter logistics. Items delivered
+during logistics are therefore usable by research only on a later tick.
+Preflight reserves possible research events before any mutation.

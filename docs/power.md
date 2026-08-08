@@ -49,6 +49,7 @@ generator's production themselves. Fixed consumer demands are:
 | Assembler | 25 |
 | Inserter | 5 |
 | Steam Condenser | 50 |
+| Research Lab | 50 |
 
 Every connected consumer reserves its full demand regardless of activity.
 Within each network, consumers are considered by ascending entity ID. A
@@ -56,7 +57,8 @@ consumer receives either its complete demand or zero. A consumer too large for
 the remaining generation is skipped, allowing a smaller later consumer to use
 the leftover power. The Steam Condenser introduces no special power logic: it
 is one more fixed-demand consumer, indistinguishable to the dispatcher from an
-extractor or assembler.
+extractor or assembler. Research Labs use the same allocation and attachment
+rules and receive no research-specific priority.
 
 Commands apply before power discovery, so pole, generator, and demolition
 changes affect allocation in the same tick. Powered machines advance normally.

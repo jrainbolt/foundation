@@ -4,8 +4,6 @@
 #include "event_internal.h"
 #include "simulation_internal.h"
 
-#include <limits.h>
-
 size_t factory_technology_definition_count(void)
 { return factory_content_technology_count(); }
 
@@ -122,9 +120,6 @@ uint32_t factory_simulation_get_completed_technology_count(const FactorySimulati
     return count;
 }
 
-uint32_t factory_simulation_get_research_science_quantity(const FactorySimulation *s)
-{ return s==NULL?0U:s->research.science_quantity; }
-
 FactoryResult factory_research_select(FactorySimulation *s,FactoryTechnologyId id)
 {
     const FactoryTechnologyDefinition *d=factory_technology_definition_get(id);
@@ -138,46 +133,6 @@ FactoryResult factory_research_select(FactorySimulation *s,FactoryTechnologyId i
     factory_simulation_emit_event(s,(FactoryEvent){
         .type=FACTORY_EVENT_RESEARCH_SELECTED,.technology_id=id});
     return FACTORY_RESULT_OK;
-}
-
-FactoryResult factory_research_insert_science(FactorySimulation *s,uint32_t quantity)
-{
-    if (quantity==0U) return FACTORY_RESULT_INVALID_ARGUMENT;
-    if (s->research.science_quantity>UINT32_MAX-quantity)
-        return FACTORY_RESULT_RESEARCH_INVENTORY_OVERFLOW;
-    s->research.science_quantity+=quantity;
-    return FACTORY_RESULT_OK;
-}
-
-void factory_research_update(FactorySimulation *s)
-{
-    const FactoryTechnologyDefinition *d=factory_technology_definition_get(
-        s->research.active);
-    size_t index;
-    FactoryTechnologyProgress *p;
-    if (d==NULL) return;
-    index=definition_index(d->id); p=&s->research.progress[index];
-    if (!p->science_committed) {
-        if (s->research.science_quantity<d->science_quantity_per_unit) return;
-        s->research.science_quantity-=d->science_quantity_per_unit;
-        p->science_committed=true;
-    }
-    if (p->work_ticks==UINT64_MAX) return;
-    ++p->work_ticks;
-    if (p->work_ticks<d->work_ticks_per_unit) return;
-    p->work_ticks=0U; p->science_committed=false; ++p->completed_units;
-    factory_simulation_emit_event(s,(FactoryEvent){
-        .type=FACTORY_EVENT_RESEARCH_UNIT_COMPLETED,.technology_id=d->id,
-        .item_type=d->science_item,.quantity=d->science_quantity_per_unit,
-        .related_quantity=p->completed_units,
-        .third_quantity=d->required_science_units});
-    if (p->completed_units==d->required_science_units) {
-        s->research.completed_bits|=UINT64_C(1)<<d->id;
-        s->research.active=FACTORY_TECHNOLOGY_NONE;
-        factory_simulation_emit_event(s,(FactoryEvent){
-            .type=FACTORY_EVENT_TECHNOLOGY_COMPLETED,.technology_id=d->id,
-            .quantity=p->completed_units});
-    }
 }
 
 bool factory_research_state_valid(const FactoryResearchState *s)

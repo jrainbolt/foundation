@@ -67,6 +67,7 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
         case FACTORY_COMMAND_PLACE_HEAT_EXCHANGER:
         case FACTORY_COMMAND_PLACE_STEAM_TURBINE:
         case FACTORY_COMMAND_PLACE_STEAM_CONDENSER:
+        case FACTORY_COMMAND_PLACE_RESEARCH_LAB:
             return true;
         case FACTORY_COMMAND_INSERT_REACTOR_FUEL:
             return command->data.insert_reactor_fuel.reactor_entity_id != 0U
@@ -75,8 +76,6 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
         case FACTORY_COMMAND_SELECT_RESEARCH:
             return command->data.select_research.technology_id
                 != FACTORY_TECHNOLOGY_NONE;
-        case FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE:
-            return command->data.insert_research_science.quantity!=0U;
         case FACTORY_COMMAND_FLUID_INSERT:
             return command->data.fluid_insert.destination_entity_id != 0U
                 && factory_fluid_definition_get(

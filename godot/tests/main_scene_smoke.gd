@@ -33,7 +33,7 @@ func _run() -> void:
 		return
 	var initial_tick := int(main.simulation.get_tick())
 	var canvas: Node = main.canvas
-	if initial_tick != 11 or canvas.entity_nodes.size() != 48:
+	if initial_tick != 54 or canvas.entity_nodes.size() != 53:
 		_fail("deterministic demo or entity visuals are incorrect")
 		return
 	var research: Dictionary = main.simulation.get_research()
@@ -160,7 +160,7 @@ func _run() -> void:
 	if canvas.resources.size() != 2 or canvas.edges.is_empty():
 		_fail("resource or power-edge visuals are missing")
 		return
-	if not main.tick_label.text.contains("11"):
+	if not main.tick_label.text.contains("54"):
 		_fail("debug tick panel did not update")
 		return
 
@@ -189,7 +189,7 @@ func _run() -> void:
 	if int(main.simulation.get_tick()) != initial_tick:
 		_fail("reset did not restore initial tick")
 		return
-	if canvas.entity_nodes.size() != 48 or canvas.resources.size() != 2:
+	if canvas.entity_nodes.size() != 53 or canvas.resources.size() != 2:
 		_fail("reset did not restore deterministic visuals")
 		return
 

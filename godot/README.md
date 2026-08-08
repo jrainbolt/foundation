@@ -251,5 +251,9 @@ states.
 When no entity is selected, the inspector summarizes only already-exported
 presentation data: time, entity and powered counts, power links, construction
 inventory, completed research count, and frontend interaction mode. The
+demo includes a visible Basic Science storage, inserter, and powered Research
+Lab chain; research progress is produced by that physical path rather than the
+legacy controller-science command. The Lab is buildable, selectable,
+inspectable, and demolishable through the existing command bridge. The
 sidebar, top controls, and build panel derive their widths from the logical
 viewport, so high-DPI and larger windows retain the same information hierarchy.

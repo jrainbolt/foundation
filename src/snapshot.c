@@ -9,7 +9,7 @@
 
 #define SNAPSHOT_HEADER_SIZE 48U
 #define SNAPSHOT_SECTION_HEADER_SIZE 16U
-#define SNAPSHOT_SECTION_COUNT 26U
+#define SNAPSHOT_SECTION_COUNT 27U
 
 static const uint8_t snapshot_magic[8] = {
     'F', 'O', 'U', 'N', 'D', 'A', 'T', 'N'
@@ -40,6 +40,7 @@ typedef enum {
     SNAPSHOT_SECTION_HEAT_EXCHANGERS,
     SNAPSHOT_SECTION_STEAM_TURBINES,
     SNAPSHOT_SECTION_STEAM_CONDENSERS,
+    SNAPSHOT_SECTION_RESEARCH_LABS,
     SNAPSHOT_SECTION_COMMANDS,
     SNAPSHOT_SECTION_RESULTS
 } SnapshotSection;
@@ -258,7 +259,7 @@ static FactoryResult snapshot_size_unvalidated(
     }
     tiles = (size_t)simulation->world->width
         * (size_t)simulation->world->height;
-    if (!checked_add(&size, 64U)
+    if (!checked_add(&size, 60U)
         || !checked_add(&size, 8U)
         || !checked_records(
             &size, simulation->entities->count, 4U)
@@ -285,6 +286,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_records(&size, simulation->heat_exchangers.count, 12U)
         || !checked_records(&size, simulation->steam_turbines.count, 16U)
         || !checked_records(&size, simulation->steam_condensers.count, 16U)
+        || !checked_records(&size, simulation->research_labs.count, 16U)
         || !checked_records(&size, simulation->command_count, 24U)
         || !checked_records(&size, simulation->result_count, 68U)
         || !size_to_u32(simulation->entities->count)
@@ -310,6 +312,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !size_to_u32(simulation->heat_exchangers.count)
         || !size_to_u32(simulation->steam_turbines.count)
         || !size_to_u32(simulation->steam_condensers.count)
+        || !size_to_u32(simulation->research_labs.count)
         || !section_size_valid(
             simulation->entities->count, 4U, 8U)
         || !section_size_valid(tiles, 16U, 8U)
@@ -334,6 +337,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !section_size_valid(simulation->heat_exchangers.count, 12U, 0U)
         || !section_size_valid(simulation->steam_turbines.count,16U,0U)
         || !section_size_valid(simulation->steam_condensers.count,16U,0U)
+        || !section_size_valid(simulation->research_labs.count,16U,0U)
         || size > UINT64_MAX) {
         return FACTORY_RESULT_SNAPSHOT_SIZE_OVERFLOW;
     }
@@ -380,6 +384,8 @@ static bool entity_has_subsystem(
         factory_steam_turbine_store_find(&simulation->steam_turbines,id);
     const FactorySteamCondenser *steam_condenser =
         factory_steam_condenser_store_find(&simulation->steam_condensers,id);
+    const FactoryResearchLab *research_lab =
+        factory_research_lab_store_find(&simulation->research_labs,id);
     const FactorySolarGenerator *solar_generator =
         factory_solar_generator_store_find(&simulation->solar_generators, id);
     const FactoryAccumulator *accumulator =
@@ -404,6 +410,7 @@ static bool entity_has_subsystem(
     found += heat_conductor != NULL;
     found += heat_exchanger != NULL;
     found += steam_condenser != NULL;
+    found += research_lab != NULL;
     if (steam_engine != NULL && generator != NULL) --found;
     if (steam_turbine != NULL && generator != NULL) --found;
     if (solar_generator != NULL && generator != NULL) --found;
@@ -439,6 +446,8 @@ static bool entity_has_subsystem(
         *out_x=steam_turbine->x; *out_y=steam_turbine->y;
     } else if (steam_condenser != NULL) {
         *out_x=steam_condenser->x; *out_y=steam_condenser->y;
+    } else if (research_lab != NULL) {
+        *out_x=research_lab->x; *out_y=research_lab->y;
     } else if (solar_generator != NULL) {
         *out_x = solar_generator->x; *out_y = solar_generator->y;
     } else if (accumulator != NULL) {
@@ -549,6 +558,7 @@ static FactoryResult validate_simulation(
         + simulation->steam_engines.count
         + simulation->steam_turbines.count
         + simulation->steam_condensers.count
+        + simulation->research_labs.count
         + simulation->solar_generators.count
         + simulation->accumulators.count
         + simulation->reactors.count
@@ -871,6 +881,11 @@ static FactoryResult validate_simulation(
             || water->accepted_fluid_classes!=FACTORY_FLUID_CLASS_AQUEOUS)
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
+    for (index=0U;index<simulation->research_labs.count;++index) {
+        const FactoryResearchLab *lab=&simulation->research_labs.items[index];
+        if (lab->science_quantity>FACTORY_RESEARCH_LAB_SCIENCE_CAPACITY)
+            return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
     for (index = 0U; index < simulation->solar_generators.count; ++index) {
         const FactorySolarGenerator *solar =
             &simulation->solar_generators.items[index];
@@ -1104,7 +1119,7 @@ static FactoryResult validate_simulation(
         const FactoryCommandResult *value = &simulation->results[index];
         if (!snapshot_command_valid(&value->command)
             || value->result > FACTORY_RESULT_TECHNOLOGY_LOCKED
-            || value->entity_type > FACTORY_ENTITY_TYPE_STEAM_CONDENSER
+            || value->entity_type > FACTORY_ENTITY_TYPE_RESEARCH_LAB
             || value->previous_assembler_recipe
                 >= FACTORY_ASSEMBLER_RECIPE_COUNT
             || value->new_assembler_recipe
@@ -1259,8 +1274,9 @@ static void write_command(
         case FACTORY_COMMAND_SELECT_RESEARCH:
             fields[0]=command->data.select_research.technology_id;
             break;
-        case FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE:
-            fields[0]=command->data.insert_research_science.quantity;
+        case FACTORY_COMMAND_PLACE_RESEARCH_LAB:
+            fields[0]=(uint32_t)command->data.place_research_lab.x;
+            fields[1]=(uint32_t)command->data.place_research_lab.y;
             break;
     }
     write_u32(writer, (uint32_t)command->type);
@@ -1284,7 +1300,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             return false;
         }
     }
-    if (type > FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE) {
+    if (type > FACTORY_COMMAND_PLACE_RESEARCH_LAB) {
         return false;
     }
     command->type = (FactoryCommandType)type;
@@ -1323,12 +1339,12 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             case FACTORY_COMMAND_PLACE_HEAT_EXCHANGER:
             case FACTORY_COMMAND_PLACE_STEAM_TURBINE:
             case FACTORY_COMMAND_PLACE_STEAM_CONDENSER:
+            case FACTORY_COMMAND_PLACE_RESEARCH_LAB:
                 used = 2U;
                 break;
             case FACTORY_COMMAND_DEMOLISH_ENTITY:
             case FACTORY_COMMAND_GRANT_CONSTRUCTION_UNITS:
             case FACTORY_COMMAND_SELECT_RESEARCH:
-            case FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE:
                 used = 1U;
                 break;
         }
@@ -1480,8 +1496,9 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
         case FACTORY_COMMAND_SELECT_RESEARCH:
             command->data.select_research.technology_id=fields[0];
             break;
-        case FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE:
-            command->data.insert_research_science.quantity=fields[0];
+        case FACTORY_COMMAND_PLACE_RESEARCH_LAB:
+            command->data.place_research_lab.x=(int32_t)fields[0];
+            command->data.place_research_lab.y=(int32_t)fields[1];
             break;
     }
     return snapshot_command_valid(command);
@@ -1506,12 +1523,11 @@ static void write_snapshot(
     write_u32(writer, SNAPSHOT_SECTION_COUNT);
     write_u32(writer, 0U);
 
-    write_section_header(writer, SNAPSHOT_SECTION_METADATA, 1U, 64U);
+    write_section_header(writer, SNAPSHOT_SECTION_METADATA, 1U, 60U);
     write_u64(writer, simulation->clock.tick);
     write_u32(writer, simulation->construction_inventory.units);
     write_u32(writer, 0U);
     write_u32(writer,simulation->research.active);
-    write_u32(writer,simulation->research.science_quantity);
     write_u64(writer,simulation->research.completed_bits);
     for (index=0U;index<FACTORY_TECHNOLOGY_COUNT;++index) {
         write_u32(writer,simulation->research.progress[index].completed_units);
@@ -1896,6 +1912,14 @@ static void write_snapshot(
         write_u32(writer,v->entity_id); write_i32(writer,v->x);
         write_i32(writer,v->y); write_u32(writer,v->definition_id);
     }
+    write_section_header(writer,SNAPSHOT_SECTION_RESEARCH_LABS,
+        simulation->research_labs.count,
+        simulation->research_labs.count*16U);
+    for (index=0U;index<simulation->research_labs.count;++index) {
+        const FactoryResearchLab *v=&simulation->research_labs.items[index];
+        write_u32(writer,v->entity_id); write_i32(writer,v->x);
+        write_i32(writer,v->y); write_u32(writer,v->science_quantity);
+    }
 
     write_section_header(
         writer, SNAPSHOT_SECTION_COMMANDS,
@@ -2090,14 +2114,13 @@ static bool load_sections(
     size_t index;
 
     if (!read_section_header(
-            reader, SNAPSHOT_SECTION_METADATA, 0U, 64U, &count)
+            reader, SNAPSHOT_SECTION_METADATA, 0U, 60U, &count)
         || count != 1U
         || !read_u64(reader, &tick)
         || !read_u32(reader, &simulation->construction_inventory.units)
         || !read_u32(reader, &reserved)
         || reserved != 0U
         || !read_u32(reader,&simulation->research.active)
-        || !read_u32(reader,&simulation->research.science_quantity)
         || !read_u64(reader,&simulation->research.completed_bits)) {
         return false;
     }
@@ -2556,6 +2579,21 @@ static bool load_sections(
             ||!read_i32(reader,&v->y)||!read_u32(reader,&value)) return false;
         v->definition_id=(FactorySteamCondenserDefinitionId)value;
         v->activity=FACTORY_STEAM_CONDENSER_IDLE;
+    }
+    if (!read_section_header(reader,SNAPSHOT_SECTION_RESEARCH_LABS,16U,0U,
+            &count)
+        || !allocate_records((void **)&simulation->research_labs.items,
+            count,sizeof(FactoryResearchLab))) return false;
+    simulation->research_labs.count=count;
+    simulation->research_labs.capacity=count;
+    for (index=0U;index<count;++index) {
+        FactoryResearchLab *v=&simulation->research_labs.items[index];
+        if (!read_u32(reader,&v->entity_id)||!read_i32(reader,&v->x)
+            ||!read_i32(reader,&v->y)||!read_u32(reader,&v->science_quantity))
+            return false;
+        v->activity=FACTORY_RESEARCH_LAB_IDLE;
+        v->science_consumed_last_tick=0U;
+        v->work_contributed_last_tick=0U;
     }
 
     if (!read_section_header(

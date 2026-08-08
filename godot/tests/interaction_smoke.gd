@@ -47,12 +47,12 @@ func run_test() -> void:
 	uninitialized = null
 	controller.enter_build_mode(5)
 	if not require_value(controller.mode == 1 and controller.build_entity_type == 5, "enter build mode"): return
-	controller.set_hovered_grid(Vector2i(12,7))
+	controller.set_hovered_grid(Vector2i(12,0))
 	if not require_value(controller.preview_is_advisably_valid(), "empty placement preview"): return
 	controller.set_hovered_grid(Vector2i(0,2))
 	if not require_value(not controller.preview_is_advisably_valid(), "occupied placement preview"): return
 	if not require_value(controller.hovered_entity_id == 1 and canvas.entity_nodes[1].hovered, "entity hover outline state"): return
-	controller.set_hovered_grid(Vector2i(12,7))
+	controller.set_hovered_grid(Vector2i(12,0))
 	if not require_value(not canvas.entity_nodes[1].hovered, "entity hover clearing"): return
 	controller.rotate_build()
 	if not require_value(controller.build_direction == 1, "build rotation"): return
@@ -86,7 +86,7 @@ func run_test() -> void:
 	if not require_value(inspector.details.text.contains("Inventory and storage"), "storage inspector section"): return
 	controller.select_entity(26)
 	if not require_value(inspector.details.text.contains("Network"), "power inspector data"): return
-	controller.select_entity(27)
+	controller.select_entity(32)
 	if not require_value(inspector.details.text.contains("Fluid Quantity"), "fluid inspector data"): return
 	controller.select_entity(13)
 	if not require_value(inspector.configuration_selector.visible and inspector.configuration_selector.item_count == 4, "assembler recipe selector"): return
@@ -122,18 +122,18 @@ func run_test() -> void:
 	if not require_value(inspector.entity_id == selected and int(simulation.get_tick()) == selection_tick_before + 1, "inspector refresh"): return
 	controller.select_entity(1)
 	var entity_count: int = simulation.get_entities().size()
-	if not require_value(simulation.queue_place_entity(5,12,7,0) == 0, "placement queue submission"): return
+	if not require_value(simulation.queue_place_entity(5,12,0,0) == 0, "placement queue submission"): return
 	if not require_value(simulation.get_entities().size() == entity_count, "placement mutated before tick"): return
 	if not require_value(simulation.step() == 0, "placement execution tick"): return
 	var command_results: Array = simulation.get_command_results()
 	if not require_value(command_results.size() == 1 and int(command_results[0].result) == 0, "successful placement result"): return
 	if not require_value(main._synchronize() and simulation.get_entities().size() == entity_count + 1, "placement presentation synchronization"): return
 	if not require_value(controller.selected_entity_id == 1, "selection did not survive placement"): return
-	if not require_value(simulation.queue_place_entity(2,12,7,1) == 0 and simulation.step() == 0, "occupied placement execution"): return
+	if not require_value(simulation.queue_place_entity(2,12,0,1) == 0 and simulation.step() == 0, "occupied placement execution"): return
 	command_results = simulation.get_command_results()
 	if not require_value(int(command_results[0].result) != 0 and simulation.get_entities().size() == entity_count + 1, "occupied placement rejection"): return
-	if not require_value(main._synchronize() and controller.select_entity(49), "select constructed entity"): return
-	if not require_value(simulation.queue_demolish_entity(49) == 0, "demolition queue submission"): return
+	if not require_value(main._synchronize() and controller.select_entity(54), "select constructed entity"): return
+	if not require_value(simulation.queue_demolish_entity(54) == 0, "demolition queue submission"): return
 	if not require_value(simulation.get_entities().size() == entity_count + 1, "demolition mutated before tick"): return
 	if not require_value(simulation.step() == 0 and main._synchronize(), "demolition execution and synchronization"): return
 	command_results = simulation.get_command_results()
@@ -147,7 +147,7 @@ func run_test() -> void:
 	controller.select_entity(1)
 	main._reset_demo()
 	if not require_value(controller.selected_entity_id == 0 and inspector.entity_id == 0, "reset selection policy"): return
-	if not require_value(canvas.entity_nodes.size() == 48, "reset visual parity"): return
+	if not require_value(canvas.entity_nodes.size() == 53, "reset visual parity"): return
 	main.queue_free()
 	await process_frame
 	print("Foundation interaction smoke test passed")

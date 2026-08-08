@@ -10,7 +10,6 @@ struct FactoryPresentationSnapshot {
     uint64_t day;
     uint32_t time_of_day;
     FactoryTechnologyId active_research;
-    uint32_t research_science_quantity;
     uint32_t completed_technology_count;
     FactoryTechnologyProgressInspection active_research_progress;
     FactoryPresentationEntity *entities;
@@ -200,6 +199,8 @@ static FactoryResult populate_entity(
         factory_heat_conductor_store_find(&simulation->heat_conductors,id);
     const FactoryHeatExchanger *heat_exchanger =
         factory_heat_exchanger_store_find(&simulation->heat_exchangers,id);
+    const FactoryResearchLab *research_lab=
+        factory_research_lab_store_find(&simulation->research_labs,id);
     FactoryPipeInspection pipe;
     FactoryPowerPoleInspection pole;
     FactoryPowerGeneratorInspection generator;
@@ -535,6 +536,23 @@ static FactoryResult populate_entity(
                     == FACTORY_FLUID_STORAGE_STEAM_ENGINE_INPUT)
                 out->data.steam_engine.steam_network_id =
                     simulation->fluid_networks.ports[i].network_id;
+    } else if(research_lab!=NULL){
+        FactoryResearchLabInspection lab;
+        if(factory_simulation_get_research_lab(simulation,id,&lab)
+            !=FACTORY_RESULT_OK)return FACTORY_RESULT_ENTITY_NOT_FOUND;
+        out->entity_type=FACTORY_ENTITY_TYPE_RESEARCH_LAB;
+        out->x=lab.x;out->y=lab.y;out->powered=lab.powered;
+        out->status=lab.activity==FACTORY_RESEARCH_LAB_WORKING
+            ?FACTORY_PRESENTATION_MACHINE_STATUS_WORKING
+            :lab.activity==FACTORY_RESEARCH_LAB_UNPOWERED
+                ?FACTORY_PRESENTATION_MACHINE_STATUS_UNPOWERED
+                :lab.activity==FACTORY_RESEARCH_LAB_NO_SCIENCE
+                    ?FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_INPUT
+                    :FACTORY_PRESENTATION_MACHINE_STATUS_IDLE;
+        out->data.research_lab=(FactoryPresentationResearchLab){
+            lab.science_quantity,lab.science_capacity,lab.power_network_id,
+            lab.connected,lab.activity,lab.science_consumed_last_tick,
+            lab.work_contributed_last_tick};
     } else if (fluid_storage != NULL) {
         out->entity_type = FACTORY_ENTITY_TYPE_FLUID_TANK;
         out->x = fluid_storage->x;
@@ -608,8 +626,6 @@ FactoryResult factory_presentation_snapshot_rebuild(
     next.day = simulation->clock.day;
     next.time_of_day = simulation->clock.time_of_day;
     next.active_research=factory_simulation_get_active_research(simulation);
-    next.research_science_quantity=
-        factory_simulation_get_research_science_quantity(simulation);
     next.completed_technology_count=
         factory_simulation_get_completed_technology_count(simulation);
     if (next.active_research!=FACTORY_TECHNOLOGY_NONE)
@@ -721,9 +737,6 @@ FactoryTechnologyId factory_presentation_snapshot_get_active_research(
     const FactoryPresentationSnapshot *snapshot)
 { return snapshot==NULL?FACTORY_TECHNOLOGY_NONE:snapshot->active_research; }
 
-uint32_t factory_presentation_snapshot_get_research_science_quantity(
-    const FactoryPresentationSnapshot *snapshot)
-{ return snapshot==NULL?0U:snapshot->research_science_quantity; }
 
 uint32_t factory_presentation_snapshot_get_completed_technology_count(
     const FactoryPresentationSnapshot *snapshot)

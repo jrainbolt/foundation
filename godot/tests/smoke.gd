@@ -35,7 +35,6 @@ func _initialize() -> void:
 	var initial_research: Dictionary = simulation.get_research()
 	if not _require(
 		initial_research.active_technology_id == 0
-		and initial_research.science_quantity == 0
 		and initial_research.completed_technology_count == 0,
 		"unsafe initial research state"
 	):
@@ -53,19 +52,18 @@ func _initialize() -> void:
 		and simulation.has_method("queue_set_assembler_recipe")
 		and simulation.has_method("queue_set_storage_output")
 		and simulation.has_method("get_command_results")
-		and simulation.get_build_catalog().size() == 21
+		and simulation.get_build_catalog().size() == 22
 		and simulation.get_assembler_recipe_catalog().size() == 4
 		and simulation.get_item_catalog().size() == 10
 		and simulation.get_construction_units() >= 0,
 		"construction command bridge"
 	):
 		return
-	if not _require(simulation.get_tick() == 11, "unexpected reset tick"):
+	if not _require(simulation.get_tick() == 54, "unexpected reset tick"):
 		return
 	var research: Dictionary = simulation.get_research()
 	if not _require(
 		research.active_technology_id == 0
-		and research.science_quantity == 0
 		and research.completed_technology_count == 2,
 		"research presentation parity: %s" % research
 	):
@@ -76,7 +74,7 @@ func _initialize() -> void:
 	if not _require(not simulation.has_error(), simulation.get_last_error()):
 		return
 	if not _require(
-		entities.size() == 48,
+		entities.size() == 53,
 		"missing presentation entities: got %d" % entities.size()
 	):
 		return
@@ -88,7 +86,7 @@ func _initialize() -> void:
 		return
 	var expected_types := [
 		1, 2, 3, 2, 2, 2, 1, 2, 3, 2, 2, 2, 4, 2,
-		6, 2, 2, 5, 5, 7, 5, 8, 8, 8, 8, 9, 10, 11,
+		6, 2, 2, 5, 5, 7, 5, 8, 8, 8, 8, 9, 5, 7, 22, 8, 9, 10, 11,
 		12, 11, 13, 11, 14, 15, 8, 16, 7, 17,
 		18, 18, 18, 19, 11, 10, 11, 20,
 		11, 21
@@ -105,7 +103,7 @@ func _initialize() -> void:
 		):
 			return
 		seen_ids[entity_id] = true
-	if not _require(seen_ids.size() == 48, "duplicate or missing stable IDs"):
+	if not _require(seen_ids.size() == 53, "duplicate or missing stable IDs"):
 		return
 	var tank: Dictionary = {}
 	for entity: Dictionary in entities:
@@ -120,24 +118,24 @@ func _initialize() -> void:
 		"fluid tank presentation: tank=%s entities=%s" % [tank, entities]
 	):
 		return
-	var demo_pipe: Dictionary = entities[27]
+	var demo_pipe: Dictionary = entities[32]
 	if not _require(
 		int(demo_pipe.type) == 11
 		and int(demo_pipe.connection_mask) == 3
-		and int(demo_pipe.network_id) == 28
-		and int(tank.network_id) == 28,
+		and int(demo_pipe.network_id) == 33
+		and int(tank.network_id) == 33,
 		"pipe/network presentation fields"
 	):
 		return
-	var water_extractor: Dictionary = entities[28]
-	var boiler: Dictionary = entities[30]
-	var steam_engine: Dictionary = entities[32]
-	var solar_generator: Dictionary = entities[33]
-	var accumulator: Dictionary = entities[35]
-	var reactor: Dictionary = entities[37]
-	var heat_conductor: Dictionary = entities[38]
-	var heat_exchanger: Dictionary = entities[41]
-	var steam_turbine: Dictionary = entities[45]
+	var water_extractor: Dictionary = entities[33]
+	var boiler: Dictionary = entities[35]
+	var steam_engine: Dictionary = entities[37]
+	var solar_generator: Dictionary = entities[38]
+	var accumulator: Dictionary = entities[40]
+	var reactor: Dictionary = entities[42]
+	var heat_conductor: Dictionary = entities[43]
+	var heat_exchanger: Dictionary = entities[46]
+	var steam_turbine: Dictionary = entities[50]
 	if not _require(
 		int(water_extractor.type) == 12
 		and int(water_extractor.stored_water) == 0
@@ -163,7 +161,7 @@ func _initialize() -> void:
 		"steam turbine presentation fields"
 	):
 		return
-	var steam_condenser: Dictionary = entities[47]
+	var steam_condenser: Dictionary = entities[52]
 	if not _require(
 		int(steam_condenser.type) == 21
 		and int(steam_condenser.steam_capacity) == 2000
@@ -191,7 +189,7 @@ func _initialize() -> void:
 		and int(reactor.remaining_heat_yield) == 9900
 		and int(reactor.generated_last_tick) == 100
 		and int(reactor.reactor_activity) == 1
-		and int(reactor.heat_network_id) == 39
+		and int(reactor.heat_network_id) == 44
 		and bool(reactor.heat_connected),
 		"reactor presentation fields"
 	):
@@ -199,16 +197,16 @@ func _initialize() -> void:
 	if not _require(
 		int(heat_conductor.type) == 18
 		and int(heat_conductor.connection_mask) == 8
-		and int(heat_conductor.heat_network_id) == 39
+		and int(heat_conductor.heat_network_id) == 44
 		and bool(heat_conductor.connected),
 		"heat conductor presentation fields"
 	):
 		return
 	if not _require(
 		int(heat_exchanger.type) == 19
-		and int(heat_exchanger.heat_network_id) == 39
-		and int(heat_exchanger.water_network_id) == 43
-		and int(heat_exchanger.steam_network_id) == 45
+		and int(heat_exchanger.heat_network_id) == 44
+		and int(heat_exchanger.water_network_id) == 48
+		and int(heat_exchanger.steam_network_id) == 50
 		and int(heat_exchanger.stored_water) == 0
 		and int(heat_exchanger.stored_steam) == 100
 		and int(heat_exchanger.consumed_heat_last_tick) == 100
@@ -350,7 +348,7 @@ func _initialize() -> void:
 		return
 	if not _require(second.reset_demo() == 0, "second reset failed"):
 		return
-	if not _require(second.get_tick() == 11, "second adapter tick"):
+	if not _require(second.get_tick() == 54, "second adapter tick"):
 		return
 	if not _require(simulation.get_tick() == tick_before, "adapter interference"):
 		return

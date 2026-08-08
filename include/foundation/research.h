@@ -67,7 +67,5 @@ bool factory_simulation_has_unlock(
     const FactorySimulation *simulation,FactoryUnlockFlags unlock);
 uint32_t factory_simulation_get_completed_technology_count(
     const FactorySimulation *simulation);
-uint32_t factory_simulation_get_research_science_quantity(
-    const FactorySimulation *simulation);
 
 #endif

@@ -1,13 +1,25 @@
 #include "foundation/content.h"
 #include "foundation/simulation.h"
+#include "logistics_endpoint_internal.h"
+#include "power_fixture.h"
 #include <stdbool.h>
 #include <stdio.h>
 static int failures;
 #define CHECK(c) do{if(!(c)){fprintf(stderr,"FAIL %s:%d: %s\n",__FILE__,__LINE__,#c);++failures;}}while(false)
 static void submit(FactorySimulation*s,FactoryCommand c){CHECK(factory_simulation_submit_command(s,&c)==FACTORY_RESULT_OK);}
 static void tick(FactorySimulation*s){CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);}
+static FactoryEntityId ensure_lab(FactorySimulation*s){
+ for(FactoryEntityId id=1U;id<20U;++id){FactoryResearchLabInspection lab;
+  if(factory_simulation_get_research_lab(s,id,&lab)==FACTORY_RESULT_OK)return id;}
+ submit(s,(FactoryCommand){FACTORY_COMMAND_PLACE_RESEARCH_LAB,{.place_research_lab={7,7}}});
+ CHECK(factory_test_submit_power_pair(s,6,7,6,6));tick(s);
+ return factory_simulation_get_command_result(s,0)->entity_id;
+}
 static void unlock(FactorySimulation*s,FactoryTechnologyId id,uint32_t q,uint32_t n){
- submit(s,(FactoryCommand){FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE,{.insert_research_science={q}}});
+ FactoryEntityId lab=ensure_lab(s);
+ for(uint32_t i=0;i<q;++i)CHECK(factory_logistics_endpoint_insert(s,
+  (FactoryLogisticsEndpoint){lab,FACTORY_LOGISTICS_SLOT_RESEARCH_LAB_INPUT},
+  FACTORY_ITEM_BASIC_SCIENCE)==FACTORY_LOGISTICS_RESULT_OK);
  submit(s,(FactoryCommand){FACTORY_COMMAND_SELECT_RESEARCH,{.select_research={id}}});
  for(uint32_t i=0;i<n;++i)tick(s);
 }
@@ -23,7 +35,7 @@ int main(void){
  CHECK(factory_simulation_is_entity_unlocked(s,FACTORY_ENTITY_TYPE_STEAM_CONDENSER)); submit(s,c);tick(s);
  CHECK(factory_simulation_get_command_result(s,0)->result==FACTORY_RESULT_OK);
  factory_simulation_destroy(s);factory_world_destroy(w);
- w=factory_world_create(4,4);s=factory_simulation_create_with_construction_units(w,500);
+ w=factory_world_create(8,8);s=factory_simulation_create_with_construction_units(w,500);
  submit(s,(FactoryCommand){FACTORY_COMMAND_PLACE_ASSEMBLER,{.place_assembler={0,0,FACTORY_DIRECTION_EAST}}});tick(s);
  submit(s,(FactoryCommand){FACTORY_COMMAND_SET_ASSEMBLER_RECIPE,{.set_assembler_recipe={1,FACTORY_ASSEMBLER_RECIPE_COPPER_WIRE}}});tick(s);
  CHECK(factory_simulation_get_command_result(s,0)->result==FACTORY_RESULT_TECHNOLOGY_LOCKED);

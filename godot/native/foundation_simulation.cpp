@@ -1,4 +1,7 @@
 #include "foundation_simulation.h"
+extern "C" {
+#include "logistics_endpoint_internal.h"
+}
 
 #include <climits>
 
@@ -84,6 +87,9 @@ FactoryCommand place(
     case FACTORY_COMMAND_PLACE_STEAM_CONDENSER:
         command.data.place_steam_condenser = {x, y};
         break;
+    case FACTORY_COMMAND_PLACE_RESEARCH_LAB:
+        command.data.place_research_lab = {x, y};
+        break;
     default:
         break;
     }
@@ -157,8 +163,6 @@ const char *result_name_c(FactoryResult result)
         return "technology already completed";
     case FACTORY_RESULT_TECHNOLOGY_PREREQUISITES_MISSING:
         return "technology prerequisites missing";
-    case FACTORY_RESULT_RESEARCH_INVENTORY_OVERFLOW:
-        return "research inventory overflow";
     case FACTORY_RESULT_TECHNOLOGY_LOCKED:
         return "technology locked";
     }
@@ -329,23 +333,17 @@ FactoryResult FoundationSimulation::build_demo()
         place(FACTORY_COMMAND_PLACE_POWER_POLE, 4, 6),
         place(FACTORY_COMMAND_PLACE_POWER_POLE, 9, 5),
         place(FACTORY_COMMAND_PLACE_POWER_GENERATOR, 0, 0),
+        place(FACTORY_COMMAND_PLACE_STORAGE, 11, 3),
+        place(FACTORY_COMMAND_PLACE_INSERTER, 11, 4, FACTORY_DIRECTION_SOUTH),
+        place(FACTORY_COMMAND_PLACE_RESEARCH_LAB, 11, 5),
+        place(FACTORY_COMMAND_PLACE_POWER_POLE, 12, 6),
+        place(FACTORY_COMMAND_PLACE_POWER_GENERATOR, 12, 7),
     };
     for (const FactoryCommand &command : placements) {
         result = submit(command);
         if (result != FACTORY_RESULT_OK)
             return result;
     }
-    FactoryCommand research_science = {};
-    research_science.type = FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE;
-    research_science.data.insert_research_science.quantity = 4U;
-    result = submit(research_science);
-    if (result != FACTORY_RESULT_OK) return result;
-    FactoryCommand select_research = {};
-    select_research.type = FACTORY_COMMAND_SELECT_RESEARCH;
-    select_research.data.select_research.technology_id =
-        FACTORY_TECHNOLOGY_BASIC_AUTOMATION;
-    result = submit(select_research);
-    if (result != FACTORY_RESULT_OK) return result;
     result = factory_simulation_tick(simulation_);
     if (result != FACTORY_RESULT_OK)
         return result;
@@ -375,20 +373,43 @@ FactoryResult FoundationSimulation::build_demo()
         || storage->result != FACTORY_RESULT_OK)
         return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
 
-    /* Demo setup unlocks gated content through the same deterministic public
-     * research commands used by normal clients. */
-    for (int tick = 0; tick < 5; ++tick) {
+    /* Seed a visible logistics source, then let the ordinary inserter and
+     * powered research lab perform all research work. This setup-only insert
+     * does not bypass the lab or mutate the research controller. */
+    if (factory_logistics_endpoint_insert(simulation_,
+            {26U, FACTORY_LOGISTICS_SLOT_BURNER_INPUT},
+            FACTORY_ITEM_BIOMASS_PELLET) != FACTORY_LOGISTICS_RESULT_OK
+        || factory_logistics_endpoint_insert(simulation_,
+            {31U, FACTORY_LOGISTICS_SLOT_BURNER_INPUT},
+            FACTORY_ITEM_BIOMASS_PELLET) != FACTORY_LOGISTICS_RESULT_OK)
+        return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+    for (int science = 0; science < 6; ++science) {
+        if (factory_logistics_endpoint_insert(simulation_,
+                {27U, FACTORY_LOGISTICS_SLOT_STORAGE_INPUT},
+                FACTORY_ITEM_BASIC_SCIENCE) != FACTORY_LOGISTICS_RESULT_OK)
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+    }
+    FactoryCommand science_output = {};
+    science_output.type = FACTORY_COMMAND_SET_STORAGE_OUTPUT;
+    science_output.data.set_storage_output = {
+        27U, FACTORY_ITEM_BASIC_SCIENCE};
+    result = submit(science_output);
+    if (result != FACTORY_RESULT_OK) return result;
+    FactoryCommand select_research = {};
+    select_research.type = FACTORY_COMMAND_SELECT_RESEARCH;
+    select_research.data.select_research.technology_id =
+        FACTORY_TECHNOLOGY_BASIC_AUTOMATION;
+    result = submit(select_research);
+    if (result != FACTORY_RESULT_OK) return result;
+    for (int tick = 0; tick < 32; ++tick) {
         result = factory_simulation_tick(simulation_);
         if (result != FACTORY_RESULT_OK) return result;
     }
-    research_science.data.insert_research_science.quantity = 2U;
-    result = submit(research_science);
-    if (result != FACTORY_RESULT_OK) return result;
     select_research.data.select_research.technology_id =
         FACTORY_TECHNOLOGY_FLUID_HANDLING;
     result = submit(select_research);
     if (result != FACTORY_RESULT_OK) return result;
-    for (int tick = 0; tick < 4; ++tick) {
+    for (int tick = 0; tick < 20; ++tick) {
         result = factory_simulation_tick(simulation_);
         if (result != FACTORY_RESULT_OK) return result;
     }
@@ -460,7 +481,7 @@ FactoryResult FoundationSimulation::build_demo()
     FactoryCommand reactor_fuel = {};
     reactor_fuel.type = FACTORY_COMMAND_INSERT_REACTOR_FUEL;
     reactor_fuel.data.insert_reactor_fuel = {
-        38U, FACTORY_NUCLEAR_FUEL_BASIC_ROD};
+        43U, FACTORY_NUCLEAR_FUEL_BASIC_ROD};
     result = submit(reactor_fuel);
     if (result != FACTORY_RESULT_OK)
         return result;
@@ -491,10 +512,10 @@ FactoryResult FoundationSimulation::build_demo()
     result = submit(place(FACTORY_COMMAND_PLACE_STEAM_CONDENSER, 11, 0));
     if (result != FACTORY_RESULT_OK) return result;
     result = factory_simulation_submit_fluid_insert(
-        simulation_, 44U, FACTORY_FLUID_WATER, 200U);
+        simulation_, 49U, FACTORY_FLUID_WATER, 200U);
     if (result != FACTORY_RESULT_OK) return result;
     result = factory_simulation_submit_fluid_insert(
-        simulation_, 27U, FACTORY_FLUID_WATER, 2500U);
+        simulation_, 32U, FACTORY_FLUID_WATER, 2500U);
     if (result != FACTORY_RESULT_OK)
         return result;
     result = factory_simulation_tick(simulation_);
@@ -506,7 +527,7 @@ FactoryResult FoundationSimulation::build_demo()
         return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
     if (tank_result->result != FACTORY_RESULT_OK)
         return tank_result->result;
-    if (tank_result->entity_id != 27U)
+    if (tank_result->entity_id != 32U)
         return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
     FactoryFluidStorageInspection tank_storage = {};
     result = factory_simulation_get_fluid_storage(
@@ -552,7 +573,7 @@ int64_t FoundationSimulation::queue_place_entity(
     int64_t entity_type,int64_t x,int64_t y,int64_t direction)
 {
     if (simulation_==nullptr || entity_type<=FACTORY_ENTITY_TYPE_NONE
-        || entity_type>FACTORY_ENTITY_TYPE_STEAM_CONDENSER
+        || entity_type>FACTORY_ENTITY_TYPE_RESEARCH_LAB
         || x<INT32_MIN || x>INT32_MAX || y<INT32_MIN || y>INT32_MAX
         || direction<FACTORY_DIRECTION_NORTH
         || direction>FACTORY_DIRECTION_WEST)
@@ -580,6 +601,7 @@ int64_t FoundationSimulation::queue_place_entity(
     case FACTORY_ENTITY_TYPE_HEAT_EXCHANGER: command_type=FACTORY_COMMAND_PLACE_HEAT_EXCHANGER;break;
     case FACTORY_ENTITY_TYPE_STEAM_TURBINE: command_type=FACTORY_COMMAND_PLACE_STEAM_TURBINE;break;
     case FACTORY_ENTITY_TYPE_STEAM_CONDENSER: command_type=FACTORY_COMMAND_PLACE_STEAM_CONDENSER;break;
+    case FACTORY_ENTITY_TYPE_RESEARCH_LAB: command_type=FACTORY_COMMAND_PLACE_RESEARCH_LAB;break;
     default:return FACTORY_RESULT_INVALID_ARGUMENT;
     }
     FactoryCommand command=place(command_type,(int32_t)x,(int32_t)y,
@@ -822,8 +844,6 @@ Dictionary FoundationSimulation::get_research() const
     if (presentation_ == nullptr) return value;
     value["active_technology_id"]=(int64_t)
         factory_presentation_snapshot_get_active_research(presentation_);
-    value["science_quantity"]=(int64_t)
-        factory_presentation_snapshot_get_research_science_quantity(presentation_);
     value["completed_technology_count"]=(int64_t)
         factory_presentation_snapshot_get_completed_technology_count(presentation_);
     FactoryTechnologyProgressInspection progress={};
@@ -1234,6 +1254,21 @@ bool FoundationSimulation::entity_to_dictionary(
             (int64_t)entity.data.steam_condenser.completed_cycles_last_tick;
         value["condenser_activity"] =
             (int64_t)entity.data.steam_condenser.activity;
+        break;
+    case FACTORY_ENTITY_TYPE_RESEARCH_LAB:
+        value["science_quantity"] =
+            (int64_t)entity.data.research_lab.science_quantity;
+        value["science_capacity"] =
+            (int64_t)entity.data.research_lab.science_capacity;
+        value["power_network_id"] =
+            (int64_t)entity.data.research_lab.power_network_id;
+        value["power_connected"] = entity.data.research_lab.connected;
+        value["lab_activity"] =
+            (int64_t)entity.data.research_lab.activity;
+        value["science_consumed_last_tick"] =
+            (int64_t)entity.data.research_lab.science_consumed_last_tick;
+        value["work_contributed_last_tick"] =
+            (int64_t)entity.data.research_lab.work_contributed_last_tick;
         break;
     default:
         break;

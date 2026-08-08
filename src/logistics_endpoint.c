@@ -165,6 +165,7 @@ FactoryLogisticsResult factory_logistics_endpoint_can_accept(
     const FactoryStorage *storage;
     const FactoryRecipe *recipe;
     const FactoryBurner *burner;
+    const FactoryResearchLab *research_lab;
     FactoryLogisticsResult result = validate_entity(simulation, endpoint);
 
     if (result != FACTORY_LOGISTICS_RESULT_OK) {
@@ -172,6 +173,16 @@ FactoryLogisticsResult factory_logistics_endpoint_can_accept(
     }
     if (!item_is_valid(item)) {
         return FACTORY_LOGISTICS_RESULT_INVALID_ITEM;
+    }
+    research_lab=factory_research_lab_store_find(
+        &simulation->research_labs,endpoint.entity_id);
+    if(research_lab!=NULL){
+        if(endpoint.slot!=FACTORY_LOGISTICS_SLOT_RESEARCH_LAB_INPUT)
+            return FACTORY_LOGISTICS_RESULT_INVALID_SLOT;
+        if(item!=FACTORY_ITEM_BASIC_SCIENCE)
+            return FACTORY_LOGISTICS_RESULT_INCOMPATIBLE_ITEM;
+        return research_lab->science_quantity<FACTORY_RESEARCH_LAB_SCIENCE_CAPACITY
+            ?FACTORY_LOGISTICS_RESULT_OK:FACTORY_LOGISTICS_RESULT_BLOCKED;
     }
     burner = factory_burner_store_find(
         &simulation->burners, endpoint.entity_id
@@ -403,8 +414,13 @@ static void insert_unchecked(
     FactoryBurner *burner = factory_burner_store_find_mutable(
         &simulation->burners, endpoint.entity_id
     );
+    FactoryResearchLab *research_lab=factory_research_lab_store_find_mutable(
+        &simulation->research_labs,endpoint.entity_id);
 
-    if (burner != NULL
+    if(research_lab!=NULL
+        && endpoint.slot==FACTORY_LOGISTICS_SLOT_RESEARCH_LAB_INPUT){
+        ++research_lab->science_quantity;
+    } else if (burner != NULL
         && endpoint.slot == FACTORY_LOGISTICS_SLOT_BURNER_INPUT) {
         (void)factory_burner_insert(burner, item);
     } else if (belt != NULL) {

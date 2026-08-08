@@ -14,6 +14,11 @@ visible simulation state. It answers “what exists now,” while the simulation
 event batch answers “what happened during the latest successful step.” Neither
 presentation records nor events are authoritative.
 
+Research Lab records expose Basic Science quantity/capacity, the top-level
+powered state, power network and connection, activity, science consumed this
+tick, and work contributed this tick. Global research progress remains a
+separate controller projection and is never inferred from lab records.
+
 Create a snapshot with `factory_presentation_snapshot_create`, rebuild it from
 a simulation, and release it with `factory_presentation_snapshot_destroy`.
 Entity, resource, and power-edge pointers returned by inspection belong to the
@@ -71,8 +76,8 @@ activity.
 Progress is always a tick numerator and duration denominator; no percentage
 or interpolation value is calculated.
 
-Global research presentation copies the active technology ID, controller
-science quantity, completed-technology count, and active unit/work progress.
+Global research presentation copies the active technology ID,
+completed-technology count, and active unit/work progress.
 It never evaluates prerequisites or unlock state.
 
 Machine-status precedence is:

@@ -125,6 +125,7 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     factory_inserter_store_destroy(&simulation->inserters);
     factory_splitter_store_destroy(&simulation->splitters);
     factory_assembler_store_destroy(&simulation->assemblers);
+    factory_research_lab_store_destroy(&simulation->research_labs);
     factory_refinery_store_destroy(&simulation->refineries);
     factory_extractor_store_destroy(&simulation->extractors);
     factory_entity_manager_destroy(simulation->entities);
@@ -786,6 +787,21 @@ static FactoryResult place_assembler(
     return FACTORY_RESULT_OK;
 }
 
+static FactoryResult place_research_lab(FactorySimulation *simulation,
+    const FactoryCommand *command,FactoryEntityId *out_id)
+{
+    int32_t x=command->data.place_research_lab.x;
+    int32_t y=command->data.place_research_lab.y;
+    FactoryResult result=validate_empty_tile(simulation,x,y);
+    if(result!=FACTORY_RESULT_OK)return result;
+    if(!factory_research_lab_store_reserve_one(&simulation->research_labs))
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    result=occupy_with_entity(simulation,x,y,out_id);
+    if(result!=FACTORY_RESULT_OK)return result;
+    factory_research_lab_store_add(&simulation->research_labs,*out_id,x,y);
+    return FACTORY_RESULT_OK;
+}
+
 static FactoryResult place_splitter(
     FactorySimulation *simulation,
     const FactoryCommand *command,
@@ -896,6 +912,8 @@ static FactoryResult validate_demolition(
         factory_heat_conductor_store_find(&simulation->heat_conductors, id);
     const FactoryHeatExchanger *heat_exchanger =
         factory_heat_exchanger_store_find(&simulation->heat_exchangers, id);
+    const FactoryResearchLab *research_lab=
+        factory_research_lab_store_find(&simulation->research_labs,id);
     const FactoryTile *tile;
 
     if (id == 0U) {
@@ -976,6 +994,11 @@ static FactoryResult validate_demolition(
         *out_type = FACTORY_ENTITY_TYPE_INSERTER;
         *out_x = inserter->x;
         *out_y = inserter->y;
+    } else if(research_lab!=NULL){
+        if(research_lab->science_quantity!=0U)
+            return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
+        *out_type=FACTORY_ENTITY_TYPE_RESEARCH_LAB;
+        *out_x=research_lab->x;*out_y=research_lab->y;
     } else if (power_pole != NULL) {
         *out_type = FACTORY_ENTITY_TYPE_POWER_POLE;
         *out_x = power_pole->x;
@@ -1238,6 +1261,9 @@ static bool remove_subsystem_record(
             simulation->fluid_networks.dirty=true;
             return factory_heat_exchanger_store_remove(
                 &simulation->heat_exchangers,id);
+        case FACTORY_ENTITY_TYPE_RESEARCH_LAB:
+            return factory_research_lab_store_remove(
+                &simulation->research_labs,id);
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;
@@ -1349,6 +1375,8 @@ static bool placement_type(
             *out_type=FACTORY_ENTITY_TYPE_STEAM_TURBINE; return true;
         case FACTORY_COMMAND_PLACE_STEAM_CONDENSER:
             *out_type=FACTORY_ENTITY_TYPE_STEAM_CONDENSER; return true;
+        case FACTORY_COMMAND_PLACE_RESEARCH_LAB:
+            *out_type=FACTORY_ENTITY_TYPE_RESEARCH_LAB; return true;
         default:
             return false;
     }
@@ -1714,13 +1742,13 @@ static void apply_commands(FactorySimulation *simulation)
                 result->result=place_steam_condenser(
                     simulation,&result->command,&result->entity_id);
                 break;
+            case FACTORY_COMMAND_PLACE_RESEARCH_LAB:
+                result->result=place_research_lab(
+                    simulation,&result->command,&result->entity_id);
+                break;
             case FACTORY_COMMAND_SELECT_RESEARCH:
                 result->result=factory_research_select(simulation,
                     result->command.data.select_research.technology_id);
-                break;
-            case FACTORY_COMMAND_INSERT_RESEARCH_SCIENCE:
-                result->result=factory_research_insert_science(simulation,
-                    result->command.data.insert_research_science.quantity);
                 break;
             case FACTORY_COMMAND_FLUID_INSERT:
             case FACTORY_COMMAND_FLUID_REMOVE:
@@ -2034,6 +2062,7 @@ static size_t plan_belt_transfers(
         const FactorySplitter *destination_splitter;
         const FactoryStorage *destination_storage;
         const FactoryPowerGenerator *destination_generator;
+        const FactoryResearchLab *destination_research_lab;
         FactoryLogisticsEndpoint destination = {0};
         int32_t target_x;
         int32_t target_y;
@@ -2069,6 +2098,9 @@ static size_t plan_belt_transfers(
         destination_splitter = factory_splitter_store_find(
             &simulation->splitters, tile->occupying_entity
         );
+        destination_research_lab = factory_research_lab_store_find(
+            &simulation->research_labs, tile->occupying_entity
+        );
         if (destination_belt != NULL) {
             destination = (FactoryLogisticsEndpoint){
                 destination_belt->entity_id, FACTORY_LOGISTICS_SLOT_MAIN
@@ -2082,6 +2114,11 @@ static size_t plan_belt_transfers(
             destination = (FactoryLogisticsEndpoint){
                 destination_generator->entity_id,
                 FACTORY_LOGISTICS_SLOT_BURNER_INPUT
+            };
+        } else if (destination_research_lab != NULL) {
+            destination = (FactoryLogisticsEndpoint){
+                destination_research_lab->entity_id,
+                FACTORY_LOGISTICS_SLOT_RESEARCH_LAB_INPUT
             };
         } else if (destination_refinery != NULL) {
             adjacent_coordinate(
@@ -2459,6 +2496,7 @@ static bool inspect_inserter_destination(
     const FactoryRefinery *refinery;
     const FactoryAssembler *assembler;
     const FactoryPowerGenerator *generator;
+    const FactoryResearchLab *research_lab;
 
     *out_endpoint = (FactoryLogisticsEndpoint){
         0U, FACTORY_LOGISTICS_SLOT_NONE
@@ -2540,6 +2578,15 @@ static bool inspect_inserter_destination(
     if (generator != NULL) {
         *out_endpoint = (FactoryLogisticsEndpoint){
             generator->entity_id, FACTORY_LOGISTICS_SLOT_BURNER_INPUT
+        };
+    }
+    research_lab = factory_research_lab_store_find(
+        &simulation->research_labs, tile->occupying_entity
+    );
+    if (research_lab != NULL) {
+        *out_endpoint = (FactoryLogisticsEndpoint){
+            research_lab->entity_id,
+            FACTORY_LOGISTICS_SLOT_RESEARCH_LAB_INPUT
         };
     }
     return out_endpoint->entity_id != 0U
@@ -2684,7 +2731,7 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     update_belt_transfers(simulation);
     factory_refinery_store_update(&simulation->refineries, simulation);
     factory_assembler_store_update(&simulation->assemblers, simulation);
-    factory_research_update(simulation);
+    factory_research_labs_update(simulation);
     factory_storage_store_update(&simulation->storages);
     update_inserters(simulation);
     simulation->events.recording = false;

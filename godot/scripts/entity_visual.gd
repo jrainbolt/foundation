@@ -11,6 +11,7 @@ const COLORS := {
 	13: Color("#8b4d2d"), 14: Color("#857322"), 15: Color("#857322"),
 	16: Color("#64752b"), 17: Color("#39754f"), 18: Color("#873d8c"),
 	19: Color("#873d8c"), 20: Color("#857322"), 21: Color("#286d80"),
+	22: Color("#475d91"),
 }
 const TITLES := {
 	1: "EXTRACTOR", 2: "BELT", 3: "REFINERY", 4: "ASSEMBLER",
@@ -19,12 +20,14 @@ const TITLES := {
 	13: "BOILER", 14: "STEAM ENGINE", 15: "SOLAR", 16: "ACCUMULATOR",
 	17: "REACTOR", 18: "HEAT PIPE", 19: "HEAT EXCHANGER",
 	20: "TURBINE", 21: "CONDENSER",
+	22: "RESEARCH LAB",
 }
 const ABBREVIATIONS := {
 	1: "EX", 2: "BELT", 3: "REF", 4: "ASM", 5: "BOX", 6: "SPLIT",
 	7: "INS", 8: "POLE", 9: "GEN", 10: "TANK", 11: "PIPE",
 	12: "WATER", 13: "BOIL", 14: "STEAM", 15: "SOLAR", 16: "ACC",
 	17: "CORE", 18: "HEAT", 19: "HEX", 20: "TURB", 21: "COND",
+	22: "LAB",
 }
 
 var state: Dictionary = {}
@@ -52,7 +55,7 @@ func apply(next_state: Dictionary) -> void:
 func _draw() -> void:
 	var entity_type := int(state.get("type", 0))
 	var color: Color = COLORS.get(entity_type, Color("#505862"))
-	if not bool(state.get("powered", true)) and entity_type in [1, 3, 4, 7, 21]:
+	if not bool(state.get("powered", true)) and entity_type in [1, 3, 4, 7, 21, 22]:
 		color = color.darkened(0.42)
 	draw_rect(TILE_RECT, Color("#111820"), true)
 	draw_rect(Rect2(6, 6, 64, 64), color, true)
@@ -106,6 +109,8 @@ func _important_status(entity_type: int) -> String:
 			return "NET %d" % int(state.get("heat_network_id", 0))
 		21:
 			return "%d WATER" % int(state.get("stored_water", 0))
+		22:
+			return "%d / %d SCI" % [int(state.get("science_quantity", 0)), int(state.get("science_capacity", 0))]
 	return ""
 
 func _draw_connections(entity_type: int) -> void:

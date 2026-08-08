@@ -17,6 +17,7 @@ The content view contains deterministic ordered tables for:
 - steam-generation recipes;
 - fluid-conversion and heat-exchange recipes;
 - Steam Turbine and Steam Condenser definitions.
+- Research Lab construction, footprint, unlock, logistics, and power roles.
 
 Every category provides count, indexed lookup, and stable-ID lookup. The main
 categories also expose category validation, while `factory_content_validate`
@@ -50,8 +51,9 @@ fluid metadata, recipe content, or construction metadata. Presentation also
 exports IDs and runtime state only; frontends may independently query content
 when they need descriptive metadata.
 
-Definitions are excluded from canonical snapshots. This milestone does not
-change snapshot version 16, section sizes, bytes, or load behavior. Querying or
+Definitions are excluded from canonical snapshots. Adding authoritative
+Research Lab components later changed snapshots to version 17, but immutable
+definition records remain excluded. Querying or
 validating content cannot mutate simulation state, snapshots, event batches,
 or presentation snapshots.
 

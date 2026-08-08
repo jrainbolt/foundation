@@ -1,4 +1,9 @@
-# Snapshot format version 16
+# Snapshot format version 17
+
+Version 17 adds the authoritative Research Lab component section. Each record
+stores entity ID, grid position, and Basic Science quantity. Power topology,
+activity, and latest-tick contribution fields remain transient. Older versions
+are strictly rejected under the existing snapshot policy.
 
 Version 16 adds bounded authoritative research state to metadata and Basic
 Science to storage records. Older snapshot versions remain strictly rejected.
@@ -23,12 +28,12 @@ timestamp, or process-specific value enters the format.
 | Offset | Width | Field |
 |---:|---:|---|
 | 0 | 8 | Magic bytes `FOUNDATN` |
-| 8 | 4 | Version (`15`) |
+| 8 | 4 | Version (`17`) |
 | 12 | 4 | Header size (`48`) |
 | 16 | 8 | Total snapshot size |
 | 24 | 8 | Payload size |
 | 32 | 8 | Simulation tick |
-| 40 | 4 | Section count (`26`) |
+| 40 | 4 | Section count (`27`) |
 | 44 | 4 | Reserved zero |
 
 Unsigned and signed integers use 32-bit or 64-bit two's-complement
@@ -46,11 +51,11 @@ Each section starts with four 32-bit fields:
 | Record count | Number of fixed-width records |
 | Payload size | Bytes following the section header |
 
-Version 16 requires each section exactly once in this order:
+Version 17 requires each section exactly once in this order:
 
 | Type | Section | Record width |
 |---:|---|---:|
-| 1 | Metadata | one 64-byte payload |
+| 1 | Metadata | one 60-byte payload |
 | 2 | Entity manager | 4 bytes per live ID plus 8-byte prefix |
 | 3 | World tiles | 16 bytes plus 8-byte dimensions |
 | 4 | Extractors | 36 |
@@ -74,8 +79,9 @@ Version 16 requires each section exactly once in this order:
 | 22 | Heat exchangers | 12 |
 | 23 | Steam turbines | 16 |
 | 24 | Steam condensers | 16 |
-| 25 | Pending commands | 24 |
-| 26 | Command results | 68 |
+| 25 | Research Labs | 16 |
+| 26 | Pending commands | 24 |
+| 27 | Command results | 68 |
 
 Unknown, reordered, duplicated, missing, incorrectly sized, or unsupported
 sections are rejected. Exact full-buffer consumption is required.
@@ -86,8 +92,9 @@ row-major. Commands use a type plus five explicit 32-bit payload fields; unused
 fields are zero. Results contain that command encoding followed by result,
 entity, position, construction, assembler-recipe, and storage-output fields.
 
-Metadata contains tick, construction units, active research, research science,
-completed bits, and two fixed progress records. Storage records include all
+Metadata contains tick, construction units, active research, completed bits,
+and two fixed progress records. Unconsumed science exists only in ordinary
+item inventories and Research Lab records. Storage records include all
 nine item counters, capacity, output configuration, buffer item, and occupancy.
 Assembler records include recipe, both generic
 counted slots, processing fields, and counted output. Inserter records include
