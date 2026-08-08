@@ -42,6 +42,12 @@ public:
     int64_t reset_demo();
     int64_t step();
     int64_t step_many(int64_t count);
+    int64_t queue_place_entity(
+        int64_t entity_type,int64_t x,int64_t y,int64_t direction);
+    int64_t queue_demolish_entity(int64_t entity_id);
+    Array get_command_results() const;
+    Array get_build_catalog() const;
+    int64_t get_construction_units() const;
     int64_t place_fluid_tank(int64_t x, int64_t y);
     int64_t insert_fluid(
         int64_t destination_entity_id, int64_t fluid_type, int64_t quantity

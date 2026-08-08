@@ -10,6 +10,13 @@ const STEPS_PER_SECOND := 12.0
 @onready var run_button: Button = %RunButton
 @onready var world_controller: Node = %WorldController
 @onready var inspector: Control = %EntityInspector
+@onready var build_toolbar: HBoxContainer = %BuildToolbar
+@onready var mode_label: Label = %ModeLabel
+@onready var construction_label: Label = %ConstructionLabel
+@onready var build_panel: PanelContainer = $Interface/BuildPanel
+@onready var sidebar: VBoxContainer = $Interface/Sidebar
+@onready var top_toolbar: PanelContainer = $Interface/Toolbar
+const Format := preload("res://scripts/presentation_format.gd")
 
 var simulation: Object
 var running := false
@@ -17,12 +24,32 @@ var cadence_accumulator := 0.0
 var event_lines: Array[String] = []
 
 func _ready() -> void:
+	call_deferred("_position_interface")
 	if not ClassDB.class_exists("FoundationSimulation"):
 		status_label.text = "Status: native extension failed to load"
 		set_physics_process(false)
 		return
 	simulation = ClassDB.instantiate("FoundationSimulation")
+	build_toolbar.build_selected.connect(_on_build_selected)
+	build_toolbar.demolish_selected.connect(_on_demolish_selected)
+	world_controller.placement_requested.connect(_on_placement_requested)
+	world_controller.demolition_requested.connect(_on_demolition_requested)
+	world_controller.interaction_mode_changed.connect(_on_interaction_mode_changed)
 	_reset_demo()
+	build_toolbar.configure(simulation)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED and is_node_ready():
+		_position_interface()
+
+func _position_interface() -> void:
+	var viewport_size := size
+	if viewport_size.y < 300.0:
+		viewport_size = Vector2(
+			float(ProjectSettings.get_setting("display/window/size/viewport_width",1100)),
+			float(ProjectSettings.get_setting("display/window/size/viewport_height",720)))
+	build_panel.position = Vector2(12.0,viewport_size.y - 106.0)
+	build_panel.size = Vector2(maxf(360.0,viewport_size.x - 324.0),96.0)
 
 func _physics_process(delta: float) -> void:
 	if not running:
@@ -43,6 +70,7 @@ func _reset_demo() -> void:
 	event_lines.clear()
 	if is_instance_valid(world_controller):
 		world_controller.clear_selection()
+		world_controller.enter_select_mode()
 	var result: int = simulation.reset_demo()
 	_show_result(result)
 	_synchronize()
@@ -72,6 +100,8 @@ func _synchronize() -> bool:
 		return false
 	canvas.synchronize(entities, resources, power_edges)
 	world_controller.refresh_selection()
+	build_toolbar.refresh(simulation)
+	construction_label.text = "Construction: %d units" % int(simulation.get_construction_units())
 	tick_label.text = "Tick: %d  Day: %d  Time: %d" % [
 		tick, day, time_of_day
 	]
@@ -102,3 +132,42 @@ func _on_step_pressed() -> void:
 func _on_run_pressed() -> void:
 	running = not running
 	run_button.text = "Pause" if running else "Run"
+
+func _on_build_selected(entity_type: int) -> void:
+	world_controller.enter_build_mode(entity_type)
+
+func _on_demolish_selected() -> void:
+	world_controller.enter_demolish_mode()
+
+func _on_interaction_mode_changed(mode: int,entity_type: int) -> void:
+	build_toolbar.set_active(entity_type,mode == 2)
+	if mode == 1:
+		mode_label.text = "Mode: Build %s — R rotates, Esc cancels" % Format.entity_type(entity_type)
+	elif mode == 2:
+		mode_label.text = "Mode: Demolish — Esc cancels"
+	else:
+		mode_label.text = "Mode: Select"
+
+func _on_placement_requested(entity_type: int,grid: Vector2i,direction: int) -> void:
+	var queued: int = simulation.queue_place_entity(entity_type,grid.x,grid.y,direction)
+	if queued != 0:
+		status_label.text = "Status: %s" % simulation.result_name(queued)
+		return
+	_execute_queued_command("Placed %s" % Format.entity_type(entity_type))
+
+func _on_demolition_requested(entity_id: int) -> void:
+	var queued: int = simulation.queue_demolish_entity(entity_id)
+	if queued != 0:
+		status_label.text = "Status: %s" % simulation.result_name(queued)
+		return
+	_execute_queued_command("Demolished entity #%d" % entity_id)
+
+func _execute_queued_command(success_message: String) -> void:
+	if not _advance(1): return
+	var results: Array = simulation.get_command_results()
+	if results.is_empty():
+		status_label.text = "Status: command produced no result"
+		return
+	var command_result: Dictionary = results.back()
+	var result := int(command_result.result)
+	status_label.text = "Status: %s" % (success_message if result == 0 else simulation.result_name(result))

@@ -75,6 +75,22 @@ when those fields exist for the selected entity. No selection, camera, or
 inspector state enters Foundation snapshots, events, presentation records, or
 the native adapter. Styling is intentionally provisional and technical.
 
+## Command-driven building
+
+The bottom toolbar is populated from immutable Foundation entity definitions,
+including authoritative construction costs and unlock availability. Choose an
+entity to enter Build mode, move the advisory ghost with the mouse, press R to
+rotate, and left-click to queue its normal Foundation placement command. Choose
+Demolish and click an entity to queue the normal demolition command. Escape
+returns to Select mode, and Reset also clears the active interaction mode.
+
+The ghost predicts only visible occupancy and is deliberately advisory.
+Foundation performs all bounds, terrain, inventory, unlock, occupancy, and
+transaction validation during the following deterministic tick. The UI reads
+the existing transient FIFO command-result batch afterward, rebuilds the normal
+presentation snapshot, and displays the authoritative result. It never creates,
+removes, moves, or edits a visual speculatively.
+
 For a headless integration smoke test after building:
 
 ```sh

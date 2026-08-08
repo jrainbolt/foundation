@@ -175,6 +175,18 @@ void FoundationSimulation::_bind_methods()
         D_METHOD("step_many", "count"), &FoundationSimulation::step_many
     );
     ClassDB::bind_method(
+        D_METHOD("queue_place_entity","entity_type","x","y","direction"),
+        &FoundationSimulation::queue_place_entity);
+    ClassDB::bind_method(
+        D_METHOD("queue_demolish_entity","entity_id"),
+        &FoundationSimulation::queue_demolish_entity);
+    ClassDB::bind_method(D_METHOD("get_command_results"),
+        &FoundationSimulation::get_command_results);
+    ClassDB::bind_method(D_METHOD("get_build_catalog"),
+        &FoundationSimulation::get_build_catalog);
+    ClassDB::bind_method(D_METHOD("get_construction_units"),
+        &FoundationSimulation::get_construction_units);
+    ClassDB::bind_method(
         D_METHOD("place_fluid_tank", "x", "y"),
         &FoundationSimulation::place_fluid_tank
     );
@@ -524,6 +536,111 @@ int64_t FoundationSimulation::step_many(int64_t count)
             return result;
     }
     return FACTORY_RESULT_OK;
+}
+
+int64_t FoundationSimulation::queue_place_entity(
+    int64_t entity_type,int64_t x,int64_t y,int64_t direction)
+{
+    if (simulation_==nullptr || entity_type<=FACTORY_ENTITY_TYPE_NONE
+        || entity_type>FACTORY_ENTITY_TYPE_STEAM_CONDENSER
+        || x<INT32_MIN || x>INT32_MAX || y<INT32_MIN || y>INT32_MAX
+        || direction<FACTORY_DIRECTION_NORTH
+        || direction>FACTORY_DIRECTION_WEST)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommandType command_type;
+    switch ((FactoryEntityType)entity_type) {
+    case FACTORY_ENTITY_TYPE_EXTRACTOR: command_type=FACTORY_COMMAND_PLACE_EXTRACTOR;break;
+    case FACTORY_ENTITY_TYPE_BELT: command_type=FACTORY_COMMAND_PLACE_BELT;break;
+    case FACTORY_ENTITY_TYPE_REFINERY: command_type=FACTORY_COMMAND_PLACE_REFINERY;break;
+    case FACTORY_ENTITY_TYPE_ASSEMBLER: command_type=FACTORY_COMMAND_PLACE_ASSEMBLER;break;
+    case FACTORY_ENTITY_TYPE_STORAGE: command_type=FACTORY_COMMAND_PLACE_STORAGE;break;
+    case FACTORY_ENTITY_TYPE_SPLITTER: command_type=FACTORY_COMMAND_PLACE_SPLITTER;break;
+    case FACTORY_ENTITY_TYPE_INSERTER: command_type=FACTORY_COMMAND_PLACE_INSERTER;break;
+    case FACTORY_ENTITY_TYPE_POWER_POLE: command_type=FACTORY_COMMAND_PLACE_POWER_POLE;break;
+    case FACTORY_ENTITY_TYPE_POWER_GENERATOR: command_type=FACTORY_COMMAND_PLACE_POWER_GENERATOR;break;
+    case FACTORY_ENTITY_TYPE_FLUID_TANK: command_type=FACTORY_COMMAND_PLACE_FLUID_TANK;break;
+    case FACTORY_ENTITY_TYPE_PIPE: command_type=FACTORY_COMMAND_PLACE_PIPE;break;
+    case FACTORY_ENTITY_TYPE_WATER_EXTRACTOR: command_type=FACTORY_COMMAND_PLACE_WATER_EXTRACTOR;break;
+    case FACTORY_ENTITY_TYPE_BOILER: command_type=FACTORY_COMMAND_PLACE_BOILER;break;
+    case FACTORY_ENTITY_TYPE_STEAM_ENGINE: command_type=FACTORY_COMMAND_PLACE_STEAM_ENGINE;break;
+    case FACTORY_ENTITY_TYPE_SOLAR_GENERATOR: command_type=FACTORY_COMMAND_PLACE_SOLAR_GENERATOR;break;
+    case FACTORY_ENTITY_TYPE_ACCUMULATOR: command_type=FACTORY_COMMAND_PLACE_ACCUMULATOR;break;
+    case FACTORY_ENTITY_TYPE_REACTOR_CORE: command_type=FACTORY_COMMAND_PLACE_REACTOR_CORE;break;
+    case FACTORY_ENTITY_TYPE_HEAT_CONDUCTOR: command_type=FACTORY_COMMAND_PLACE_HEAT_CONDUCTOR;break;
+    case FACTORY_ENTITY_TYPE_HEAT_EXCHANGER: command_type=FACTORY_COMMAND_PLACE_HEAT_EXCHANGER;break;
+    case FACTORY_ENTITY_TYPE_STEAM_TURBINE: command_type=FACTORY_COMMAND_PLACE_STEAM_TURBINE;break;
+    case FACTORY_ENTITY_TYPE_STEAM_CONDENSER: command_type=FACTORY_COMMAND_PLACE_STEAM_CONDENSER;break;
+    default:return FACTORY_RESULT_INVALID_ARGUMENT;
+    }
+    FactoryCommand command=place(command_type,(int32_t)x,(int32_t)y,
+        (FactoryDirection)direction,(FactoryDirection)direction);
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
+int64_t FoundationSimulation::queue_demolish_entity(int64_t entity_id)
+{
+    if (simulation_==nullptr || entity_id<=0 || entity_id>UINT32_MAX)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};
+    command.type=FACTORY_COMMAND_DEMOLISH_ENTITY;
+    command.data.demolish_entity.entity_id=(FactoryEntityId)entity_id;
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
+Array FoundationSimulation::get_command_results() const
+{
+    Array values;
+    if (simulation_==nullptr) return values;
+    size_t count=factory_simulation_get_command_result_count(simulation_);
+    for (size_t i=0;i<count;++i) {
+        const FactoryCommandResult *r=factory_simulation_get_command_result(simulation_,i);
+        if (r==nullptr) continue;
+        Dictionary value;
+        value["result"]=(int64_t)r->result;
+        value["command_type"]=(int64_t)r->command.type;
+        if (!set_unsigned(&value,"entity_id",r->entity_id,
+                "command_result.entity_id")
+            || !set_unsigned(&value,"construction_units_changed",
+                r->construction_units_changed,
+                "command_result.construction_units_changed")
+            || !set_unsigned(&value,"construction_units_remaining",
+                r->construction_units_remaining,
+                "command_result.construction_units_remaining"))
+            return Array();
+        value["entity_type"]=(int64_t)r->entity_type;
+        value["x"]=(int64_t)r->x; value["y"]=(int64_t)r->y;
+        values.append(value);
+    }
+    return values;
+}
+
+Array FoundationSimulation::get_build_catalog() const
+{
+    Array values;
+    for (size_t i=0;i<factory_content_entity_definition_count();++i) {
+        const FactoryEntityDefinition *d=factory_content_entity_definition_at(i);
+        if (d==nullptr) continue;
+        Dictionary value;
+        value["entity_type"]=(int64_t)d->entity_type;
+        if (!set_unsigned(&value,"construction_cost",d->construction_cost,
+                "content.construction_cost")
+            || !set_unsigned(&value,"required_unlock",d->required_unlock,
+                "content.required_unlock")
+            || !set_unsigned(&value,"footprint_width",d->footprint_width,
+                "content.footprint_width")
+            || !set_unsigned(&value,"footprint_height",d->footprint_height,
+                "content.footprint_height"))
+            return Array();
+        value["unlocked"]=simulation_!=nullptr
+            && factory_simulation_is_entity_unlocked(simulation_,d->entity_type);
+        values.append(value);
+    }
+    return values;
+}
+
+int64_t FoundationSimulation::get_construction_units() const
+{
+    return simulation_==nullptr?0:(int64_t)factory_simulation_construction_units(simulation_);
 }
 
 int64_t FoundationSimulation::place_fluid_tank(int64_t x, int64_t y)

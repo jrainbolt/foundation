@@ -25,6 +25,12 @@ func _run() -> void:
 			or main.get_node_or_null("World/Grid") == null:
 		_fail("interactive frontend nodes are missing")
 		return
+	var build_panel: Control = main.get_node_or_null("Interface/BuildPanel")
+	if main.build_toolbar == null \
+			or build_panel == null or not build_panel.visible \
+			or int(main.world_controller.mode) != 0:
+		_fail("construction toolbar or default interaction mode is incorrect")
+		return
 	var initial_tick := int(main.simulation.get_tick())
 	var canvas: Node = main.canvas
 	if initial_tick != 11 or canvas.entity_nodes.size() != 48:

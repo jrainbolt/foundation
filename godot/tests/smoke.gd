@@ -47,6 +47,15 @@ func _initialize() -> void:
 	var result: int = simulation.reset_demo()
 	if not _require(result == 0, simulation.result_name(result)):
 		return
+	if not _require(
+		simulation.has_method("queue_place_entity")
+		and simulation.has_method("queue_demolish_entity")
+		and simulation.has_method("get_command_results")
+		and simulation.get_build_catalog().size() == 21
+		and simulation.get_construction_units() >= 0,
+		"construction command bridge"
+	):
+		return
 	if not _require(simulation.get_tick() == 11, "unexpected reset tick"):
 		return
 	var research: Dictionary = simulation.get_research()
