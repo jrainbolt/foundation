@@ -441,7 +441,8 @@ void factory_locomotives_update(FactorySimulation*s)
     FactoryLocomotiveStore*store=&s->locomotives;
     for(size_t i=0;i<store->count;++i)store->plans[i]=(FactoryLocomotivePlan){
         .id=store->items[i].entity_id,.from=store->items[i].rail_entity_id};
-    qsort(store->plans,store->count,sizeof(*store->plans),plan_compare);
+    if(store->count>1U)
+        qsort(store->plans,store->count,sizeof(*store->plans),plan_compare);
     for(size_t i=0;i<store->count;++i){FactoryLocomotive*l=
         factory_locomotive_store_find_mutable(store,store->plans[i].id);
         if(l->progress<FACTORY_LOCOMOTIVE_MOVE_TICKS)++l->progress;
