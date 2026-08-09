@@ -174,3 +174,12 @@ recomputed after load.
 Version 15 has no compression, encryption, checksum, optional sections, or
 migration decoder. A future incompatible change must introduce a deliberate
 new-version decoder or compatibility policy.
+
+## Version 20 rail sections
+
+Version 20 adds canonical Rail and Rail Station sections. Rail records contain
+entity ID, signed grid coordinates, and explicit geometry. Station records
+contain entity ID, signed grid coordinates, and orientation. Derived ports,
+neighbors, network IDs, station attachment, and topology events are excluded.
+Load validates geometry, orientation, terrain, occupancy, and component
+correspondence, then rebuilds topology without emitting events.

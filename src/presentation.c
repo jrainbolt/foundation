@@ -209,6 +209,9 @@ static FactoryResult populate_entity(
     const FactoryConstructionDepot *construction_depot=
         factory_construction_depot_store_find(
             &simulation->construction_depots,id);
+    const FactoryRail *rail=factory_rail_store_find(&simulation->rails,id);
+    const FactoryRailStation *rail_station=
+        factory_rail_station_store_find(&simulation->rail_stations,id);
     FactoryPipeInspection pipe;
     FactoryPowerPoleInspection pole;
     FactoryPowerGeneratorInspection generator;
@@ -563,6 +566,27 @@ static FactoryResult populate_entity(
             lab.science_quantity,lab.science_capacity,lab.power_network_id,
             lab.connected,lab.activity,lab.science_consumed_last_tick,
             lab.work_contributed_last_tick};
+    } else if(rail!=NULL){
+        FactoryRailInspection inspection;
+        if(!factory_simulation_get_rail(simulation,id,&inspection))
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        out->entity_type=FACTORY_ENTITY_TYPE_RAIL;out->x=rail->x;out->y=rail->y;
+        out->data.rail=(FactoryPresentationRail){inspection.geometry,
+            inspection.port_mask,inspection.connection_mask,
+            inspection.network_id,{inspection.neighbors[0],inspection.neighbors[1],
+            inspection.neighbors[2],inspection.neighbors[3]}};
+    } else if(rail_station!=NULL){
+        FactoryRailStationInspection inspection;
+        if(!factory_simulation_get_rail_station(simulation,id,&inspection))
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        out->entity_type=FACTORY_ENTITY_TYPE_RAIL_STATION;
+        out->x=rail_station->x;out->y=rail_station->y;
+        out->direction=rail_station->orientation;
+        out->status=inspection.connected?FACTORY_PRESENTATION_MACHINE_STATUS_IDLE
+            :FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_INPUT;
+        out->data.rail_station=(FactoryPresentationRailStation){
+            inspection.attached_rail_id,inspection.network_id,
+            inspection.connected};
     } else if(construction_depot!=NULL){
         out->entity_type=FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT;
         out->x=construction_depot->x;out->y=construction_depot->y;

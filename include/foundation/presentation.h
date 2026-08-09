@@ -7,6 +7,7 @@
 
 #include "foundation/simulation.h"
 #include "foundation/research_lab.h"
+#include "foundation/rail.h"
 
 #define FACTORY_PRESENTATION_DIRECTION_NONE (-1)
 #define FACTORY_PRESENTATION_STORAGE_ITEM_COUNT 10U
@@ -267,6 +268,20 @@ typedef struct {
 } FactoryPresentationConstructionDepot;
 
 typedef struct {
+    FactoryRailGeometry geometry;
+    uint32_t port_mask;
+    uint32_t connection_mask;
+    FactoryRailNetworkId network_id;
+    FactoryEntityId neighbors[FACTORY_RAIL_NEIGHBOR_COUNT];
+} FactoryPresentationRail;
+
+typedef struct {
+    FactoryEntityId attached_rail_id;
+    FactoryRailNetworkId network_id;
+    bool connected;
+} FactoryPresentationRailStation;
+
+typedef struct {
     FactoryEntityId entity_id;
     FactoryEntityType entity_type;
     int32_t x;
@@ -298,6 +313,8 @@ typedef struct {
         FactoryPresentationSteamCondenser steam_condenser;
         FactoryPresentationResearchLab research_lab;
         FactoryPresentationConstructionDepot construction_depot;
+        FactoryPresentationRail rail;
+        FactoryPresentationRailStation rail_station;
     } data;
 } FactoryPresentationEntity;
 

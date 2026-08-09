@@ -30,6 +30,7 @@
 #include "research_internal.h"
 #include "research_lab_internal.h"
 #include "construction_depot_internal.h"
+#include "rail_internal.h"
 
 struct FactorySimulation {
     FactorySimulationClock clock;
@@ -66,6 +67,9 @@ struct FactorySimulation {
     FactoryResearchState research;
     FactoryResearchLabStore research_labs;
     FactoryConstructionDepotStore construction_depots;
+    FactoryRailStore rails;
+    FactoryRailStationStore rail_stations;
+    FactoryRailTopology rail_topology;
     /* Test-fixture setup only; production simulations leave this zero. */
     uint32_t fixture_initial_generator_fuel;
     FactoryPowerState power;

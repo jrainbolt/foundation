@@ -13,6 +13,7 @@ const COLORS := {
 	19: Color("#873d8c"), 20: Color("#857322"), 21: Color("#286d80"),
 	22: Color("#475d91"),
 	23: Color("#596b46"),
+	24: Color("#9ea7af"), 25: Color("#506a78"),
 }
 const TITLES := {
 	1: "EXTRACTOR", 2: "BELT", 3: "REFINERY", 4: "ASSEMBLER",
@@ -23,6 +24,7 @@ const TITLES := {
 	20: "TURBINE", 21: "CONDENSER",
 	22: "RESEARCH LAB",
 	23: "CONSTRUCTION DEPOT",
+	24: "RAIL", 25: "RAIL STATION",
 }
 const ABBREVIATIONS := {
 	1: "EX", 2: "BELT", 3: "REF", 4: "ASM", 5: "BOX", 6: "SPLIT",
@@ -31,6 +33,7 @@ const ABBREVIATIONS := {
 	17: "CORE", 18: "HEAT", 19: "HEX", 20: "TURB", 21: "COND",
 	22: "LAB",
 	23: "DEPOT",
+	24: "", 25: "STN",
 }
 
 var state: Dictionary = {}
@@ -58,6 +61,14 @@ func apply(next_state: Dictionary) -> void:
 func _draw() -> void:
 	var entity_type := int(state.get("type", 0))
 	var color: Color = COLORS.get(entity_type, Color("#505862"))
+	if entity_type == 24:
+		_draw_rail()
+		_draw_selection()
+		return
+	if entity_type == 25:
+		_draw_station(color)
+		_draw_selection()
+		return
 	if not bool(state.get("powered", true)) and entity_type in [1, 3, 4, 7, 21, 22]:
 		color = color.darkened(0.42)
 	draw_rect(TILE_RECT, Color("#111820"), true)
@@ -72,6 +83,9 @@ func _draw() -> void:
 	_draw_direction()
 	_draw_resource_badge()
 	_draw_process_bar()
+	_draw_selection()
+
+func _draw_selection() -> void:
 	if hovered:
 		draw_rect(Rect2(2, 2, 72, 72), Color("#f5fbff", 0.92), false, 1.5)
 	if selected:
@@ -79,6 +93,24 @@ func _draw() -> void:
 		draw_rect(Rect2(1.5, 1.5, 73, 73), Color("#fff176"), false, 3.5)
 		draw_circle(Vector2(66, 10), 7.0, Color("#fff176"))
 		draw_string(ThemeDB.fallback_font, Vector2(63, 14), "S", HORIZONTAL_ALIGNMENT_CENTER, 7, 9, Color("#20252d"))
+
+func _draw_rail() -> void:
+	var center := Vector2(38, 38)
+	var vectors := [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]
+	var mask := int(state.get("port_mask", 0))
+	for index in 4:
+		if mask & (1 << index):
+			draw_line(center, center + vectors[index] * 38.0, Color("#252b30"), 13.0)
+			draw_line(center, center + vectors[index] * 38.0, Color("#aeb8bf"), 7.0)
+	draw_circle(center, 6.0, Color("#d4dde3"))
+	draw_string(ThemeDB.fallback_font,Vector2(5,14),"N%d" % int(state.get("rail_network_id",0)),HORIZONTAL_ALIGNMENT_LEFT,-1,9,Color("#dce7ee"))
+
+func _draw_station(color: Color) -> void:
+	draw_rect(Rect2(8,14,60,48),Color("#111820"),true)
+	draw_rect(Rect2(11,17,54,42),color,true)
+	draw_line(Vector2(12,55),Vector2(64,55),Color("#c8d1d6"),5.0)
+	_draw_centered("STN",43.0,18,Color.WHITE)
+	_draw_centered("CONNECTED" if bool(state.get("rail_connected",false)) else "NO RAIL",57.0,9,Color("#cfe7d4") if bool(state.get("rail_connected",false)) else Color("#ff9f91"))
 
 func _draw_centered(text: String, baseline: float, size: int, color: Color) -> void:
 	draw_string(ThemeDB.fallback_font, Vector2(7, baseline), text, HORIZONTAL_ALIGNMENT_CENTER, 62, size, color)

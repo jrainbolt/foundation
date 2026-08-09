@@ -71,6 +71,7 @@ add_library(factory_engine
     src/recipe.c
     src/refinery.c
     src/reactor.c
+    src/rail.c
     src/research.c
     src/research_lab.c
     src/simulation.c
@@ -398,4 +399,8 @@ add_test(NAME factory_telemetry_tests COMMAND factory_telemetry_tests)
 add_executable(factory_construction_depot_tests tests/test_construction_depot.c)
 target_link_libraries(factory_construction_depot_tests PRIVATE factory_engine foundation_project_options)
 add_test(NAME factory_construction_depot_tests COMMAND factory_construction_depot_tests)
+
+add_executable(factory_rail_tests tests/test_rail.c)
+target_link_libraries(factory_rail_tests PRIVATE factory_engine foundation_project_options)
+add_test(NAME factory_rail_tests COMMAND factory_rail_tests)
 endif()

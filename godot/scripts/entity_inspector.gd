@@ -62,6 +62,12 @@ func show_entity(state: Dictionary) -> void:
 	if state.has("powered"): field(lines, "Powered", Format.yes_no(bool(state.powered)))
 	for key in ["network", "power_network_id", "network_id", "input_network_id", "output_network_id", "steam_network_id", "water_network_id", "heat_network_id"]:
 		if state.has(key): field(lines, key.capitalize(), str(int(state[key])))
+	if state.has("rail_network_id"): field(lines,"Rail network",str(int(state.rail_network_id)))
+	if state.has("rail_geometry"): field(lines,"Geometry",str(int(state.rail_geometry)))
+	if state.has("connection_mask"): field(lines,"Connection mask",str(int(state.connection_mask)))
+	if state.has("rail_neighbors"): field(lines,"Neighbors",str(state.rail_neighbors))
+	if state.has("rail_connected"): field(lines,"Rail connected",Format.yes_no(bool(state.rail_connected)))
+	if state.has("attached_rail_id"): field(lines,"Attached rail","#%d" % int(state.attached_rail_id))
 	if state.has("recipe") or state.has("progress") or state.has("duration"):
 		section(lines, "Process")
 		if state.has("recipe"): field(lines, "Recipe ID", str(int(state.recipe)))

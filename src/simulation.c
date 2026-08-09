@@ -131,6 +131,9 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     factory_splitter_store_destroy(&simulation->splitters);
     factory_assembler_store_destroy(&simulation->assemblers);
     factory_construction_depot_store_destroy(&simulation->construction_depots);
+    factory_rail_store_destroy(&simulation->rails);
+    factory_rail_station_store_destroy(&simulation->rail_stations);
+    factory_rail_topology_destroy(&simulation->rail_topology);
     factory_research_lab_store_destroy(&simulation->research_labs);
     factory_refinery_store_destroy(&simulation->refineries);
     factory_extractor_store_destroy(&simulation->extractors);
@@ -824,6 +827,37 @@ static FactoryResult place_construction_depot(FactorySimulation *simulation,
     return FACTORY_RESULT_OK;
 }
 
+static FactoryResult place_rail(FactorySimulation *s,const FactoryCommand*c,
+    FactoryEntityId*out_id)
+{
+    int32_t x=c->data.place_rail.x,y=c->data.place_rail.y;
+    FactoryResult result=validate_empty_tile(s,x,y);
+    if(result!=FACTORY_RESULT_OK)return result;
+    if(!factory_rail_store_reserve_one(&s->rails))return FACTORY_RESULT_OUT_OF_MEMORY;
+    result=occupy_with_entity(s,x,y,out_id);if(result!=FACTORY_RESULT_OK)return result;
+    factory_rail_store_add(&s->rails,*out_id,x,y,
+        (FactoryRailGeometry)c->data.place_rail.geometry);
+    s->rail_topology.dirty=true;return FACTORY_RESULT_OK;
+}
+
+static FactoryResult place_rail_station(FactorySimulation*s,
+    const FactoryCommand*c,FactoryEntityId*out_id)
+{
+    static const int32_t dx[4]={0,1,0,-1},dy[4]={-1,0,1,0};
+    int32_t x=c->data.place_rail_station.x,y=c->data.place_rail_station.y;
+    FactoryDirection o=c->data.place_rail_station.orientation;
+    FactoryResult result=validate_empty_tile(s,x,y);bool attached=false;
+    if(result!=FACTORY_RESULT_OK)return result;
+    for(size_t i=0U;i<s->rails.count;++i)if(s->rails.items[i].x==x+dx[o]
+        &&s->rails.items[i].y==y+dy[o]){attached=true;break;}
+    if(!attached)return FACTORY_RESULT_INVALID_STATE;
+    if(!factory_rail_station_store_reserve_one(&s->rail_stations))
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    result=occupy_with_entity(s,x,y,out_id);if(result!=FACTORY_RESULT_OK)return result;
+    factory_rail_station_store_add(&s->rail_stations,*out_id,x,y,o);
+    s->rail_topology.dirty=true;return FACTORY_RESULT_OK;
+}
+
 static FactoryResult place_splitter(
     FactorySimulation *simulation,
     const FactoryCommand *command,
@@ -939,6 +973,9 @@ static FactoryResult validate_demolition(
     const FactoryConstructionDepot *construction_depot=
         factory_construction_depot_store_find(
             &simulation->construction_depots,id);
+    const FactoryRail *rail=factory_rail_store_find(&simulation->rails,id);
+    const FactoryRailStation *rail_station=
+        factory_rail_station_store_find(&simulation->rail_stations,id);
     const FactoryTile *tile;
 
     if (id == 0U) {
@@ -1019,6 +1056,11 @@ static FactoryResult validate_demolition(
         *out_type = FACTORY_ENTITY_TYPE_INSERTER;
         *out_x = inserter->x;
         *out_y = inserter->y;
+    } else if(rail!=NULL){
+        *out_type=FACTORY_ENTITY_TYPE_RAIL;*out_x=rail->x;*out_y=rail->y;
+    } else if(rail_station!=NULL){
+        *out_type=FACTORY_ENTITY_TYPE_RAIL_STATION;
+        *out_x=rail_station->x;*out_y=rail_station->y;
     } else if(construction_depot!=NULL){
         if(construction_depot->material_quantity!=0U)
             return FACTORY_RESULT_CONSTRUCTION_DEPOT_NOT_EMPTY;
@@ -1297,6 +1339,12 @@ static bool remove_subsystem_record(
         case FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT:
             return factory_construction_depot_store_remove(
                 &simulation->construction_depots,id);
+        case FACTORY_ENTITY_TYPE_RAIL:
+            simulation->rail_topology.dirty=true;
+            return factory_rail_store_remove(&simulation->rails,id);
+        case FACTORY_ENTITY_TYPE_RAIL_STATION:
+            simulation->rail_topology.dirty=true;
+            return factory_rail_station_store_remove(&simulation->rail_stations,id);
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;
@@ -1419,6 +1467,10 @@ static bool placement_type(
             *out_type=FACTORY_ENTITY_TYPE_RESEARCH_LAB; return true;
         case FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT:
             *out_type=FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT; return true;
+        case FACTORY_COMMAND_PLACE_RAIL:
+            *out_type=FACTORY_ENTITY_TYPE_RAIL;return true;
+        case FACTORY_COMMAND_PLACE_RAIL_STATION:
+            *out_type=FACTORY_ENTITY_TYPE_RAIL_STATION;return true;
         default:
             return false;
     }
@@ -1860,6 +1912,12 @@ static void apply_commands(FactorySimulation *simulation)
                 result->result=place_construction_depot(
                     simulation,&result->command,&result->entity_id);
                 break;
+            case FACTORY_COMMAND_PLACE_RAIL:
+                result->result=place_rail(simulation,&result->command,
+                    &result->entity_id);break;
+            case FACTORY_COMMAND_PLACE_RAIL_STATION:
+                result->result=place_rail_station(simulation,&result->command,
+                    &result->entity_id);break;
             case FACTORY_COMMAND_SELECT_RESEARCH:
                 result->result=factory_research_select(simulation,
                     result->command.data.select_research.technology_id);
@@ -2893,6 +2951,7 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
             .type = FACTORY_EVENT_SUNSET});
     (void)factory_fluid_network_rebuild(simulation, true);
     (void)factory_heat_network_rebuild(simulation, true);
+    (void)factory_rail_topology_rebuild(simulation);
     factory_fluid_network_transfer(simulation);
     factory_burner_store_begin_tick(&simulation->burners, simulation);
     factory_fluid_machines_update(simulation);

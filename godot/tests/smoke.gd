@@ -52,7 +52,7 @@ func _initialize() -> void:
 		and simulation.has_method("queue_set_assembler_recipe")
 		and simulation.has_method("queue_set_storage_output")
 		and simulation.has_method("get_command_results")
-		and simulation.get_build_catalog().size() == 23
+		and simulation.get_build_catalog().size() == 25
 		and simulation.get_assembler_recipe_catalog().size() == 4
 		and simulation.get_item_catalog().size() == 11
 		and simulation.get_construction_units() >= 0,

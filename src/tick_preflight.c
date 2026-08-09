@@ -128,6 +128,8 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
     RESERVE_STORE(s->heat_exchangers,1U);
     RESERVE_STORE(s->research_labs,1U);
     RESERVE_STORE(s->construction_depots,1U);
+    RESERVE_STORE(s->rails,1U);
+    RESERVE_STORE(s->rail_stations,1U);
 #undef RESERVE_STORE
     ADD_BOUND(poles,s->power_poles.count,1U);
     ADD_BOUND(generators,s->power_generators.count,1U);
@@ -179,7 +181,13 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
         || !add_block(&next,FACTORY_TOPOLOGY_HEAT,heat_ports,
             sizeof(FactoryHeatPortInspection))
         || !add_block(&next,FACTORY_TOPOLOGY_HEAT,conductors,
-            sizeof(FactoryHeatNetworkInspection))) {
+            sizeof(FactoryHeatNetworkInspection))
+        || !add_block(&next,FACTORY_TOPOLOGY_RAIL,s->rails.count+q,
+            sizeof(FactoryRailInspection))
+        || !add_block(&next,FACTORY_TOPOLOGY_RAIL,s->rail_stations.count+q,
+            sizeof(FactoryRailStationInspection))
+        || !add_block(&next,FACTORY_TOPOLOGY_RAIL,s->rails.count+q,
+            sizeof(FactoryRailNetworkInspection))) {
         factory_tick_preflight_destroy(&next);
         return FACTORY_RESULT_OUT_OF_MEMORY;
     }

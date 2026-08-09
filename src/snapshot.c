@@ -10,7 +10,7 @@
 
 #define SNAPSHOT_HEADER_SIZE 48U
 #define SNAPSHOT_SECTION_HEADER_SIZE 16U
-#define SNAPSHOT_SECTION_COUNT 28U
+#define SNAPSHOT_SECTION_COUNT 30U
 
 static const uint8_t snapshot_magic[8] = {
     'F', 'O', 'U', 'N', 'D', 'A', 'T', 'N'
@@ -43,6 +43,8 @@ typedef enum {
     SNAPSHOT_SECTION_STEAM_CONDENSERS,
     SNAPSHOT_SECTION_RESEARCH_LABS,
     SNAPSHOT_SECTION_CONSTRUCTION_DEPOTS,
+    SNAPSHOT_SECTION_RAILS,
+    SNAPSHOT_SECTION_RAIL_STATIONS,
     SNAPSHOT_SECTION_COMMANDS,
     SNAPSHOT_SECTION_RESULTS
 } SnapshotSection;
@@ -290,6 +292,8 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_records(&size, simulation->steam_condensers.count, 16U)
         || !checked_records(&size, simulation->research_labs.count, 16U)
         || !checked_records(&size,simulation->construction_depots.count,16U)
+        || !checked_records(&size,simulation->rails.count,16U)
+        || !checked_records(&size,simulation->rail_stations.count,16U)
         || !checked_records(&size, simulation->command_count, 24U)
         || !checked_records(&size, simulation->result_count, 72U)
         || !size_to_u32(simulation->entities->count)
@@ -317,6 +321,8 @@ static FactoryResult snapshot_size_unvalidated(
         || !size_to_u32(simulation->steam_condensers.count)
         || !size_to_u32(simulation->research_labs.count)
         || !size_to_u32(simulation->construction_depots.count)
+        || !size_to_u32(simulation->rails.count)
+        || !size_to_u32(simulation->rail_stations.count)
         || !section_size_valid(
             simulation->entities->count, 4U, 8U)
         || !section_size_valid(tiles, 16U, 16U)
@@ -343,6 +349,8 @@ static FactoryResult snapshot_size_unvalidated(
         || !section_size_valid(simulation->steam_condensers.count,16U,0U)
         || !section_size_valid(simulation->research_labs.count,16U,0U)
         || !section_size_valid(simulation->construction_depots.count,16U,0U)
+        || !section_size_valid(simulation->rails.count,16U,0U)
+        || !section_size_valid(simulation->rail_stations.count,16U,0U)
         || size > UINT64_MAX) {
         return FACTORY_RESULT_SNAPSHOT_SIZE_OVERFLOW;
     }
@@ -394,6 +402,9 @@ static bool entity_has_subsystem(
     const FactoryConstructionDepot *construction_depot=
         factory_construction_depot_store_find(
             &simulation->construction_depots,id);
+    const FactoryRail *rail=factory_rail_store_find(&simulation->rails,id);
+    const FactoryRailStation *rail_station=
+        factory_rail_station_store_find(&simulation->rail_stations,id);
     const FactorySolarGenerator *solar_generator =
         factory_solar_generator_store_find(&simulation->solar_generators, id);
     const FactoryAccumulator *accumulator =
@@ -420,6 +431,8 @@ static bool entity_has_subsystem(
     found += steam_condenser != NULL;
     found += research_lab != NULL;
     found += construction_depot != NULL;
+    found += rail != NULL;
+    found += rail_station != NULL;
     if (steam_engine != NULL && generator != NULL) --found;
     if (steam_turbine != NULL && generator != NULL) --found;
     if (solar_generator != NULL && generator != NULL) --found;
@@ -457,6 +470,10 @@ static bool entity_has_subsystem(
         *out_x=steam_condenser->x; *out_y=steam_condenser->y;
     } else if (research_lab != NULL) {
         *out_x=research_lab->x; *out_y=research_lab->y;
+    } else if(rail!=NULL){
+        *out_x=rail->x;*out_y=rail->y;
+    } else if(rail_station!=NULL){
+        *out_x=rail_station->x;*out_y=rail_station->y;
     } else if(construction_depot!=NULL){
         *out_x=construction_depot->x;*out_y=construction_depot->y;
     } else if (solar_generator != NULL) {
@@ -578,6 +595,7 @@ static FactoryResult validate_simulation(
         + simulation->steam_condensers.count
         + simulation->research_labs.count
         + simulation->construction_depots.count
+        + simulation->rails.count + simulation->rail_stations.count
         + simulation->solar_generators.count
         + simulation->accumulators.count
         + simulation->reactors.count
@@ -784,6 +802,18 @@ static FactoryResult validate_simulation(
             &simulation->construction_depots.items[index];
         if(depot->material_quantity>FACTORY_CONSTRUCTION_DEPOT_CAPACITY)
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
+    for(index=0U;index<simulation->rails.count;++index){
+        const FactoryRail*r=&simulation->rails.items[index];
+        if(!factory_rail_geometry_is_valid(r->geometry)
+            ||factory_world_get_terrain(simulation->world,r->x,r->y)
+                !=FACTORY_TERRAIN_GROUND)return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
+    for(index=0U;index<simulation->rail_stations.count;++index){
+        const FactoryRailStation*st=&simulation->rail_stations.items[index];
+        if(!direction_valid((uint32_t)st->orientation)
+            ||factory_world_get_terrain(simulation->world,st->x,st->y)
+                !=FACTORY_TERRAIN_GROUND)return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
     for (index = 0U; index < simulation->power_generators.count; ++index) {
         const FactoryPowerGenerator *generator =
@@ -1148,7 +1178,7 @@ static FactoryResult validate_simulation(
         const FactoryCommandResult *value = &simulation->results[index];
         if (!snapshot_command_valid(&value->command)
             || value->result > FACTORY_RESULT_CONSTRUCTION_DEPOT_NOT_EMPTY
-            || value->entity_type > FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT
+            || value->entity_type > FACTORY_ENTITY_TYPE_RAIL_STATION
             || value->previous_assembler_recipe
                 >= FACTORY_ASSEMBLER_RECIPE_COUNT
             || value->new_assembler_recipe
@@ -1311,6 +1341,14 @@ static void write_command(
             fields[0]=(uint32_t)command->data.place_construction_depot.x;
             fields[1]=(uint32_t)command->data.place_construction_depot.y;
             break;
+        case FACTORY_COMMAND_PLACE_RAIL:
+            fields[0]=(uint32_t)command->data.place_rail.x;
+            fields[1]=(uint32_t)command->data.place_rail.y;
+            fields[2]=command->data.place_rail.geometry;break;
+        case FACTORY_COMMAND_PLACE_RAIL_STATION:
+            fields[0]=(uint32_t)command->data.place_rail_station.x;
+            fields[1]=(uint32_t)command->data.place_rail_station.y;
+            fields[2]=command->data.place_rail_station.orientation;break;
     }
     write_u32(writer, (uint32_t)command->type);
     for (index = 0U; index < 5U; ++index) {
@@ -1333,7 +1371,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             return false;
         }
     }
-    if (type > FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT) {
+    if (type > FACTORY_COMMAND_PLACE_RAIL_STATION) {
         return false;
     }
     command->type = (FactoryCommandType)type;
@@ -1350,6 +1388,8 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             case FACTORY_COMMAND_PLACE_INSERTER:
             case FACTORY_COMMAND_FLUID_INSERT:
             case FACTORY_COMMAND_FLUID_TRANSFER:
+            case FACTORY_COMMAND_PLACE_RAIL:
+            case FACTORY_COMMAND_PLACE_RAIL_STATION:
                 used = 3U;
                 break;
             case FACTORY_COMMAND_PLACE_STORAGE:
@@ -1538,6 +1578,15 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             command->data.place_construction_depot.x=(int32_t)fields[0];
             command->data.place_construction_depot.y=(int32_t)fields[1];
             break;
+        case FACTORY_COMMAND_PLACE_RAIL:
+            command->data.place_rail.x=(int32_t)fields[0];
+            command->data.place_rail.y=(int32_t)fields[1];
+            command->data.place_rail.geometry=fields[2];break;
+        case FACTORY_COMMAND_PLACE_RAIL_STATION:
+            command->data.place_rail_station.x=(int32_t)fields[0];
+            command->data.place_rail_station.y=(int32_t)fields[1];
+            command->data.place_rail_station.orientation=
+                (FactoryDirection)fields[2];break;
     }
     return snapshot_command_valid(command);
 }
@@ -1968,6 +2017,21 @@ static void write_snapshot(
             &simulation->construction_depots.items[index];
         write_u32(writer,value->entity_id);write_i32(writer,value->x);
         write_i32(writer,value->y);write_u32(writer,value->material_quantity);
+    }
+
+    write_section_header(writer,SNAPSHOT_SECTION_RAILS,simulation->rails.count,
+        simulation->rails.count*16U);
+    for(index=0U;index<simulation->rails.count;++index){
+        const FactoryRail*v=&simulation->rails.items[index];
+        write_u32(writer,v->entity_id);write_i32(writer,v->x);
+        write_i32(writer,v->y);write_u32(writer,v->geometry);
+    }
+    write_section_header(writer,SNAPSHOT_SECTION_RAIL_STATIONS,
+        simulation->rail_stations.count,simulation->rail_stations.count*16U);
+    for(index=0U;index<simulation->rail_stations.count;++index){
+        const FactoryRailStation*v=&simulation->rail_stations.items[index];
+        write_u32(writer,v->entity_id);write_i32(writer,v->x);
+        write_i32(writer,v->y);write_u32(writer,v->orientation);
     }
 
     write_section_header(
@@ -2663,6 +2727,27 @@ static bool load_sections(
             return false;
     }
 
+    if(!read_section_header(reader,SNAPSHOT_SECTION_RAILS,16U,0U,&count)
+        ||!allocate_records((void**)&simulation->rails.items,count,
+            sizeof(FactoryRail)))return false;
+    simulation->rails.count=count;simulation->rails.capacity=count;
+    for(index=0U;index<count;++index){FactoryRail*v=&simulation->rails.items[index];
+        if(!read_u32(reader,&v->entity_id)||!read_i32(reader,&v->x)
+            ||!read_i32(reader,&v->y)||!read_u32(reader,&value)
+            ||!factory_rail_geometry_is_valid((FactoryRailGeometry)value))return false;
+        v->geometry=(FactoryRailGeometry)value;
+    }
+    if(!read_section_header(reader,SNAPSHOT_SECTION_RAIL_STATIONS,16U,0U,&count)
+        ||!allocate_records((void**)&simulation->rail_stations.items,count,
+            sizeof(FactoryRailStation)))return false;
+    simulation->rail_stations.count=count;simulation->rail_stations.capacity=count;
+    for(index=0U;index<count;++index){FactoryRailStation*v=&simulation->rail_stations.items[index];
+        if(!read_u32(reader,&v->entity_id)||!read_i32(reader,&v->x)
+            ||!read_i32(reader,&v->y)||!read_u32(reader,&value)
+            ||!direction_valid(value))return false;
+        v->orientation=(FactoryDirection)value;
+    }
+
     if (!read_section_header(
             reader, SNAPSHOT_SECTION_COMMANDS, 24U, 0U, &count)
         || count > FACTORY_COMMAND_QUEUE_CAPACITY) {
@@ -2855,6 +2940,9 @@ FactoryResult factory_simulation_load_snapshot(
         factory_simulation_destroy(simulation);
         return result;
     }
+    simulation->rail_topology.dirty=true;
+    result=factory_rail_topology_rebuild(simulation);
+    if(result!=FACTORY_RESULT_OK){factory_simulation_destroy(simulation);return result;}
     *out_simulation = simulation;
     return FACTORY_RESULT_OK;
 }

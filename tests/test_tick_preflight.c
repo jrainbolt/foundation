@@ -70,6 +70,9 @@ static void test_each_topology_failure(void)
         {.place_pipe={2,2}}},9U,FACTORY_ENTITY_TYPE_PIPE);
     verify_failure_and_retry((FactoryCommand){FACTORY_COMMAND_PLACE_HEAT_CONDUCTOR,
         {.place_heat_conductor={2,2}}},14U,FACTORY_ENTITY_TYPE_HEAT_CONDUCTOR);
+    verify_failure_and_retry((FactoryCommand){FACTORY_COMMAND_PLACE_RAIL,
+        {.place_rail={2,2,FACTORY_RAIL_HORIZONTAL}}},16U,
+        FACTORY_ENTITY_TYPE_RAIL);
 }
 
 static void test_combined_batch_is_all_or_nothing(void)

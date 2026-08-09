@@ -54,7 +54,9 @@ typedef enum {
     FACTORY_COMMAND_PLACE_STEAM_CONDENSER,
     FACTORY_COMMAND_SELECT_RESEARCH,
     FACTORY_COMMAND_PLACE_RESEARCH_LAB,
-    FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT
+    FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT,
+    FACTORY_COMMAND_PLACE_RAIL,
+    FACTORY_COMMAND_PLACE_RAIL_STATION
 } FactoryCommandType;
 
 typedef struct {
@@ -160,6 +162,9 @@ typedef struct {
         struct { FactoryTechnologyId technology_id; } select_research;
         struct { int32_t x; int32_t y; } place_research_lab;
         struct { int32_t x; int32_t y; } place_construction_depot;
+        struct { int32_t x; int32_t y; uint32_t geometry; } place_rail;
+        struct { int32_t x; int32_t y; FactoryDirection orientation; }
+            place_rail_station;
     } data;
 } FactoryCommand;
 

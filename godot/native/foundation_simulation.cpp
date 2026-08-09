@@ -97,6 +97,10 @@ FactoryCommand place(
     case FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT:
         command.data.place_construction_depot={x,y};
         break;
+    case FACTORY_COMMAND_PLACE_RAIL:
+        command.data.place_rail={x,y,(uint32_t)first};break;
+    case FACTORY_COMMAND_PLACE_RAIL_STATION:
+        command.data.place_rail_station={x,y,first};break;
     default:
         break;
     }
@@ -614,10 +618,12 @@ int64_t FoundationSimulation::queue_place_entity(
     int64_t entity_type,int64_t x,int64_t y,int64_t direction)
 {
     if (simulation_==nullptr || entity_type<=FACTORY_ENTITY_TYPE_NONE
-        || entity_type>FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT
+        || entity_type>FACTORY_ENTITY_TYPE_RAIL_STATION
         || x<INT32_MIN || x>INT32_MAX || y<INT32_MIN || y>INT32_MAX
-        || direction<FACTORY_DIRECTION_NORTH
-        || direction>FACTORY_DIRECTION_WEST)
+        || direction<0
+        || (entity_type==FACTORY_ENTITY_TYPE_RAIL
+            ?direction>=FACTORY_RAIL_GEOMETRY_COUNT
+            :direction>FACTORY_DIRECTION_WEST))
         return FACTORY_RESULT_INVALID_ARGUMENT;
     FactoryCommandType command_type;
     switch ((FactoryEntityType)entity_type) {
@@ -644,6 +650,8 @@ int64_t FoundationSimulation::queue_place_entity(
     case FACTORY_ENTITY_TYPE_STEAM_CONDENSER: command_type=FACTORY_COMMAND_PLACE_STEAM_CONDENSER;break;
     case FACTORY_ENTITY_TYPE_RESEARCH_LAB: command_type=FACTORY_COMMAND_PLACE_RESEARCH_LAB;break;
     case FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT: command_type=FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT;break;
+    case FACTORY_ENTITY_TYPE_RAIL: command_type=FACTORY_COMMAND_PLACE_RAIL;break;
+    case FACTORY_ENTITY_TYPE_RAIL_STATION: command_type=FACTORY_COMMAND_PLACE_RAIL_STATION;break;
     default:return FACTORY_RESULT_INVALID_ARGUMENT;
     }
     FactoryCommand command=place(command_type,(int32_t)x,(int32_t)y,
@@ -1324,6 +1332,20 @@ bool FoundationSimulation::entity_to_dictionary(
         value["supply_radius"]=(int64_t)
             entity.data.construction_depot.supply_radius;
         break;
+    case FACTORY_ENTITY_TYPE_RAIL: {
+        value["rail_geometry"]=(int64_t)entity.data.rail.geometry;
+        value["port_mask"]=(int64_t)entity.data.rail.port_mask;
+        value["connection_mask"]=(int64_t)entity.data.rail.connection_mask;
+        value["rail_network_id"]=(int64_t)entity.data.rail.network_id;
+        Array neighbors;for(size_t i=0U;i<FACTORY_RAIL_NEIGHBOR_COUNT;++i)
+            neighbors.append((int64_t)entity.data.rail.neighbors[i]);
+        value["rail_neighbors"]=neighbors;break;
+    }
+    case FACTORY_ENTITY_TYPE_RAIL_STATION:
+        value["attached_rail_id"]=(int64_t)
+            entity.data.rail_station.attached_rail_id;
+        value["rail_network_id"]=(int64_t)entity.data.rail_station.network_id;
+        value["rail_connected"]=entity.data.rail_station.connected;break;
     default:
         break;
     }

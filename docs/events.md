@@ -106,3 +106,10 @@ changes a deposit from positive quantity to zero. It follows that cycle's
 `FACTORY_EVENT_PRODUCTION_COMPLETED`; `entity_id` is the extractor,
 `resource_type` is the deposit type, and `x`/`y` are world coordinates.
 Deposits have no synthetic entity IDs.
+
+# Rail infrastructure
+
+Successful rail and Rail Station placement/demolition emits the ordinary
+construction/demolition event at the FIFO commit point. This milestone adds no
+bespoke topology events, so rebuilds and snapshot loads produce no rail event
+noise.

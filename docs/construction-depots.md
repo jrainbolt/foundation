@@ -36,3 +36,8 @@ derived and transient.
 This establishes physical remote-outpost supply without train-specific state.
 Future rail logistics can transport the same ordinary construction item to
 distant depots.
+
+Static rails and Rail Stations use this physical supply path. Each tile is an
+independent transaction: a rail costs 2 units and a station costs 30, selected
+from the lowest-ID eligible depot. There is no free or bulk-build discount and
+failed validation consumes nothing.

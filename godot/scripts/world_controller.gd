@@ -40,7 +40,7 @@ func enter_demolish_mode() -> void:
 
 func rotate_build() -> void:
 	if mode == InteractionMode.BUILD:
-		build_direction = (build_direction + 1) % 4
+		build_direction = (build_direction + 1) % (6 if build_entity_type == 24 else 4)
 		queue_redraw()
 
 func preview_is_advisably_valid() -> bool:
@@ -164,9 +164,16 @@ func _draw() -> void:
 		draw_rect(preview,color,true)
 		draw_rect(preview,color.lightened(0.35),false,3.0)
 		draw_string(ThemeDB.fallback_font,preview.position+Vector2(5,18),"BUILD %d" % build_entity_type,HORIZONTAL_ALIGNMENT_LEFT,-1,11)
-		var vectors := [Vector2.UP,Vector2.RIGHT,Vector2.DOWN,Vector2.LEFT]
 		var center := preview.get_center()
-		draw_line(center,center+vectors[build_direction]*20.0,Color.WHITE,3.0)
+		var vectors := [Vector2.UP,Vector2.RIGHT,Vector2.DOWN,Vector2.LEFT]
+		if build_entity_type == 24:
+			var rail_masks := [10,5,3,9,6,12]
+			var mask: int = rail_masks[build_direction]
+			for index in range(4):
+				if mask & (1 << index):
+					draw_line(center,center+vectors[index]*36.0,Color.WHITE,5.0)
+		else:
+			draw_line(center,center+vectors[build_direction]*20.0,Color.WHITE,3.0)
 	elif mode == InteractionMode.DEMOLISH:
 		draw_line(grid_to_world(hovered_grid)+Vector2(12,12),grid_to_world(hovered_grid)+Vector2(52,52),Color("#ff6868"),5.0)
 		draw_line(grid_to_world(hovered_grid)+Vector2(52,12),grid_to_world(hovered_grid)+Vector2(12,52),Color("#ff6868"),5.0)

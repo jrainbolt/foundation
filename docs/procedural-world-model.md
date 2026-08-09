@@ -45,3 +45,8 @@ The demo uses generated coherent Water, Rock, and finite resource patches,
 while retaining its deterministic systems factory inside the protected core.
 Movement costs, biomes, chunks, hidden generation state, and renderer assets
 remain deliberately deferred.
+
+Rails and Rail Stations use the same authoritative buildability rule: Ground
+is allowed, while Water and Rock are blocked. Generated geography therefore
+constrains manual remote corridors without bridges, excavation, automatic
+routing, or terrain mutation.

@@ -268,3 +268,16 @@ legacy controller-science command. The Lab is buildable, selectable,
 inspectable, and demolishable through the existing command bridge. The
 sidebar, top controls, and build panel derive their widths from the logical
 viewport, so high-DPI and larger windows retain the same information hierarchy.
+
+## Static rails
+
+The build catalog includes Rail and Rail Station. Select Rail and press `R` to
+cycle through horizontal, vertical, and the four curve geometries; the preview
+draws the exact ports edge-to-edge. Stations retain four cardinal rotations,
+where orientation identifies the neighboring rail Foundation requires.
+
+Rails render as specialized line geometry and stations as platform shapes with
+connected/disconnected state. Their inspectors use only renderer-neutral
+presentation fields: geometry, masks, cardinal neighbors, attached rail, and
+lowest-ID rail network. Foundation remains authoritative for terrain,
+occupancy, physical construction supply, and attachment.

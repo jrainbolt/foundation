@@ -60,3 +60,8 @@ or presentation snapshots.
 Future content additions extend the fixed tables and their validators. Runtime
 registration, dynamic strings, plugins, balancing, unlock enforcement, and UI
 remain outside this layer.
+
+Rail and Rail Station definitions own their provisional construction costs (2
+and 30 construction material), one-cell footprints, and role metadata.
+Geometry and station orientation are authoritative per-entity state; derived
+rail ports and topology are not immutable content records.

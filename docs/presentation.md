@@ -135,3 +135,8 @@ This milestone intentionally performs a complete rebuild. That is simpler and
 safer than maintaining a second mutable mirror, at the cost of allocation and
 copying proportional to the current world and entity counts. A future
 milestone may add deltas, but no dirty tracking or delta contract exists now.
+
+Rail presentation exposes geometry, derived port/connection masks, network ID,
+and neighbors in North/East/South/West order. Rail Station presentation exposes
+orientation, attached rail, network ID, and connected state. Frontends do not
+calculate authoritative attachment or connectivity; no train fields exist.

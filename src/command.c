@@ -1,4 +1,5 @@
 #include "foundation/command.h"
+#include "foundation/rail.h"
 
 #include <stddef.h>
 
@@ -70,6 +71,12 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
         case FACTORY_COMMAND_PLACE_RESEARCH_LAB:
         case FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT:
             return true;
+        case FACTORY_COMMAND_PLACE_RAIL:
+            return factory_rail_geometry_is_valid(
+                (FactoryRailGeometry)command->data.place_rail.geometry);
+        case FACTORY_COMMAND_PLACE_RAIL_STATION:
+            direction=command->data.place_rail_station.orientation;
+            break;
         case FACTORY_COMMAND_INSERT_REACTOR_FUEL:
             return command->data.insert_reactor_fuel.reactor_entity_id != 0U
                 && factory_nuclear_fuel_definition_get(
