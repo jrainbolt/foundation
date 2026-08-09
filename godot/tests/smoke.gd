@@ -56,6 +56,10 @@ func _initialize() -> void:
 		and simulation.has_method("queue_place_cargo_wagon")
 		and simulation.has_method("queue_couple_rear_wagon")
 		and simulation.has_method("queue_decouple_rear_wagon")
+		and simulation.has_method("queue_set_train_destination")
+		and simulation.has_method("queue_clear_train_destination")
+		and simulation.has_method("queue_replan_train_route")
+		and simulation.has_method("get_train_route")
 		and simulation.has_method("get_command_results")
 		and simulation.get_build_catalog().size() == 28
 		and simulation.get_assembler_recipe_catalog().size() == 4
@@ -129,7 +133,10 @@ func _initialize() -> void:
 		and int(locomotive.movement_interval) == 4
 		and int(locomotive.rail_network_id) == 54
 		and int(locomotive.train_id) == 63
-		and int(locomotive.vehicle_count) == 3,
+		and int(locomotive.vehicle_count) == 3
+		and int(locomotive.destination_station_id) == 0
+		and int(locomotive.route_status) == 0
+		and simulation.get_train_route(63).is_empty(),
 		"locomotive presentation: %s" % locomotive
 	):
 		return

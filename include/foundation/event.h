@@ -57,7 +57,10 @@ typedef enum {
     FACTORY_EVENT_RAIL_SWITCH_CHANGED,
     FACTORY_EVENT_LOCOMOTIVE_MOVED,
     FACTORY_EVENT_RAIL_VEHICLES_COUPLED,
-    FACTORY_EVENT_RAIL_VEHICLES_DECOUPLED
+    FACTORY_EVENT_RAIL_VEHICLES_DECOUPLED,
+    FACTORY_EVENT_TRAIN_DESTINATION_CHANGED,
+    FACTORY_EVENT_TRAIN_ROUTE_INVALIDATED,
+    FACTORY_EVENT_TRAIN_ARRIVED
 } FactoryEventType;
 
 /*
@@ -116,6 +119,12 @@ typedef enum {
  * previous branch, and related_quantity is the newly selected branch.
  * locomotive moved: entity_id identifies the locomotive, related_entity_id
  * is the previous rail entity, and quantity is the new rail entity ID.
+ * train destination changed: entity_id is the train, related_entity_id is the
+ * new station (zero when cleared), and quantity is the previous station.
+ * train route invalidated: entity_id is the train, related_entity_id is its
+ * retained destination, and quantity is the failing next rail when available.
+ * train arrived: entity_id is the train, related_entity_id is the station, and
+ * quantity is the station attachment rail occupied by the locomotive.
  *
  * tick is the simulation tick at the start of the step that emitted the
  * event. Item-transfer quantity is currently one. Successful requests for an

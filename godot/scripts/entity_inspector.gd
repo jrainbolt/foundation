@@ -4,6 +4,7 @@ extends PanelContainer
 signal assembler_recipe_requested(entity_id: int,recipe_id: int)
 signal storage_output_requested(entity_id: int,item_type: int)
 signal rail_switch_branch_requested(entity_id: int,branch: int)
+signal train_destination_requested(entity_id: int,station_id: int)
 
 const Format := preload("res://scripts/presentation_format.gd")
 @onready var title_label: Label = %InspectorTitle
@@ -13,6 +14,7 @@ const Format := preload("res://scripts/presentation_format.gd")
 var entity_id := 0
 var recipe_catalog: Array = []
 var item_catalog: Array = []
+var station_catalog: Array = []
 var configuring := false
 
 func _ready() -> void:
@@ -21,6 +23,9 @@ func _ready() -> void:
 func configure_catalogs(recipes: Array,items: Array) -> void:
 	recipe_catalog = recipes.duplicate(true)
 	item_catalog = items.duplicate(true)
+
+func configure_stations(stations: Array) -> void:
+	station_catalog = stations.duplicate(true)
 
 func clear_entity() -> void:
 	entity_id = 0
@@ -79,6 +84,10 @@ func show_entity(state: Dictionary) -> void:
 	if state.has("locomotive_activity"): field(lines,"Locomotive activity",str(int(state.locomotive_activity)))
 	if state.has("train_id"): field(lines,"Train ID","#%d" % int(state.train_id))
 	if state.has("vehicle_count"): field(lines,"Vehicle count",str(int(state.vehicle_count)))
+	if state.has("destination_station_id"): field(lines,"Destination","None" if int(state.destination_station_id) == 0 else "Station #%d" % int(state.destination_station_id))
+	if state.has("route_status"): field(lines,"Route status",["NONE","ACTIVE","ARRIVED","INVALID"][clampi(int(state.route_status),0,3)])
+	if state.has("route_length"): field(lines,"Route progress","%d / %d" % [int(state.get("route_index",0)),maxi(0,int(state.route_length)-1)])
+	if state.has("next_planned_rail_id"): field(lines,"Next planned rail","#%d" % int(state.next_planned_rail_id))
 	if state.has("consist_index"): field(lines,"Consist index",str(int(state.consist_index)))
 	if state.has("coupled"): field(lines,"Coupled",Format.yes_no(bool(state.coupled)))
 	if state.has("recipe") or state.has("progress") or state.has("duration"):
@@ -163,6 +172,17 @@ func _show_configuration(type_id: int,state: Dictionary) -> void:
 			configuration_selector.set_item_metadata(branch,branch)
 			if branch == int(state.get("selected_branch",0)):
 				configuration_selector.select(branch)
+	elif type_id == 27:
+		configuration_label.text = "Train destination"
+		configuration_selector.add_item("None")
+		configuration_selector.set_item_metadata(0,0)
+		for station: Dictionary in station_catalog:
+			var index := configuration_selector.item_count
+			var station_id := int(station.get("id",0))
+			configuration_selector.add_item("Station #%d" % station_id)
+			configuration_selector.set_item_metadata(index,station_id)
+			if station_id == int(state.get("destination_station_id",0)):
+				configuration_selector.select(index)
 	else:
 		_hide_configuration()
 		configuring = false
@@ -178,5 +198,7 @@ func _on_configuration_selected(index: int) -> void:
 		assembler_recipe_requested.emit(entity_id,value)
 	elif configuration_label.text == "Rail switch branch":
 		rail_switch_branch_requested.emit(entity_id,value)
+	elif configuration_label.text == "Train destination":
+		train_destination_requested.emit(entity_id,value)
 	else:
 		storage_output_requested.emit(entity_id,value)

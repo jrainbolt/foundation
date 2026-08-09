@@ -84,6 +84,9 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
         case FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH:
         case FACTORY_COMMAND_COUPLE_REAR_WAGON:
         case FACTORY_COMMAND_DECOUPLE_REAR_WAGON:
+        case FACTORY_COMMAND_SET_TRAIN_DESTINATION:
+        case FACTORY_COMMAND_CLEAR_TRAIN_DESTINATION:
+        case FACTORY_COMMAND_REPLAN_TRAIN_ROUTE:
             break;
         default:
             ++additions;

@@ -47,13 +47,28 @@ typedef FactoryEntityId FactoryTrainId;
 #define FACTORY_RAIL_NEIGHBOR_COUNT 4U
 #define FACTORY_LOCOMOTIVE_MOVE_TICKS 4U
 #define FACTORY_CARGO_WAGON_CAPACITY 100U
+#define FACTORY_TRAIN_ROUTE_MAX_STEPS 4096U
+
+typedef enum {
+    FACTORY_TRAIN_ROUTE_NONE = 0,
+    FACTORY_TRAIN_ROUTE_ACTIVE,
+    FACTORY_TRAIN_ROUTE_ARRIVED,
+    FACTORY_TRAIN_ROUTE_INVALID
+} FactoryTrainRouteStatus;
+
+typedef struct {
+    FactoryEntityId rail_entity_id;
+    FactoryDirection entry_direction;
+} FactoryTrainRouteStep;
 
 typedef enum {
     FACTORY_LOCOMOTIVE_MOVING=0,
     FACTORY_LOCOMOTIVE_BLOCKED_TRACK,
     FACTORY_LOCOMOTIVE_BLOCKED_SWITCH,
     FACTORY_LOCOMOTIVE_BLOCKED_OCCUPIED,
-    FACTORY_LOCOMOTIVE_DISCONNECTED
+    FACTORY_LOCOMOTIVE_DISCONNECTED,
+    FACTORY_LOCOMOTIVE_ARRIVED,
+    FACTORY_LOCOMOTIVE_ROUTE_INVALID
 } FactoryLocomotiveActivity;
 
 typedef struct {
@@ -69,6 +84,11 @@ typedef struct {
     FactoryLocomotiveActivity activity;
     FactoryTrainId train_id;
     uint32_t vehicle_count;
+    FactoryEntityId destination_station_id;
+    FactoryTrainRouteStatus route_status;
+    uint32_t route_length;
+    uint32_t route_index;
+    FactoryEntityId next_planned_rail_id;
 } FactoryLocomotiveInspection;
 
 typedef struct {
@@ -168,5 +188,7 @@ FactoryResult factory_simulation_cargo_wagon_remove(FactorySimulation *simulatio
     FactoryEntityId id,FactoryItemType item,uint32_t quantity);
 FactoryEntityId factory_simulation_get_rail_vehicle_occupant(
     const FactorySimulation *simulation,FactoryEntityId rail_entity_id);
+bool factory_simulation_get_train_route_step(const FactorySimulation *simulation,
+    FactoryTrainId train_id,size_t index,FactoryTrainRouteStep *out_step);
 
 #endif

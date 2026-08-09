@@ -101,6 +101,13 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
                 &&command->data.couple_rear_wagon.wagon_entity_id!=0U;
         case FACTORY_COMMAND_DECOUPLE_REAR_WAGON:
             return command->data.decouple_rear_wagon.locomotive_entity_id!=0U;
+        case FACTORY_COMMAND_SET_TRAIN_DESTINATION:
+            return command->data.set_train_destination.train_id!=0U
+                &&command->data.set_train_destination.station_entity_id!=0U;
+        case FACTORY_COMMAND_CLEAR_TRAIN_DESTINATION:
+            return command->data.clear_train_destination.train_id!=0U;
+        case FACTORY_COMMAND_REPLAN_TRAIN_ROUTE:
+            return command->data.replan_train_route.train_id!=0U;
         case FACTORY_COMMAND_INSERT_REACTOR_FUEL:
             return command->data.insert_reactor_fuel.reactor_entity_id != 0U
                 && factory_nuclear_fuel_definition_get(

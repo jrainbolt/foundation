@@ -8,6 +8,11 @@ var entity_nodes: Dictionary = {}
 var resources: Array = []
 var edges: Array = []
 var terrain: Array = []
+var selected_route: Array = []
+
+func set_selected_route(route: Array) -> void:
+	selected_route = route.duplicate(true)
+	queue_redraw()
 
 func terrain_is_buildable(grid: Vector2i) -> bool:
 	for cell: Dictionary in terrain:
@@ -77,8 +82,17 @@ func _draw() -> void:
 		var a: FoundationEntityVisual = entity_nodes.get(int(edge.a))
 		var b: FoundationEntityVisual = entity_nodes.get(int(edge.b))
 		if a != null and b != null:
-			draw_line(
+				draw_line(
 				a.position + Vector2(38, 38),
 				b.position + Vector2(38, 38),
 				Color("#f2d95c", 0.9), 4.0
-			)
+				)
+	if selected_route.size() > 1:
+		for index in range(selected_route.size() - 1):
+			var a_id := int(selected_route[index].rail_entity_id)
+			var b_id := int(selected_route[index + 1].rail_entity_id)
+			var a: FoundationEntityVisual = entity_nodes.get(a_id)
+			var b: FoundationEntityVisual = entity_nodes.get(b_id)
+			if a != null and b != null:
+				draw_line(a.position + Vector2(38,38),b.position + Vector2(38,38),
+					Color("#72e6ff",0.9),5.0)

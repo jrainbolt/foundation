@@ -304,6 +304,11 @@ typedef struct {
     FactoryLocomotiveActivity activity;
     FactoryTrainId train_id;
     uint32_t vehicle_count;
+    FactoryEntityId destination_station_id;
+    FactoryTrainRouteStatus route_status;
+    uint32_t route_length;
+    uint32_t route_index;
+    FactoryEntityId next_planned_rail_id;
 } FactoryPresentationLocomotive;
 
 typedef struct {

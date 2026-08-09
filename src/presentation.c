@@ -620,7 +620,9 @@ static FactoryResult populate_entity(
             inspection.travel_direction,inspection.movement_progress,
             inspection.movement_interval,inspection.next_rail_id,
             inspection.network_id,inspection.activity,inspection.train_id,
-            inspection.vehicle_count};
+            inspection.vehicle_count,inspection.destination_station_id,
+            inspection.route_status,inspection.route_length,
+            inspection.route_index,inspection.next_planned_rail_id};
     } else if(cargo_wagon!=NULL){FactoryCargoWagonInspection inspection;
         if(!factory_simulation_get_cargo_wagon(simulation,id,&inspection))
             return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;

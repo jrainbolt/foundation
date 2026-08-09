@@ -225,6 +225,14 @@ void FoundationSimulation::_bind_methods()
         &FoundationSimulation::queue_couple_rear_wagon);
     ClassDB::bind_method(D_METHOD("queue_decouple_rear_wagon","locomotive_id"),
         &FoundationSimulation::queue_decouple_rear_wagon);
+    ClassDB::bind_method(D_METHOD("queue_set_train_destination","train_id","station_id"),
+        &FoundationSimulation::queue_set_train_destination);
+    ClassDB::bind_method(D_METHOD("queue_clear_train_destination","train_id"),
+        &FoundationSimulation::queue_clear_train_destination);
+    ClassDB::bind_method(D_METHOD("queue_replan_train_route","train_id"),
+        &FoundationSimulation::queue_replan_train_route);
+    ClassDB::bind_method(D_METHOD("get_train_route","train_id"),
+        &FoundationSimulation::get_train_route);
     ClassDB::bind_method(D_METHOD("get_command_results"),
         &FoundationSimulation::get_command_results);
     ClassDB::bind_method(D_METHOD("get_build_catalog"),
@@ -792,6 +800,50 @@ int64_t FoundationSimulation::queue_place_locomotive(
     command.data.place_locomotive={(FactoryEntityId)rail_entity_id,
         (FactoryDirection)direction};
     return factory_simulation_submit_command(simulation_,&command);
+}
+
+int64_t FoundationSimulation::queue_set_train_destination(
+    int64_t train_id,int64_t station_id)
+{
+    if(simulation_==nullptr||train_id<=0||train_id>UINT32_MAX
+        ||station_id<=0||station_id>UINT32_MAX)return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};command.type=FACTORY_COMMAND_SET_TRAIN_DESTINATION;
+    command.data.set_train_destination={(FactoryEntityId)train_id,
+        (FactoryEntityId)station_id};
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
+int64_t FoundationSimulation::queue_clear_train_destination(int64_t train_id)
+{
+    if(simulation_==nullptr||train_id<=0||train_id>UINT32_MAX)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};command.type=FACTORY_COMMAND_CLEAR_TRAIN_DESTINATION;
+    command.data.clear_train_destination={(FactoryEntityId)train_id};
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
+int64_t FoundationSimulation::queue_replan_train_route(int64_t train_id)
+{
+    if(simulation_==nullptr||train_id<=0||train_id>UINT32_MAX)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};command.type=FACTORY_COMMAND_REPLAN_TRAIN_ROUTE;
+    command.data.replan_train_route={(FactoryEntityId)train_id};
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
+Array FoundationSimulation::get_train_route(int64_t train_id) const
+{
+    Array route;if(simulation_==nullptr||train_id<=0||train_id>UINT32_MAX)return route;
+    FactoryLocomotiveInspection locomotive;
+    if(!factory_simulation_get_locomotive(simulation_,(FactoryEntityId)train_id,
+            &locomotive))return route;
+    for(size_t i=0U;i<locomotive.route_length;++i){FactoryTrainRouteStep step;
+        if(!factory_simulation_get_train_route_step(simulation_,
+                (FactoryTrainId)train_id,i,&step))break;
+        Dictionary value;value["rail_entity_id"]=(int64_t)step.rail_entity_id;
+        value["entry_direction"]=(int64_t)step.entry_direction;route.append(value);
+    }
+    return route;
 }
 
 int64_t FoundationSimulation::queue_place_cargo_wagon(
@@ -1492,6 +1544,11 @@ bool FoundationSimulation::entity_to_dictionary(
         value["locomotive_activity"]=(int64_t)entity.data.locomotive.activity;
         value["train_id"]=(int64_t)entity.data.locomotive.train_id;
         value["vehicle_count"]=(int64_t)entity.data.locomotive.vehicle_count;
+        value["destination_station_id"]=(int64_t)entity.data.locomotive.destination_station_id;
+        value["route_status"]=(int64_t)entity.data.locomotive.route_status;
+        value["route_length"]=(int64_t)entity.data.locomotive.route_length;
+        value["route_index"]=(int64_t)entity.data.locomotive.route_index;
+        value["next_planned_rail_id"]=(int64_t)entity.data.locomotive.next_planned_rail_id;
         break;
     case FACTORY_ENTITY_TYPE_CARGO_WAGON:
         value["rail_entity_id"]=(int64_t)entity.data.cargo_wagon.rail_entity_id;

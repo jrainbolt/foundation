@@ -925,7 +925,9 @@ static FactoryResult place_locomotive(FactorySimulation*s,
     FactoryEntityId id=factory_entity_create(s->entities);
     if(id==0U)return FACTORY_RESULT_OUT_OF_MEMORY;
     s->locomotives.items[s->locomotives.count++]=(FactoryLocomotive){
-        id,rail_id,entry,0U,FACTORY_LOCOMOTIVE_MOVING,0U,1U};
+        .entity_id=id,.rail_entity_id=rail_id,.entry_direction=entry,
+        .activity=FACTORY_LOCOMOTIVE_MOVING,.vehicle_count=1U,
+        .route_status=FACTORY_TRAIN_ROUTE_NONE};
     *out_id=id;return FACTORY_RESULT_OK;
 }
 
@@ -2144,6 +2146,20 @@ static void apply_commands(FactorySimulation *simulation)
             case FACTORY_COMMAND_DECOUPLE_REAR_WAGON:
                 result->result=decouple_rear_wagon(simulation,&result->command,
                     &result->entity_id);break;
+            case FACTORY_COMMAND_SET_TRAIN_DESTINATION:
+                result->entity_id=result->command.data.set_train_destination.train_id;
+                result->result=factory_train_set_destination(simulation,
+                    result->entity_id,
+                    result->command.data.set_train_destination.station_entity_id,
+                    false);break;
+            case FACTORY_COMMAND_CLEAR_TRAIN_DESTINATION:
+                result->entity_id=result->command.data.clear_train_destination.train_id;
+                result->result=factory_train_clear_destination(simulation,
+                    result->entity_id);break;
+            case FACTORY_COMMAND_REPLAN_TRAIN_ROUTE:
+                result->entity_id=result->command.data.replan_train_route.train_id;
+                result->result=factory_train_set_destination(simulation,
+                    result->entity_id,0U,true);break;
             case FACTORY_COMMAND_SELECT_RESEARCH:
                 result->result=factory_research_select(simulation,
                     result->command.data.select_research.technology_id);

@@ -41,6 +41,7 @@ func _ready() -> void:
 	inspector.assembler_recipe_requested.connect(_on_assembler_recipe_requested)
 	inspector.storage_output_requested.connect(_on_storage_output_requested)
 	inspector.rail_switch_branch_requested.connect(_on_rail_switch_branch_requested)
+	inspector.train_destination_requested.connect(_on_train_destination_requested)
 	_reset_demo()
 	build_toolbar.configure(simulation)
 	inspector.configure_catalogs(
@@ -118,6 +119,13 @@ func _synchronize() -> bool:
 		status_label.text = "Status: %s" % simulation.get_last_error()
 		return false
 	canvas.synchronize(entities, resources, power_edges, terrain)
+	var stations: Array = []
+	for entity: Dictionary in entities:
+		if int(entity.get("type",0)) == 25: stations.append(entity)
+	inspector.configure_stations(stations)
+	var selected_id := int(world_controller.selected_entity_id)
+	canvas.set_selected_route(simulation.get_train_route(selected_id)
+		if selected_id != 0 else [])
 	world_controller.refresh_selection()
 	world_controller.set_hovered_grid(world_controller.hovered_grid)
 	build_toolbar.refresh(simulation)
@@ -233,6 +241,14 @@ func _on_rail_switch_branch_requested(entity_id: int,branch: int) -> void:
 		status_label.text = "Status: %s" % simulation.result_name(queued)
 		return
 	_execute_queued_command("Rail switch branch updated")
+
+func _on_train_destination_requested(entity_id: int,station_id: int) -> void:
+	var queued: int = simulation.queue_clear_train_destination(entity_id) \
+		if station_id == 0 else simulation.queue_set_train_destination(entity_id,station_id)
+	if queued != 0:
+		status_label.text = "Status: %s" % simulation.result_name(queued)
+		return
+	_execute_queued_command("Train destination updated")
 
 func _execute_queued_command(success_message: String) -> void:
 	if not _advance(1): return

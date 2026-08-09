@@ -14,7 +14,9 @@ typedef struct {FactoryRailSwitch *items;size_t count,capacity;}
     FactoryRailSwitchStore;
 typedef struct {FactoryEntityId entity_id,rail_entity_id;FactoryDirection entry_direction;
     uint32_t progress;FactoryLocomotiveActivity activity;
-    FactoryEntityId rear_vehicle_id;uint32_t vehicle_count;} FactoryLocomotive;
+    FactoryEntityId rear_vehicle_id;uint32_t vehicle_count;
+    FactoryEntityId destination_station_id;FactoryTrainRouteStatus route_status;
+    FactoryTrainRouteStep *route;size_t route_length,route_index;} FactoryLocomotive;
 typedef struct {FactoryEntityId entity_id,rail_entity_id;FactoryDirection entry_direction;
     FactoryTrainId train_id;FactoryEntityId previous_vehicle_id,next_vehicle_id;
     FactoryItemType cargo_item;uint32_t cargo_quantity;} FactoryCargoWagon;
@@ -65,6 +67,11 @@ FactoryLocomotive *factory_locomotive_store_find_mutable(
 const FactoryLocomotive *factory_locomotive_store_find(
     const FactoryLocomotiveStore *s,FactoryEntityId id);
 bool factory_locomotive_store_remove(FactoryLocomotiveStore *s,FactoryEntityId id);
+FactoryResult factory_train_set_destination(FactorySimulation *s,
+    FactoryTrainId train_id,FactoryEntityId station_id,bool replan);
+FactoryResult factory_train_clear_destination(FactorySimulation *s,
+    FactoryTrainId train_id);
+bool factory_train_routes_validate(const FactorySimulation *s);
 void factory_cargo_wagon_store_destroy(FactoryCargoWagonStore *s);
 bool factory_cargo_wagon_store_reserve(FactoryCargoWagonStore *s,size_t required);
 FactoryCargoWagon *factory_cargo_wagon_store_find_mutable(
