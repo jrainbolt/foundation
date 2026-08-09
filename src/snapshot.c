@@ -555,6 +555,13 @@ static FactoryResult validate_simulation(
             + simulation->heat_exchangers.count * 2U
             + simulation->steam_condensers.count * 2U)
         return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    if ((!simulation->construction_bootstrap_completed
+            && simulation->construction_depots.count!=0U)
+        || (simulation->construction_bootstrap_completed
+            && (simulation->construction_inventory.units!=0U
+                || simulation->construction_depots.count==0U))) {
+        return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
     if (simulation->power_generators.count
         < simulation->steam_engines.count + simulation->steam_turbines.count
             + simulation->solar_generators.count)
@@ -1557,7 +1564,7 @@ static void write_snapshot(
     write_section_header(writer, SNAPSHOT_SECTION_METADATA, 1U, 60U);
     write_u64(writer, simulation->clock.tick);
     write_u32(writer, simulation->construction_inventory.units);
-    write_u32(writer, 0U);
+    write_u32(writer,simulation->construction_bootstrap_completed?1U:0U);
     write_u32(writer,simulation->research.active);
     write_u64(writer,simulation->research.completed_bits);
     for (index=0U;index<FACTORY_TECHNOLOGY_COUNT;++index) {
@@ -2162,11 +2169,12 @@ static bool load_sections(
         || !read_u64(reader, &tick)
         || !read_u32(reader, &simulation->construction_inventory.units)
         || !read_u32(reader, &reserved)
-        || reserved != 0U
+        || reserved > 1U
         || !read_u32(reader,&simulation->research.active)
         || !read_u64(reader,&simulation->research.completed_bits)) {
         return false;
     }
+    simulation->construction_bootstrap_completed=reserved!=0U;
     for (index=0U;index<FACTORY_TECHNOLOGY_COUNT;++index) {
         FactoryTechnologyProgress *p=&simulation->research.progress[index];
         if (!read_u32(reader,&p->completed_units)

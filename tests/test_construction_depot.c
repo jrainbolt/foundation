@@ -13,6 +13,12 @@ static int failures;
 static const FactoryCommandResult *result_at(const FactorySimulation *s,size_t i)
 {return factory_simulation_get_command_result(s,i);}
 
+static uint32_t distance_u32(int32_t ax,int32_t ay,int32_t bx,int32_t by)
+{
+    int32_t dx=ax-bx,dy=ay-by;
+    return (uint32_t)(dx<0?-dx:dx)+(uint32_t)(dy<0?-dy:dy);
+}
+
 static void test_radius_source_fifo_and_refund(void)
 {
     FactoryWorld *w=factory_world_create(24U,8U);
@@ -135,7 +141,7 @@ static void test_physical_supply_snapshot_and_telemetry(void)
 static void test_multiple_depots_and_nonempty_demolition(void)
 {
     FactoryWorld *w=factory_world_create(20U,8U);
-    FactorySimulation *s=factory_simulation_create_with_construction_units(w,1000U);
+    FactorySimulation *s=factory_simulation_create_with_construction_units(w,525U);
     FactoryCommand first={FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT,
         {.place_construction_depot={1,1}}};
     CHECK(factory_simulation_submit_command(s,&first)==FACTORY_RESULT_OK);
@@ -167,6 +173,247 @@ static void test_multiple_depots_and_nonempty_demolition(void)
     factory_simulation_destroy(s);factory_world_destroy(w);
 }
 
+static void test_bootstrap_lifecycle_and_final_depot(void)
+{
+    FactoryWorld *w=factory_world_create(20U,8U);
+    FactorySimulation *s=factory_simulation_create_with_construction_units(w,
+        FACTORY_CONSTRUCTION_COST_CONSTRUCTION_DEPOT+500U);
+    FactoryCommand depot={FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT,
+        {.place_construction_depot={1,1}}};
+    CHECK(!factory_simulation_construction_bootstrap_completed(s));
+    CHECK(factory_simulation_submit_command(s,&depot)==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    CHECK(result_at(s,0)->result==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_construction_bootstrap_completed(s));
+    CHECK(factory_simulation_construction_units(s)==0U);
+    CHECK(s->construction_depots.count==1U);
+    CHECK(s->construction_depots.items[0].material_quantity==500U);
+
+    /* Emptying the final depot does not make its refund globally owned. */
+    s->construction_depots.items[0].material_quantity=0U;
+    FactoryCommand demolish={FACTORY_COMMAND_DEMOLISH_ENTITY,
+        {.demolish_entity={1U}}};
+    CHECK(factory_simulation_submit_command(s,&demolish)==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    CHECK(result_at(s,0)->result==FACTORY_RESULT_NO_CONSTRUCTION_SUPPLY);
+    CHECK(s->construction_depots.count==1U);
+    CHECK(factory_simulation_construction_units(s)==0U);
+    CHECK(factory_simulation_construction_bootstrap_completed(s));
+
+    FactorySnapshotBuffer snapshot={0};FactorySimulation *loaded=NULL;
+    CHECK(factory_simulation_create_snapshot(s,&snapshot)==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_load_snapshot(snapshot.data,snapshot.size,&loaded)
+        ==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_construction_bootstrap_completed(loaded));
+    CHECK(factory_simulation_construction_units(loaded)==0U);
+    factory_snapshot_buffer_destroy(&snapshot);
+    factory_simulation_destroy(loaded);
+    factory_simulation_destroy(s);factory_world_destroy(w);
+}
+
+static void test_bootstrap_excess_rejected_atomically(void)
+{
+    FactoryWorld *w=factory_world_create(8U,8U);
+    FactorySimulation *s=factory_simulation_create_with_construction_units(w,
+        FACTORY_CONSTRUCTION_COST_CONSTRUCTION_DEPOT+501U);
+    FactoryCommand depot={FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT,
+        {.place_construction_depot={1,1}}};
+    CHECK(factory_simulation_submit_command(s,&depot)==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    CHECK(result_at(s,0)->result==FACTORY_RESULT_CONSTRUCTION_INVENTORY_OVERFLOW);
+    CHECK(factory_simulation_get_entity_count(s)==0U);
+    CHECK(s->construction_depots.count==0U);
+    CHECK(factory_simulation_construction_units(s)
+        ==FACTORY_CONSTRUCTION_COST_CONSTRUCTION_DEPOT+501U);
+    CHECK(!factory_simulation_construction_bootstrap_completed(s));
+    CHECK(factory_simulation_get_event_count(s)==0U);
+    factory_simulation_destroy(s);factory_world_destroy(w);
+}
+
+static void test_bootstrap_preflight_failure_is_transactional(void)
+{
+    FactoryWorld *w=factory_world_create(8U,8U);
+    FactorySimulation *s=factory_simulation_create_with_construction_units(w,
+        FACTORY_CONSTRUCTION_COST_CONSTRUCTION_DEPOT+100U);
+    FactorySnapshotBuffer before={0},after={0};
+    FactoryCommand depot={FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT,
+        {.place_construction_depot={1,1}}};
+    CHECK(factory_simulation_submit_command(s,&depot)==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_create_snapshot(s,&before)==FACTORY_RESULT_OK);
+    factory_tick_preflight_test_fail_allocations_after(0U);
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OUT_OF_MEMORY);
+    factory_tick_preflight_test_fail_allocations_after(SIZE_MAX);
+    CHECK(factory_simulation_create_snapshot(s,&after)==FACTORY_RESULT_OK);
+    CHECK(before.size==after.size&&memcmp(before.data,after.data,before.size)==0);
+    CHECK(!factory_simulation_construction_bootstrap_completed(s));
+    CHECK(s->construction_depots.count==0U);
+    CHECK(factory_simulation_get_pending_command_count(s)==1U);
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_construction_bootstrap_completed(s));
+    CHECK(s->construction_depots.items[0].material_quantity==100U);
+    factory_snapshot_buffer_destroy(&before);
+    factory_snapshot_buffer_destroy(&after);
+    factory_simulation_destroy(s);factory_world_destroy(w);
+}
+
+static void test_generated_remote_outpost(void)
+{
+    FactoryWorldGenerationConfig config;
+    FactoryWorld *w=factory_world_create_with_seed(64U,48U,UINT64_C(42));
+    int32_t sx,sy,rx=0,ry=0,route_x,depot_x;
+    uint32_t best=UINT32_MAX,initial_cost=0U,transported=30U;
+    FactoryCommand commands[FACTORY_COMMAND_QUEUE_CAPACITY];size_t count=0U;
+    factory_world_generation_default_config(&config);
+    config.water_threshold=0U;config.rock_threshold=0U;
+    CHECK(factory_world_generate(w,&config)==FACTORY_RESULT_OK);
+    sx=factory_world_get_start_x(w);sy=factory_world_get_start_y(w);
+    for(int32_t y=3;y<45;++y)for(int32_t x=7;x<57;++x){
+        const FactoryTile *tile=factory_world_get_tile(w,x,y);
+        uint32_t distance=distance_u32(sx,sy,x,y);
+        if(tile->resource!=FACTORY_RESOURCE_NONE&&distance>11U&&distance<best){
+            best=distance;rx=x;ry=y;
+        }
+    }
+    CHECK(best!=UINT32_MAX);
+    int32_t horizontal=rx>=sx?1:-1;
+    int32_t vertical=ry>=sy?1:-1;
+    FactoryDirection horizontal_direction=horizontal>0
+        ?FACTORY_DIRECTION_EAST:FACTORY_DIRECTION_WEST;
+    FactoryDirection vertical_direction=vertical>0
+        ?FACTORY_DIRECTION_SOUTH:FACTORY_DIRECTION_NORTH;
+    route_x=rx+horizontal*4;depot_x=route_x+horizontal*2;
+
+#define ADD_COMMAND(value,cost) do {commands[count++]=(value);initial_cost+=(cost);} while(false)
+    ADD_COMMAND(((FactoryCommand){FACTORY_COMMAND_PLACE_STORAGE,
+        {.place_storage={sx,sy}}}),FACTORY_CONSTRUCTION_COST_STORAGE);
+    ADD_COMMAND(((FactoryCommand){FACTORY_COMMAND_PLACE_INSERTER,
+        {.place_inserter={sx+horizontal,sy,horizontal_direction}}}),
+        FACTORY_CONSTRUCTION_COST_INSERTER);
+    ADD_COMMAND(((FactoryCommand){FACTORY_COMMAND_PLACE_POWER_POLE,
+        {.place_power_pole={sx,sy+1}}}),FACTORY_CONSTRUCTION_COST_POWER_POLE);
+    ADD_COMMAND(((FactoryCommand){FACTORY_COMMAND_PLACE_POWER_GENERATOR,
+        {.place_power_generator={sx,sy+2}}}),
+        FACTORY_CONSTRUCTION_COST_POWER_GENERATOR);
+    for(int32_t x=sx+horizontal*2;;x+=horizontal){
+        FactoryDirection direction=x==route_x&&ry!=sy
+            ?vertical_direction:horizontal_direction;
+        ADD_COMMAND(((FactoryCommand){FACTORY_COMMAND_PLACE_BELT,
+            {.place_belt={x,sy,direction}}}),FACTORY_CONSTRUCTION_COST_BELT);
+        if(x==route_x)break;
+    }
+    if(ry!=sy)for(int32_t y=sy+vertical;;y+=vertical){
+        FactoryDirection direction=y==ry
+            ?horizontal_direction:vertical_direction;
+        ADD_COMMAND(((FactoryCommand){FACTORY_COMMAND_PLACE_BELT,
+            {.place_belt={route_x,y,direction}}}),FACTORY_CONSTRUCTION_COST_BELT);
+        if(y==ry)break;
+    }
+    ADD_COMMAND(((FactoryCommand){FACTORY_COMMAND_PLACE_INSERTER,
+        {.place_inserter={route_x+horizontal,ry,horizontal_direction}}}),
+        FACTORY_CONSTRUCTION_COST_INSERTER);
+    ADD_COMMAND(((FactoryCommand){FACTORY_COMMAND_PLACE_BELT,
+        {.place_belt={rx,ry+1,FACTORY_DIRECTION_SOUTH}}}),
+        FACTORY_CONSTRUCTION_COST_BELT);
+    ADD_COMMAND(((FactoryCommand){FACTORY_COMMAND_PLACE_STORAGE,
+        {.place_storage={rx,ry+2}}}),FACTORY_CONSTRUCTION_COST_STORAGE);
+    ADD_COMMAND(((FactoryCommand){FACTORY_COMMAND_PLACE_POWER_POLE,
+        {.place_power_pole={rx+horizontal,ry+1}}}),
+        FACTORY_CONSTRUCTION_COST_POWER_POLE);
+    ADD_COMMAND(((FactoryCommand){FACTORY_COMMAND_PLACE_POWER_POLE,
+        {.place_power_pole={route_x+horizontal,ry+vertical}}}),
+        FACTORY_CONSTRUCTION_COST_POWER_POLE);
+    ADD_COMMAND(((FactoryCommand){FACTORY_COMMAND_PLACE_POWER_GENERATOR,
+        {.place_power_generator={rx+horizontal,ry+2}}}),
+        FACTORY_CONSTRUCTION_COST_POWER_GENERATOR);
+    size_t depot_command=count;
+    ADD_COMMAND(((FactoryCommand){FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT,
+        {.place_construction_depot={depot_x,ry}}}),
+        FACTORY_CONSTRUCTION_COST_CONSTRUCTION_DEPOT);
+#undef ADD_COMMAND
+    CHECK(count<FACTORY_COMMAND_QUEUE_CAPACITY);
+    FactorySimulation *s=factory_simulation_create_with_construction_units(
+        w,initial_cost);
+    s->fixture_initial_generator_fuel=FACTORY_TEST_GENERATOR_FUEL_QUANTITY;
+    for(size_t i=0U;i<count;++i)
+        CHECK(factory_simulation_submit_command(s,&commands[i])==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    for(size_t i=0U;i<count;++i)CHECK(result_at(s,i)->result==FACTORY_RESULT_OK);
+    FactoryEntityId depot_id=result_at(s,depot_command)->entity_id;
+    CHECK(factory_simulation_construction_bootstrap_completed(s));
+    CHECK(factory_simulation_construction_units(s)==0U);
+    CHECK(s->construction_depots.items[0].material_quantity==0U);
+
+    FactoryCommand extractor={FACTORY_COMMAND_PLACE_EXTRACTOR,
+        {.place_extractor={rx,ry,FACTORY_DIRECTION_SOUTH}}};
+    CHECK(factory_simulation_submit_command(s,&extractor)==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    CHECK(result_at(s,0)->result==FACTORY_RESULT_CONSTRUCTION_SUPPLY_INSUFFICIENT);
+    CHECK(s->construction_depots.items[0].material_quantity==0U);
+
+    s->storages.items[0].construction_material_amount=transported;
+    FactoryCommand output={FACTORY_COMMAND_SET_STORAGE_OUTPUT,
+        {.set_storage_output={s->storages.items[0].entity_id,
+            FACTORY_ITEM_CONSTRUCTION_MATERIAL}}};
+    CHECK(factory_simulation_submit_command(s,&output)==FACTORY_RESULT_OK);
+    FactoryTelemetryConfig telemetry_config={4U,1200U,128U};
+    FactoryTelemetry *telemetry=factory_telemetry_create(&telemetry_config);
+    size_t supply_ticks=0U;bool loaded_in_transit=false;
+    while(s->construction_depots.items[0].material_quantity<transported
+        &&supply_ticks<1100U){
+        CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+        CHECK(factory_telemetry_observe_step(telemetry,s)==FACTORY_TELEMETRY_RESULT_OK);
+        ++supply_ticks;
+        if(!loaded_in_transit
+            &&s->construction_depots.items[0].material_quantity>0U
+            &&s->construction_depots.items[0].material_quantity<transported){
+            FactorySnapshotBuffer snapshot={0};FactorySimulation *loaded=NULL;
+            CHECK(factory_simulation_create_snapshot(s,&snapshot)==FACTORY_RESULT_OK);
+            CHECK(factory_simulation_load_snapshot(snapshot.data,snapshot.size,
+                &loaded)==FACTORY_RESULT_OK);
+            factory_snapshot_buffer_destroy(&snapshot);
+            factory_simulation_destroy(s);s=loaded;loaded_in_transit=true;
+        }
+    }
+    CHECK(s->construction_depots.items[0].material_quantity==transported);
+    CHECK(loaded_in_transit);
+    FactoryTelemetryEntityItemMetrics depot_flow;
+    CHECK(factory_telemetry_get_entity_item_metrics(telemetry,depot_id,
+        FACTORY_ITEM_CONSTRUCTION_MATERIAL,FACTORY_TELEMETRY_WINDOW_LONG,
+        &depot_flow));
+    CHECK(depot_flow.received_quantity==transported);
+
+    CHECK(factory_simulation_submit_command(s,&extractor)==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    CHECK(factory_telemetry_observe_step(telemetry,s)==FACTORY_TELEMETRY_RESULT_OK);
+    CHECK(result_at(s,0)->result==FACTORY_RESULT_OK);
+    FactoryEntityId extractor_id=result_at(s,0)->entity_id;
+    CHECK(result_at(s,0)->construction_depot_id==depot_id);
+    CHECK(s->construction_depots.items[0].material_quantity
+        ==transported-FACTORY_CONSTRUCTION_COST_EXTRACTOR);
+    for(size_t i=0U;i<160U;++i){
+        CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+        CHECK(factory_telemetry_observe_step(telemetry,s)==FACTORY_TELEMETRY_RESULT_OK);
+    }
+    CHECK(factory_storage_get_total_amount(&s->storages.items[1])!=0U);
+    FactoryTelemetryEntityMetrics extractor_metrics;
+    CHECK(factory_telemetry_get_entity_metrics(telemetry,extractor_id,
+        FACTORY_TELEMETRY_WINDOW_LONG,&extractor_metrics));
+    CHECK(extractor_metrics.completed_cycles!=0U);
+    CHECK(initial_cost+transported==initial_cost
+        +s->construction_depots.items[0].material_quantity
+        +FACTORY_CONSTRUCTION_COST_EXTRACTOR);
+    printf("remote outpost: patch=(%d,%d) start=(%d,%d) distance=%u material=%u belts=%zu supply_ticks=%zu production=%llu storage_inflow=%u\n",
+        rx,ry,sx,sy,best,transported,count-11U,supply_ticks,
+        (unsigned long long)extractor_metrics.completed_cycles,
+        factory_storage_get_total_amount(&s->storages.items[1]));
+    factory_telemetry_destroy(telemetry);
+    factory_simulation_destroy(s);factory_world_destroy(w);
+}
+
 int main(void)
 {test_radius_source_fifo_and_refund();test_physical_supply_snapshot_and_telemetry();
- test_multiple_depots_and_nonempty_demolition();return failures?1:0;}
+ test_multiple_depots_and_nonempty_demolition();
+ test_bootstrap_lifecycle_and_final_depot();
+ test_bootstrap_excess_rejected_atomically();
+ test_bootstrap_preflight_failure_is_transactional();
+ test_generated_remote_outpost();return failures?1:0;}

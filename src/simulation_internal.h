@@ -71,6 +71,8 @@ struct FactorySimulation {
     FactoryPowerState power;
     FactoryEventBatch events;
     FactoryConstructionInventory construction_inventory;
+    /* Permanently true after the first Construction Depot commits. */
+    bool construction_bootstrap_completed;
     FactoryCommand commands[FACTORY_COMMAND_QUEUE_CAPACITY];
     size_t command_count;
     FactoryCommandResult results[FACTORY_COMMAND_QUEUE_CAPACITY];

@@ -1325,17 +1325,10 @@ static FactoryResult demolish_entity(
     if (!factory_entity_construction_cost(*out_type, &refund)) {
         return FACTORY_RESULT_UNSUPPORTED_ENTITY;
     }
-    if(simulation->construction_depots.count!=0U){
+    if(simulation->construction_bootstrap_completed){
         refund_depot=select_construction_depot(simulation,*out_x,*out_y,refund,
             *out_type==FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT?id:0U,true);
-        if(refund_depot==NULL){
-            if(*out_type!=FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT
-                ||simulation->construction_depots.count!=1U)
-                return FACTORY_RESULT_NO_CONSTRUCTION_SUPPLY;
-            if(!factory_construction_inventory_can_credit(
-                    &simulation->construction_inventory,refund))
-                return FACTORY_RESULT_CONSTRUCTION_INVENTORY_OVERFLOW;
-        }
+        if(refund_depot==NULL)return FACTORY_RESULT_NO_CONSTRUCTION_SUPPLY;
     } else if (!factory_construction_inventory_can_credit(
             &simulation->construction_inventory, refund)) {
         return FACTORY_RESULT_CONSTRUCTION_INVENTORY_OVERFLOW;
@@ -1474,6 +1467,9 @@ static FactoryResult grant_construction_units(
     FactoryConstructionMaterial amount
 )
 {
+    if (simulation->construction_bootstrap_completed) {
+        return FACTORY_RESULT_INVALID_STATE;
+    }
     if (!factory_construction_inventory_can_credit(
             &simulation->construction_inventory, amount)) {
         return FACTORY_RESULT_CONSTRUCTION_INVENTORY_OVERFLOW;
@@ -1680,7 +1676,7 @@ static void apply_commands(FactorySimulation *simulation)
             result->result=validate_placement_footprint(
                 simulation,&result->command,result->entity_type);
             if(result->result!=FACTORY_RESULT_OK)continue;
-            if(simulation->construction_depots.count!=0U){
+            if(simulation->construction_bootstrap_completed){
                 int32_t x=result->command.data.place_extractor.x;
                 int32_t y=result->command.data.place_extractor.y;
                 FactoryConstructionDepot *depot=select_construction_depot(
@@ -1701,6 +1697,11 @@ static void apply_commands(FactorySimulation *simulation)
             } else if (!factory_construction_inventory_can_spend(
                     &simulation->construction_inventory, cost)) {
                 result->result=FACTORY_RESULT_INSUFFICIENT_CONSTRUCTION_UNITS;
+                continue;
+            } else if(result->entity_type==FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT
+                &&simulation->construction_inventory.units-cost
+                    >FACTORY_CONSTRUCTION_DEPOT_CAPACITY) {
+                result->result=FACTORY_RESULT_CONSTRUCTION_INVENTORY_OVERFLOW;
                 continue;
             }
         }
@@ -1887,14 +1888,13 @@ static void apply_commands(FactorySimulation *simulation)
                     factory_construction_inventory_spend_validated(
                         &simulation->construction_inventory, amount);
                     if(result->entity_type==FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT
-                        &&simulation->construction_depots.count==1U){
+                        &&!simulation->construction_bootstrap_completed){
                         FactoryConstructionDepot *depot=
                             &simulation->construction_depots.items[0];
                         uint32_t moved=simulation->construction_inventory.units;
-                        if(moved>FACTORY_CONSTRUCTION_DEPOT_CAPACITY)
-                            moved=FACTORY_CONSTRUCTION_DEPOT_CAPACITY;
                         depot->material_quantity=moved;
-                        simulation->construction_inventory.units-=moved;
+                        simulation->construction_inventory.units=0U;
+                        simulation->construction_bootstrap_completed=true;
                     }
                 }
                 result->construction_units_changed = amount;
@@ -1959,6 +1959,12 @@ FactoryConstructionMaterial factory_simulation_construction_units(
     return simulation == NULL
         ? 0U
         : simulation->construction_inventory.units;
+}
+
+bool factory_simulation_construction_bootstrap_completed(
+    const FactorySimulation *simulation)
+{
+    return simulation!=NULL && simulation->construction_bootstrap_completed;
 }
 
 bool factory_simulation_get_construction_depot(const FactorySimulation *s,

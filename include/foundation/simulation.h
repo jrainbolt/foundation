@@ -46,6 +46,10 @@ void factory_simulation_destroy(FactorySimulation *simulation);
 FactoryConstructionMaterial factory_simulation_construction_units(
     const FactorySimulation *simulation
 );
+/* True once construction ownership has permanently moved to physical depots. */
+bool factory_simulation_construction_bootstrap_completed(
+    const FactorySimulation *simulation
+);
 
 /*
  * Queues a copy of command. OK means queued, not that the gameplay action
