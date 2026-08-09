@@ -145,7 +145,7 @@ static void place_remote_patches(FactoryWorld *world,
             ||!center_fits(world,x,y,c->remote_patch_radius))continue;
         if(quantity>UINT32_MAX)quantity=UINT32_MAX;
         if(place_patch(world,x,y,c->remote_patch_radius,type,(uint32_t)quantity,
-            CHANNEL_PATCH|UINT64_C(0x100)+(uint64_t)placed)>=3U)++placed;
+            CHANNEL_PATCH|(UINT64_C(0x100)+(uint64_t)placed))>=3U)++placed;
     }
 }
 
