@@ -403,4 +403,7 @@ add_test(NAME factory_construction_depot_tests COMMAND factory_construction_depo
 add_executable(factory_rail_tests tests/test_rail.c)
 target_link_libraries(factory_rail_tests PRIVATE factory_engine foundation_project_options)
 add_test(NAME factory_rail_tests COMMAND factory_rail_tests)
+add_executable(factory_locomotive_tests tests/test_locomotive.c)
+target_link_libraries(factory_locomotive_tests PRIVATE factory_engine foundation_project_options)
+add_test(NAME factory_locomotive_tests COMMAND factory_locomotive_tests)
 endif()

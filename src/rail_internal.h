@@ -12,6 +12,12 @@ typedef struct {FactoryEntityId entity_id;int32_t x,y;
     FactoryRailSwitch;
 typedef struct {FactoryRailSwitch *items;size_t count,capacity;}
     FactoryRailSwitchStore;
+typedef struct {FactoryEntityId entity_id,rail_entity_id;FactoryDirection entry_direction;
+    uint32_t progress;FactoryLocomotiveActivity activity;} FactoryLocomotive;
+typedef struct {FactoryEntityId id,from,to;FactoryDirection next_entry;
+    bool eligible,move;FactoryLocomotiveActivity blocked;} FactoryLocomotivePlan;
+typedef struct {FactoryLocomotive *items;size_t count,capacity;
+    FactoryLocomotivePlan *plans;size_t plan_capacity;} FactoryLocomotiveStore;
 typedef struct {
     FactoryRailInspection *rails;size_t rail_count;
     FactoryRailSwitchInspection *switches;size_t switch_count;
@@ -47,5 +53,13 @@ bool factory_rail_switch_store_remove(FactoryRailSwitchStore *s,
     FactoryEntityId id);
 void factory_rail_topology_destroy(FactoryRailTopology *t);
 FactoryResult factory_rail_topology_rebuild(FactorySimulation *s);
+void factory_locomotive_store_destroy(FactoryLocomotiveStore *s);
+bool factory_locomotive_store_reserve(FactoryLocomotiveStore *s,size_t required);
+FactoryLocomotive *factory_locomotive_store_find_mutable(
+    FactoryLocomotiveStore *s,FactoryEntityId id);
+const FactoryLocomotive *factory_locomotive_store_find(
+    const FactoryLocomotiveStore *s,FactoryEntityId id);
+bool factory_locomotive_store_remove(FactoryLocomotiveStore *s,FactoryEntityId id);
+void factory_locomotives_update(FactorySimulation *simulation);
 
 #endif

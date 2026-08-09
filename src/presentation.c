@@ -214,6 +214,8 @@ static FactoryResult populate_entity(
         factory_rail_station_store_find(&simulation->rail_stations,id);
     const FactoryRailSwitch *rail_switch=
         factory_rail_switch_store_find(&simulation->rail_switches,id);
+    const FactoryLocomotive *locomotive=
+        factory_locomotive_store_find(&simulation->locomotives,id);
     FactoryPipeInspection pipe;
     FactoryPowerPoleInspection pole;
     FactoryPowerGeneratorInspection generator;
@@ -602,6 +604,20 @@ static FactoryResult populate_entity(
             inspection.connection_mask,inspection.network_id,
             {inspection.neighbors[0],inspection.neighbors[1],
              inspection.neighbors[2],inspection.neighbors[3]}};
+    } else if(locomotive!=NULL){FactoryLocomotiveInspection inspection;
+        if(!factory_simulation_get_locomotive(simulation,id,&inspection))
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        out->entity_type=FACTORY_ENTITY_TYPE_LOCOMOTIVE;
+        out->x=inspection.x;out->y=inspection.y;
+        out->direction=inspection.travel_direction;
+        out->status=inspection.activity==FACTORY_LOCOMOTIVE_MOVING
+            ?FACTORY_PRESENTATION_MACHINE_STATUS_WORKING
+            :FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_OUTPUT;
+        out->data.locomotive=(FactoryPresentationLocomotive){
+            inspection.rail_entity_id,inspection.entry_direction,
+            inspection.travel_direction,inspection.movement_progress,
+            inspection.movement_interval,inspection.next_rail_id,
+            inspection.network_id,inspection.activity};
     } else if(construction_depot!=NULL){
         out->entity_type=FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT;
         out->x=construction_depot->x;out->y=construction_depot->y;

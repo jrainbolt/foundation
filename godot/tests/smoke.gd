@@ -52,15 +52,16 @@ func _initialize() -> void:
 		and simulation.has_method("queue_set_assembler_recipe")
 		and simulation.has_method("queue_set_storage_output")
 		and simulation.has_method("queue_set_rail_switch_branch")
+		and simulation.has_method("queue_place_locomotive")
 		and simulation.has_method("get_command_results")
-		and simulation.get_build_catalog().size() == 26
+		and simulation.get_build_catalog().size() == 27
 		and simulation.get_assembler_recipe_catalog().size() == 4
 		and simulation.get_item_catalog().size() == 11
 		and simulation.get_construction_units() >= 0,
 		"construction command bridge"
 	):
 		return
-	if not _require(simulation.get_tick() == 55, "unexpected reset tick"):
+	if not _require(simulation.get_tick() == 56, "unexpected reset tick"):
 		return
 	var research: Dictionary = simulation.get_research()
 	if not _require(
@@ -75,7 +76,7 @@ func _initialize() -> void:
 	if not _require(not simulation.has_error(), simulation.get_last_error()):
 		return
 	if not _require(
-		entities.size() == 62,
+		entities.size() == 63,
 		"missing presentation entities: got %d" % entities.size()
 	):
 		return
@@ -91,7 +92,7 @@ func _initialize() -> void:
 		12, 11, 13, 11, 14, 15, 8, 16, 7, 17,
 		18, 18, 18, 19, 11, 10, 11, 20,
 		11, 21,
-		24, 24, 24, 24, 24, 26, 24, 24, 25
+		24, 24, 24, 24, 24, 26, 24, 24, 25, 27
 	]
 	var seen_ids := {}
 	for index in entities.size():
@@ -105,7 +106,7 @@ func _initialize() -> void:
 		):
 			return
 		seen_ids[entity_id] = true
-	if not _require(seen_ids.size() == 62, "duplicate or missing stable IDs"):
+	if not _require(seen_ids.size() == 63, "duplicate or missing stable IDs"):
 		return
 	var rail_switch: Dictionary = entities[58]
 	if not _require(
@@ -114,6 +115,17 @@ func _initialize() -> void:
 		and int(rail_switch.connection_mask) == 13
 		and int(rail_switch.rail_network_id) == 54,
 		"rail switch presentation: %s" % rail_switch
+	):
+		return
+	var locomotive: Dictionary = entities[62]
+	if not _require(
+		int(locomotive.type) == 27
+		and int(locomotive.rail_entity_id) == 57
+		and int(locomotive.travel_direction) == 1
+		and int(locomotive.movement_progress) == 1
+		and int(locomotive.movement_interval) == 4
+		and int(locomotive.rail_network_id) == 54,
+		"locomotive presentation: %s" % locomotive
 	):
 		return
 	var tank: Dictionary = {}
@@ -151,7 +163,7 @@ func _initialize() -> void:
 		int(water_extractor.type) == 12
 		and int(water_extractor.stored_water) == 0
 		and int(water_extractor.output_capacity) == 1000
-		and int(water_extractor.progress) == 2,
+		and int(water_extractor.progress) == 3,
 		"water extractor presentation fields"
 	):
 		return
@@ -193,11 +205,11 @@ func _initialize() -> void:
 		return
 	if not _require(
 		int(reactor.type) == 17
-		and int(reactor.stored_heat) == 100
+		and int(reactor.stored_heat) == 200
 		and int(reactor.heat_capacity) == 10000
 		and int(reactor.active_fuel_id) == 1
-		and int(reactor.remaining_burn_ticks) == 98
-		and int(reactor.remaining_heat_yield) == 9800
+		and int(reactor.remaining_burn_ticks) == 97
+		and int(reactor.remaining_heat_yield) == 9700
 		and int(reactor.generated_last_tick) == 100
 		and int(reactor.reactor_activity) == 1
 		and int(reactor.heat_network_id) == 44
@@ -379,7 +391,7 @@ func _initialize() -> void:
 		return
 	if not _require(second.reset_demo() == 0, "second reset failed"):
 		return
-	if not _require(second.get_tick() == 55, "second adapter tick"):
+	if not _require(second.get_tick() == 56, "second adapter tick"):
 		return
 	if not _require(simulation.get_tick() == tick_before, "adapter interference"):
 		return

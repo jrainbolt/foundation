@@ -70,3 +70,26 @@ branch. Connection masks, neighbors, networks, and traversal results remain
 derived. Switches add branching topology only: rolling stock, automatic
 switching, occupancy, routing, reservations, signals, and schedules remain
 deferred.
+
+## Locomotives and rail-vehicle occupancy
+
+A Locomotive is a simulation entity but not a topology node or ordinary tile
+occupant. Its authoritative state is its stable ID, occupied rail-capable
+entity ID, entry direction, and integer movement progress. Position, network,
+next rail, travel direction, occupancy, and activity are derived.
+
+Progress advances once per tick and a locomotive attempts one transition at
+`FACTORY_LOCOMOTIVE_MOVE_TICKS` (four). A blocked locomotive retains completed
+progress and retries next tick. Movement calls the generic traversal API;
+switch logic is not duplicated and switches are never thrown automatically.
+Commands and topology rebuilding precede movement, so a switch command affects
+movement in the same tick.
+
+Planning uses start-of-phase occupancy and ascending locomotive IDs. A target
+must initially be empty, the lowest ID wins a shared target, and swaps or
+movement chains cannot pass through occupied nodes. Occupied rail and switches
+cannot be demolished. Removing a locomotive preserves its underlying rail.
+
+Snapshot version 22 stores only locomotive ID, occupied rail ID, entry
+direction, and progress. Wagons, consists, routing, signals, reservations,
+schedules, freight, fuel, and station stopping remain deferred.

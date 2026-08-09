@@ -10,7 +10,7 @@
 
 #define SNAPSHOT_HEADER_SIZE 48U
 #define SNAPSHOT_SECTION_HEADER_SIZE 16U
-#define SNAPSHOT_SECTION_COUNT 31U
+#define SNAPSHOT_SECTION_COUNT 32U
 
 static const uint8_t snapshot_magic[8] = {
     'F', 'O', 'U', 'N', 'D', 'A', 'T', 'N'
@@ -46,6 +46,7 @@ typedef enum {
     SNAPSHOT_SECTION_RAILS,
     SNAPSHOT_SECTION_RAIL_STATIONS,
     SNAPSHOT_SECTION_RAIL_SWITCHES,
+    SNAPSHOT_SECTION_LOCOMOTIVES,
     SNAPSHOT_SECTION_COMMANDS,
     SNAPSHOT_SECTION_RESULTS
 } SnapshotSection;
@@ -296,6 +297,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_records(&size,simulation->rails.count,16U)
         || !checked_records(&size,simulation->rail_stations.count,16U)
         || !checked_records(&size,simulation->rail_switches.count,20U)
+        || !checked_records(&size,simulation->locomotives.count,16U)
         || !checked_records(&size, simulation->command_count, 24U)
         || !checked_records(&size, simulation->result_count, 72U)
         || !size_to_u32(simulation->entities->count)
@@ -326,6 +328,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !size_to_u32(simulation->rails.count)
         || !size_to_u32(simulation->rail_stations.count)
         || !size_to_u32(simulation->rail_switches.count)
+        || !size_to_u32(simulation->locomotives.count)
         || !section_size_valid(
             simulation->entities->count, 4U, 8U)
         || !section_size_valid(tiles, 16U, 16U)
@@ -355,6 +358,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !section_size_valid(simulation->rails.count,16U,0U)
         || !section_size_valid(simulation->rail_stations.count,16U,0U)
         || !section_size_valid(simulation->rail_switches.count,20U,0U)
+        || !section_size_valid(simulation->locomotives.count,16U,0U)
         || size > UINT64_MAX) {
         return FACTORY_RESULT_SNAPSHOT_SIZE_OVERFLOW;
     }
@@ -411,6 +415,8 @@ static bool entity_has_subsystem(
         factory_rail_station_store_find(&simulation->rail_stations,id);
     const FactoryRailSwitch *rail_switch=
         factory_rail_switch_store_find(&simulation->rail_switches,id);
+    const FactoryLocomotive *locomotive=
+        factory_locomotive_store_find(&simulation->locomotives,id);
     const FactorySolarGenerator *solar_generator =
         factory_solar_generator_store_find(&simulation->solar_generators, id);
     const FactoryAccumulator *accumulator =
@@ -440,6 +446,7 @@ static bool entity_has_subsystem(
     found += rail != NULL;
     found += rail_station != NULL;
     found += rail_switch != NULL;
+    found += locomotive != NULL;
     if (steam_engine != NULL && generator != NULL) --found;
     if (steam_turbine != NULL && generator != NULL) --found;
     if (solar_generator != NULL && generator != NULL) --found;
@@ -483,6 +490,12 @@ static bool entity_has_subsystem(
         *out_x=rail_station->x;*out_y=rail_station->y;
     } else if(rail_switch!=NULL){
         *out_x=rail_switch->x;*out_y=rail_switch->y;
+    } else if(locomotive!=NULL){const FactoryRail*r=factory_rail_store_find(
+            &simulation->rails,locomotive->rail_entity_id);
+        const FactoryRailSwitch*w=factory_rail_switch_store_find(
+            &simulation->rail_switches,locomotive->rail_entity_id);
+        if(r!=NULL){*out_x=r->x;*out_y=r->y;}
+        else if(w!=NULL){*out_x=w->x;*out_y=w->y;}else return false;
     } else if(construction_depot!=NULL){
         *out_x=construction_depot->x;*out_y=construction_depot->y;
     } else if (solar_generator != NULL) {
@@ -606,6 +619,7 @@ static FactoryResult validate_simulation(
         + simulation->construction_depots.count
         + simulation->rails.count + simulation->rail_stations.count
         + simulation->rail_switches.count
+        + simulation->locomotives.count
         + simulation->solar_generators.count
         + simulation->accumulators.count
         + simulation->reactors.count
@@ -629,10 +643,12 @@ static FactoryResult validate_simulation(
         int32_t y;
         size_t other;
 
+        const FactoryLocomotive*l=factory_locomotive_store_find(
+            &simulation->locomotives,id);
         if (id == 0U || !entity_has_subsystem(simulation, id, &x, &y)
             || !factory_world_is_in_bounds(simulation->world, x, y)
-            || factory_world_get_tile(
-                simulation->world, x, y)->occupying_entity != id) {
+            || (l==NULL&&factory_world_get_tile(
+                simulation->world,x,y)->occupying_entity!=id)) {
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
         }
         for (other = index + 1U;
@@ -832,6 +848,17 @@ static FactoryResult validate_simulation(
             ||factory_world_get_terrain(simulation->world,rail_switch->x,
                 rail_switch->y)!=FACTORY_TERRAIN_GROUND)
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
+    for(index=0U;index<simulation->locomotives.count;++index){
+        const FactoryLocomotive*l=&simulation->locomotives.items[index];
+        if(!direction_valid((uint32_t)l->entry_direction)
+            ||l->progress>FACTORY_LOCOMOTIVE_MOVE_TICKS
+            ||(factory_rail_store_find(&simulation->rails,l->rail_entity_id)==NULL
+              &&factory_rail_switch_store_find(&simulation->rail_switches,
+                l->rail_entity_id)==NULL))return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+        for(size_t other=index+1U;other<simulation->locomotives.count;++other)
+            if(l->rail_entity_id==simulation->locomotives.items[other].rail_entity_id)
+                return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
     for (index = 0U; index < simulation->power_generators.count; ++index) {
         const FactoryPowerGenerator *generator =
@@ -1196,7 +1223,7 @@ static FactoryResult validate_simulation(
         const FactoryCommandResult *value = &simulation->results[index];
         if (!snapshot_command_valid(&value->command)
             || value->result > FACTORY_RESULT_CONSTRUCTION_DEPOT_NOT_EMPTY
-            || value->entity_type > FACTORY_ENTITY_TYPE_RAIL_SWITCH
+            || value->entity_type > FACTORY_ENTITY_TYPE_LOCOMOTIVE
             || value->previous_assembler_recipe
                 >= FACTORY_ASSEMBLER_RECIPE_COUNT
             || value->new_assembler_recipe
@@ -1374,6 +1401,9 @@ static void write_command(
         case FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH:
             fields[0]=command->data.set_rail_switch_branch.entity_id;
             fields[1]=command->data.set_rail_switch_branch.branch;break;
+        case FACTORY_COMMAND_PLACE_LOCOMOTIVE:
+            fields[0]=command->data.place_locomotive.rail_entity_id;
+            fields[1]=command->data.place_locomotive.direction;break;
     }
     write_u32(writer, (uint32_t)command->type);
     for (index = 0U; index < 5U; ++index) {
@@ -1396,7 +1426,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             return false;
         }
     }
-    if (type > FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH) {
+    if (type > FACTORY_COMMAND_PLACE_LOCOMOTIVE) {
         return false;
     }
     command->type = (FactoryCommandType)type;
@@ -1441,6 +1471,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             case FACTORY_COMMAND_PLACE_RESEARCH_LAB:
             case FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT:
             case FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH:
+            case FACTORY_COMMAND_PLACE_LOCOMOTIVE:
                 used = 2U;
                 break;
             case FACTORY_COMMAND_DEMOLISH_ENTITY:
@@ -1621,6 +1652,9 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
         case FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH:
             command->data.set_rail_switch_branch.entity_id=fields[0];
             command->data.set_rail_switch_branch.branch=fields[1];break;
+        case FACTORY_COMMAND_PLACE_LOCOMOTIVE:
+            command->data.place_locomotive.rail_entity_id=fields[0];
+            command->data.place_locomotive.direction=(FactoryDirection)fields[1];break;
     }
     return snapshot_command_valid(command);
 }
@@ -2074,6 +2108,13 @@ static void write_snapshot(
         write_u32(writer,v->entity_id);write_i32(writer,v->x);
         write_i32(writer,v->y);write_u32(writer,v->geometry);
         write_u32(writer,v->selected_branch);
+    }
+    write_section_header(writer,SNAPSHOT_SECTION_LOCOMOTIVES,
+        simulation->locomotives.count,simulation->locomotives.count*16U);
+    for(index=0U;index<simulation->locomotives.count;++index){
+        const FactoryLocomotive*v=&simulation->locomotives.items[index];
+        write_u32(writer,v->entity_id);write_u32(writer,v->rail_entity_id);
+        write_u32(writer,v->entry_direction);write_u32(writer,v->progress);
     }
 
     write_section_header(
@@ -2804,6 +2845,19 @@ static bool load_sections(
                 (FactoryRailSwitchBranch)branch))return false;
         v->geometry=(FactoryRailSwitchGeometry)value;
         v->selected_branch=(FactoryRailSwitchBranch)branch;
+    }
+    if(!read_section_header(reader,SNAPSHOT_SECTION_LOCOMOTIVES,16U,0U,&count)
+        ||!factory_locomotive_store_reserve(&simulation->locomotives,count))
+        return false;
+    simulation->locomotives.count=count;
+    for(index=0U;index<count;++index){FactoryLocomotive*v=
+        &simulation->locomotives.items[index];uint32_t direction,progress;
+        if(!read_u32(reader,&v->entity_id)||!read_u32(reader,&v->rail_entity_id)
+            ||!read_u32(reader,&direction)||!read_u32(reader,&progress)
+            ||!direction_valid(direction)||progress>FACTORY_LOCOMOTIVE_MOVE_TICKS)
+            return false;
+        v->entry_direction=(FactoryDirection)direction;v->progress=progress;
+        v->activity=FACTORY_LOCOMOTIVE_MOVING;
     }
 
     if (!read_section_header(

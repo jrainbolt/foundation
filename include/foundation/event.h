@@ -54,7 +54,8 @@ typedef enum {
     FACTORY_EVENT_ASSEMBLER_RECIPE_CHANGED,
     FACTORY_EVENT_STORAGE_OUTPUT_CHANGED,
     FACTORY_EVENT_RESOURCE_DEPLETED,
-    FACTORY_EVENT_RAIL_SWITCH_CHANGED
+    FACTORY_EVENT_RAIL_SWITCH_CHANGED,
+    FACTORY_EVENT_LOCOMOTIVE_MOVED
 } FactoryEventType;
 
 /*
@@ -111,6 +112,8 @@ typedef enum {
  * the final production-completed event and is emitted exactly once.
  * rail switch changed: entity_id identifies the switch, quantity is the
  * previous branch, and related_quantity is the newly selected branch.
+ * locomotive moved: entity_id identifies the locomotive, related_entity_id
+ * is the previous rail entity, and quantity is the new rail entity ID.
  *
  * tick is the simulation tick at the start of the step that emitted the
  * event. Item-transfer quantity is currently one. Successful requests for an

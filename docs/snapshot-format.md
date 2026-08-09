@@ -1,4 +1,8 @@
-# Snapshot format version 19
+# Snapshot format version 22
+
+Version 22 adds Locomotive records containing the entity ID, occupied rail
+entity ID, entry direction, and movement progress. Derived position, network,
+next rail, activity, occupancy, and presentation remain excluded.
 
 Version 19 adds the authoritative Construction Depot section, construction
 material in Storage records, and the supplying/refund depot ID in command

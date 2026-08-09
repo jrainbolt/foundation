@@ -70,6 +70,7 @@ struct FactorySimulation {
     FactoryRailStore rails;
     FactoryRailStationStore rail_stations;
     FactoryRailSwitchStore rail_switches;
+    FactoryLocomotiveStore locomotives;
     FactoryRailTopology rail_topology;
     /* Test-fixture setup only; production simulations leave this zero. */
     uint32_t fixture_initial_generator_fuel;

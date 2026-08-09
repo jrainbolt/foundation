@@ -192,7 +192,12 @@ func _mode_name(mode: int) -> String:
 	return "Select"
 
 func _on_placement_requested(entity_type: int,grid: Vector2i,direction: int) -> void:
-	var queued: int = simulation.queue_place_entity(entity_type,grid.x,grid.y,direction)
+	var queued: int
+	if entity_type == 27:
+		var rail_id: int = world_controller.pick_grid(grid)
+		queued = simulation.queue_place_locomotive(rail_id,direction)
+	else:
+		queued = simulation.queue_place_entity(entity_type,grid.x,grid.y,direction)
 	if queued != 0:
 		status_label.text = "Status: %s" % simulation.result_name(queued)
 		return

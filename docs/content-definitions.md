@@ -69,3 +69,6 @@ rail ports and topology are not immutable content records.
 The Rail Switch definition adds a 5-unit construction cost. Its geometry and
 selected branch are authoritative component state; stable stem/branch port
 semantics are defined by the public rail geometry API.
+
+The Locomotive definition owns its 12-unit construction cost. Runtime movement
+state does not duplicate immutable content data.

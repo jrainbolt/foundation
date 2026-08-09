@@ -118,3 +118,7 @@ noise.
 branch transition. `entity_id` is the switch, `quantity` is the previous
 branch, and `related_quantity` is the new branch. Its tick is the authoritative
 start-of-step tick. Invalid and same-state commands emit nothing.
+
+`FACTORY_EVENT_LOCOMOTIVE_MOVED` is emitted exactly once per successful node
+transition. It carries locomotive ID, previous rail ID, new rail ID, and tick;
+blocked attempts emit no event.

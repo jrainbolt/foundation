@@ -44,6 +44,9 @@ func rotate_build() -> void:
 		queue_redraw()
 
 func preview_is_advisably_valid() -> bool:
+	if mode == InteractionMode.BUILD and build_entity_type == 27:
+		var picked := pick_grid(hovered_grid)
+		return picked != 0 and int(canvas.entity_nodes[picked].state.get("type",0)) in [24,26]
 	return mode == InteractionMode.BUILD \
 		and canvas.terrain_is_buildable(hovered_grid) \
 		and pick_grid(hovered_grid) == 0 \

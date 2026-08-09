@@ -43,6 +43,28 @@ enum {
 typedef FactoryEntityId FactoryRailNetworkId;
 #define FACTORY_RAIL_NETWORK_NONE 0U
 #define FACTORY_RAIL_NEIGHBOR_COUNT 4U
+#define FACTORY_LOCOMOTIVE_MOVE_TICKS 4U
+
+typedef enum {
+    FACTORY_LOCOMOTIVE_MOVING=0,
+    FACTORY_LOCOMOTIVE_BLOCKED_TRACK,
+    FACTORY_LOCOMOTIVE_BLOCKED_SWITCH,
+    FACTORY_LOCOMOTIVE_BLOCKED_OCCUPIED,
+    FACTORY_LOCOMOTIVE_DISCONNECTED
+} FactoryLocomotiveActivity;
+
+typedef struct {
+    FactoryEntityId entity_id;
+    FactoryEntityId rail_entity_id;
+    int32_t x,y;
+    FactoryDirection entry_direction;
+    FactoryDirection travel_direction;
+    uint32_t movement_progress;
+    uint32_t movement_interval;
+    FactoryEntityId next_rail_id;
+    FactoryRailNetworkId network_id;
+    FactoryLocomotiveActivity activity;
+} FactoryLocomotiveInspection;
 
 typedef struct {
     FactoryEntityId entity_id;
@@ -117,5 +139,9 @@ size_t factory_simulation_get_rail_network_count(
     const FactorySimulation *simulation);
 const FactoryRailNetworkInspection *factory_simulation_get_rail_network(
     const FactorySimulation *simulation,size_t index);
+bool factory_simulation_get_locomotive(const FactorySimulation *simulation,
+    FactoryEntityId id,FactoryLocomotiveInspection *out_locomotive);
+FactoryEntityId factory_simulation_get_rail_vehicle_occupant(
+    const FactorySimulation *simulation,FactoryEntityId rail_entity_id);
 
 #endif

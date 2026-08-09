@@ -133,6 +133,13 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
     RESERVE_STORE(s->rails,1U);
     RESERVE_STORE(s->rail_stations,1U);
     RESERVE_STORE(s->rail_switches,1U);
+    {
+        size_t required;
+        if(s->locomotives.count>SIZE_MAX-q)goto overflow;
+        required=s->locomotives.count+q;
+        if(!factory_locomotive_store_reserve(&s->locomotives,required))
+            goto allocation_failed;
+    }
 #undef RESERVE_STORE
     ADD_BOUND(poles,s->power_poles.count,1U);
     ADD_BOUND(generators,s->power_generators.count,1U);

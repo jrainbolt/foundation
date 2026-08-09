@@ -71,6 +71,12 @@ func show_entity(state: Dictionary) -> void:
 	if state.has("rail_neighbors"): field(lines,"Neighbors",str(state.rail_neighbors))
 	if state.has("rail_connected"): field(lines,"Rail connected",Format.yes_no(bool(state.rail_connected)))
 	if state.has("attached_rail_id"): field(lines,"Attached rail","#%d" % int(state.attached_rail_id))
+	if state.has("rail_entity_id"): field(lines,"Current rail","#%d" % int(state.rail_entity_id))
+	if state.has("travel_direction"): field(lines,"Travel direction",Format.direction(int(state.travel_direction)))
+	if state.has("entry_direction"): field(lines,"Entry direction",Format.direction(int(state.entry_direction)))
+	if state.has("movement_progress"): field(lines,"Movement","%d / %d ticks" % [int(state.movement_progress),int(state.get("movement_interval",0))])
+	if state.has("next_rail_id"): field(lines,"Next rail","#%d" % int(state.next_rail_id))
+	if state.has("locomotive_activity"): field(lines,"Locomotive activity",str(int(state.locomotive_activity)))
 	if state.has("recipe") or state.has("progress") or state.has("duration"):
 		section(lines, "Process")
 		if state.has("recipe"): field(lines, "Recipe ID", str(int(state.recipe)))

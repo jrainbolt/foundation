@@ -134,6 +134,7 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     factory_rail_store_destroy(&simulation->rails);
     factory_rail_station_store_destroy(&simulation->rail_stations);
     factory_rail_switch_store_destroy(&simulation->rail_switches);
+    factory_locomotive_store_destroy(&simulation->locomotives);
     factory_rail_topology_destroy(&simulation->rail_topology);
     factory_research_lab_store_destroy(&simulation->research_labs);
     factory_refinery_store_destroy(&simulation->refineries);
@@ -900,6 +901,33 @@ static FactoryResult set_rail_switch_branch(FactorySimulation*s,
     return FACTORY_RESULT_OK;
 }
 
+static FactoryResult place_locomotive(FactorySimulation*s,
+    const FactoryCommand*c,FactoryEntityId*out_id)
+{
+    FactoryEntityId rail_id=c->data.place_locomotive.rail_entity_id;
+    FactoryDirection travel=c->data.place_locomotive.direction;
+    FactoryDirection entry=FACTORY_DIRECTION_NORTH;bool compatible=false;
+    FactoryRailTraversal traversal={0};
+    if(!factory_entity_is_valid(s->entities,rail_id))
+        return FACTORY_RESULT_ENTITY_NOT_FOUND;
+    if(factory_rail_store_find(&s->rails,rail_id)==NULL
+        &&factory_rail_switch_store_find(&s->rail_switches,rail_id)==NULL)
+        return FACTORY_RESULT_UNSUPPORTED_ENTITY;
+    if(factory_simulation_get_rail_vehicle_occupant(s,rail_id)!=0U)
+        return FACTORY_RESULT_ENTITY_BUSY;
+    for(uint32_t candidate=0U;candidate<4U;++candidate)
+        if(factory_simulation_get_rail_traversal(s,rail_id,
+                (FactoryDirection)candidate,&traversal)
+            &&traversal.allowed&&traversal.exit_direction==travel){
+            entry=(FactoryDirection)candidate;compatible=true;break;}
+    if(!compatible)return FACTORY_RESULT_INVALID_STATE;
+    FactoryEntityId id=factory_entity_create(s->entities);
+    if(id==0U)return FACTORY_RESULT_OUT_OF_MEMORY;
+    s->locomotives.items[s->locomotives.count++]=(FactoryLocomotive){
+        id,rail_id,entry,0U,FACTORY_LOCOMOTIVE_MOVING};
+    *out_id=id;return FACTORY_RESULT_OK;
+}
+
 static FactoryResult place_splitter(
     FactorySimulation *simulation,
     const FactoryCommand *command,
@@ -1020,6 +1048,8 @@ static FactoryResult validate_demolition(
         factory_rail_station_store_find(&simulation->rail_stations,id);
     const FactoryRailSwitch *rail_switch=
         factory_rail_switch_store_find(&simulation->rail_switches,id);
+    const FactoryLocomotive *locomotive=
+        factory_locomotive_store_find(&simulation->locomotives,id);
     const FactoryTile *tile;
 
     if (id == 0U) {
@@ -1028,7 +1058,12 @@ static FactoryResult validate_demolition(
     if (!factory_entity_is_valid(simulation->entities, id)) {
         return FACTORY_RESULT_ENTITY_NOT_FOUND;
     }
-    if (extractor != NULL) {
+    if(locomotive!=NULL){FactoryLocomotiveInspection inspection;
+        if(!factory_simulation_get_locomotive(simulation,id,&inspection))
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        *out_type=FACTORY_ENTITY_TYPE_LOCOMOTIVE;
+        *out_x=inspection.x;*out_y=inspection.y;
+    } else if (extractor != NULL) {
         if (extractor->output_item != FACTORY_ITEM_NONE
             || extractor->output_amount != 0U) {
             return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
@@ -1101,11 +1136,15 @@ static FactoryResult validate_demolition(
         *out_x = inserter->x;
         *out_y = inserter->y;
     } else if(rail!=NULL){
+        if(factory_simulation_get_rail_vehicle_occupant(simulation,id)!=0U)
+            return FACTORY_RESULT_ENTITY_BUSY;
         *out_type=FACTORY_ENTITY_TYPE_RAIL;*out_x=rail->x;*out_y=rail->y;
     } else if(rail_station!=NULL){
         *out_type=FACTORY_ENTITY_TYPE_RAIL_STATION;
         *out_x=rail_station->x;*out_y=rail_station->y;
     } else if(rail_switch!=NULL){
+        if(factory_simulation_get_rail_vehicle_occupant(simulation,id)!=0U)
+            return FACTORY_RESULT_ENTITY_BUSY;
         *out_type=FACTORY_ENTITY_TYPE_RAIL_SWITCH;
         *out_x=rail_switch->x;*out_y=rail_switch->y;
     } else if(construction_depot!=NULL){
@@ -1247,7 +1286,8 @@ static FactoryResult validate_demolition(
         return FACTORY_RESULT_UNSUPPORTED_ENTITY;
     }
     tile = factory_world_get_tile(simulation->world, *out_x, *out_y);
-    if (tile == NULL || tile->occupying_entity != id) {
+    if (tile == NULL || (*out_type!=FACTORY_ENTITY_TYPE_LOCOMOTIVE
+        &&tile->occupying_entity != id)) {
         return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
     }
     return FACTORY_RESULT_OK;
@@ -1395,6 +1435,8 @@ static bool remove_subsystem_record(
         case FACTORY_ENTITY_TYPE_RAIL_SWITCH:
             simulation->rail_topology.dirty=true;
             return factory_rail_switch_store_remove(&simulation->rail_switches,id);
+        case FACTORY_ENTITY_TYPE_LOCOMOTIVE:
+            return factory_locomotive_store_remove(&simulation->locomotives,id);
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;
@@ -1431,11 +1473,10 @@ static FactoryResult demolish_entity(
             &simulation->construction_inventory, refund)) {
         return FACTORY_RESULT_CONSTRUCTION_INVENTORY_OVERFLOW;
     }
-    result = factory_world_clear_occupying_entity(
-        simulation->world, *out_x, *out_y, id
-    );
-    if (result != FACTORY_RESULT_OK) {
-        return result;
+    if(*out_type!=FACTORY_ENTITY_TYPE_LOCOMOTIVE){
+        result=factory_world_clear_occupying_entity(
+            simulation->world,*out_x,*out_y,id);
+        if(result!=FACTORY_RESULT_OK)return result;
     }
     if (!remove_subsystem_record(simulation, *out_type, id)) {
         return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
@@ -1523,6 +1564,8 @@ static bool placement_type(
             *out_type=FACTORY_ENTITY_TYPE_RAIL_STATION;return true;
         case FACTORY_COMMAND_PLACE_RAIL_SWITCH:
             *out_type=FACTORY_ENTITY_TYPE_RAIL_SWITCH;return true;
+        case FACTORY_COMMAND_PLACE_LOCOMOTIVE:
+            *out_type=FACTORY_ENTITY_TYPE_LOCOMOTIVE;return true;
         default:
             return false;
     }
@@ -1766,6 +1809,7 @@ static void apply_commands(FactorySimulation *simulation)
         if (placement_type(
                 result->command.type, &result->entity_type)) {
             FactoryConstructionMaterial cost;
+            int32_t placement_x=0,placement_y=0;
 
             if (!factory_entity_construction_cost(
                     result->entity_type, &cost)) {
@@ -1777,12 +1821,24 @@ static void apply_commands(FactorySimulation *simulation)
                 result->result=FACTORY_RESULT_TECHNOLOGY_LOCKED;
                 continue;
             }
-            result->result=validate_placement_footprint(
-                simulation,&result->command,result->entity_type);
+            if(result->entity_type==FACTORY_ENTITY_TYPE_LOCOMOTIVE){
+                FactoryRailInspection rail;FactoryRailSwitchInspection sw;
+                FactoryEntityId target=result->command.data.place_locomotive.rail_entity_id;
+                if(factory_simulation_get_rail(simulation,target,&rail)){
+                    placement_x=rail.x;placement_y=rail.y;result->result=FACTORY_RESULT_OK;
+                }else if(factory_simulation_get_rail_switch(simulation,target,&sw)){
+                    placement_x=sw.x;placement_y=sw.y;result->result=FACTORY_RESULT_OK;
+                }else result->result=FACTORY_RESULT_ENTITY_NOT_FOUND;
+            }else{
+                placement_x=result->command.data.place_extractor.x;
+                placement_y=result->command.data.place_extractor.y;
+                result->result=validate_placement_footprint(
+                    simulation,&result->command,result->entity_type);
+            }
             if(result->result!=FACTORY_RESULT_OK)continue;
             if(simulation->construction_bootstrap_completed){
-                int32_t x=result->command.data.place_extractor.x;
-                int32_t y=result->command.data.place_extractor.y;
+                int32_t x=placement_x;
+                int32_t y=placement_y;
                 FactoryConstructionDepot *depot=select_construction_depot(
                     simulation,x,y,cost,0U,false);
                 if(depot==NULL){
@@ -1976,6 +2032,9 @@ static void apply_commands(FactorySimulation *simulation)
             case FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH:
                 result->result=set_rail_switch_branch(simulation,
                     &result->command,&result->entity_id);break;
+            case FACTORY_COMMAND_PLACE_LOCOMOTIVE:
+                result->result=place_locomotive(simulation,&result->command,
+                    &result->entity_id);break;
             case FACTORY_COMMAND_SELECT_RESEARCH:
                 result->result=factory_research_select(simulation,
                     result->command.data.select_research.technology_id);
@@ -3010,6 +3069,7 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     (void)factory_fluid_network_rebuild(simulation, true);
     (void)factory_heat_network_rebuild(simulation, true);
     (void)factory_rail_topology_rebuild(simulation);
+    factory_locomotives_update(simulation);
     factory_fluid_network_transfer(simulation);
     factory_burner_store_begin_tick(&simulation->burners, simulation);
     factory_fluid_machines_update(simulation);

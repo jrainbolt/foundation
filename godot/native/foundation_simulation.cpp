@@ -216,6 +216,9 @@ void FoundationSimulation::_bind_methods()
     ClassDB::bind_method(
         D_METHOD("queue_set_rail_switch_branch","entity_id","branch"),
         &FoundationSimulation::queue_set_rail_switch_branch);
+    ClassDB::bind_method(
+        D_METHOD("queue_place_locomotive","rail_entity_id","direction"),
+        &FoundationSimulation::queue_place_locomotive);
     ClassDB::bind_method(D_METHOD("get_command_results"),
         &FoundationSimulation::get_command_results);
     ClassDB::bind_method(D_METHOD("get_build_catalog"),
@@ -610,6 +613,16 @@ FactoryResult FoundationSimulation::build_demo()
             return rail_result==nullptr?FACTORY_RESULT_INTERNAL_STATE_MISMATCH
                 :rail_result->result;
     }
+    FactoryCommand locomotive={};locomotive.type=FACTORY_COMMAND_PLACE_LOCOMOTIVE;
+    locomotive.data.place_locomotive={57U,FACTORY_DIRECTION_EAST};
+    result=submit(locomotive);if(result!=FACTORY_RESULT_OK)return result;
+    result=factory_simulation_tick(simulation_);if(result!=FACTORY_RESULT_OK)return result;
+    const FactoryCommandResult*locomotive_result=
+        factory_simulation_get_command_result(simulation_,0U);
+    if(locomotive_result==nullptr||locomotive_result->result!=FACTORY_RESULT_OK
+        ||locomotive_result->entity_id!=63U)
+        return locomotive_result==nullptr?FACTORY_RESULT_INTERNAL_STATE_MISMATCH
+            :locomotive_result->result;
     return factory_presentation_snapshot_rebuild(presentation_, simulation_);
 }
 
@@ -750,6 +763,18 @@ int64_t FoundationSimulation::queue_set_rail_switch_branch(
     command.type=FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH;
     command.data.set_rail_switch_branch={
         (FactoryEntityId)entity_id,(uint32_t)branch};
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
+int64_t FoundationSimulation::queue_place_locomotive(
+    int64_t rail_entity_id,int64_t direction)
+{
+    if(simulation_==nullptr||rail_entity_id<=0||rail_entity_id>UINT32_MAX
+        ||direction<FACTORY_DIRECTION_NORTH||direction>FACTORY_DIRECTION_WEST)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};command.type=FACTORY_COMMAND_PLACE_LOCOMOTIVE;
+    command.data.place_locomotive={(FactoryEntityId)rail_entity_id,
+        (FactoryDirection)direction};
     return factory_simulation_submit_command(simulation_,&command);
 }
 
@@ -1413,6 +1438,16 @@ bool FoundationSimulation::entity_to_dictionary(
             neighbors.append((int64_t)entity.data.rail_switch.neighbors[i]);
         value["rail_neighbors"]=neighbors;break;
     }
+    case FACTORY_ENTITY_TYPE_LOCOMOTIVE:
+        value["rail_entity_id"]=(int64_t)entity.data.locomotive.rail_entity_id;
+        value["entry_direction"]=(int64_t)entity.data.locomotive.entry_direction;
+        value["travel_direction"]=(int64_t)entity.data.locomotive.travel_direction;
+        value["movement_progress"]=(int64_t)entity.data.locomotive.movement_progress;
+        value["movement_interval"]=(int64_t)entity.data.locomotive.movement_interval;
+        value["next_rail_id"]=(int64_t)entity.data.locomotive.next_rail_id;
+        value["rail_network_id"]=(int64_t)entity.data.locomotive.network_id;
+        value["locomotive_activity"]=(int64_t)entity.data.locomotive.activity;
+        break;
     default:
         break;
     }

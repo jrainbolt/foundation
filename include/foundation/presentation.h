@@ -294,6 +294,17 @@ typedef struct {
 } FactoryPresentationRailStation;
 
 typedef struct {
+    FactoryEntityId rail_entity_id;
+    FactoryDirection entry_direction;
+    FactoryDirection travel_direction;
+    uint32_t movement_progress;
+    uint32_t movement_interval;
+    FactoryEntityId next_rail_id;
+    FactoryRailNetworkId network_id;
+    FactoryLocomotiveActivity activity;
+} FactoryPresentationLocomotive;
+
+typedef struct {
     FactoryEntityId entity_id;
     FactoryEntityType entity_type;
     int32_t x;
@@ -328,6 +339,7 @@ typedef struct {
         FactoryPresentationRail rail;
         FactoryPresentationRailStation rail_station;
         FactoryPresentationRailSwitch rail_switch;
+        FactoryPresentationLocomotive locomotive;
     } data;
 } FactoryPresentationEntity;
 
