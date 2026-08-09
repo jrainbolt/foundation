@@ -39,7 +39,8 @@ number of observed ticks; frontends may display a ratio. Additions saturate
 rather than wrap and expose a `saturated` flag. Records remain associated with
 monotonic entity IDs until `factory_telemetry_clear`, including after demolition.
 
-Telemetry is excluded from snapshot version 18. Persistent statistics, charts,
+Construction-material delivery uses ordinary item-transfer metrics, including
+depot inflow. Telemetry is excluded from snapshot version 19. Persistent statistics, charts,
 network heuristics, and telemetry-driven gameplay are deliberately excluded.
 The layer exists so future remote-outpost and rail tests can compare exact
 throughput using the same observational evidence.

@@ -30,7 +30,8 @@ static const FactoryEntityDefinition entities[] = {
     {FACTORY_ENTITY_TYPE_HEAT_EXCHANGER,FACTORY_CONSTRUCTION_COST_HEAT_EXCHANGER,1U,1U,FACTORY_CONTENT_ORIENTATION_NONE,0U,FACTORY_CONTENT_RECIPE_FAMILY_FLUID,0U,12U,4U},
     {FACTORY_ENTITY_TYPE_STEAM_TURBINE,FACTORY_CONSTRUCTION_COST_STEAM_TURBINE,1U,1U,FACTORY_CONTENT_ORIENTATION_NONE,0U,FACTORY_CONTENT_RECIPE_FAMILY_STEAM,2U,12U,0U},
     {FACTORY_ENTITY_TYPE_STEAM_CONDENSER,FACTORY_CONSTRUCTION_COST_STEAM_CONDENSER,1U,1U,FACTORY_CONTENT_ORIENTATION_NONE,FACTORY_UNLOCK_FLUID_HANDLING,FACTORY_CONTENT_RECIPE_FAMILY_FLUID,1U,12U,0U},
-    {FACTORY_ENTITY_TYPE_RESEARCH_LAB,FACTORY_CONSTRUCTION_COST_RESEARCH_LAB,1U,1U,FACTORY_CONTENT_ORIENTATION_NONE,0U,FACTORY_CONTENT_RECIPE_FAMILY_NONE,FACTORY_CONTENT_POWER_ROLE_CONSUMER,0U,0U}
+    {FACTORY_ENTITY_TYPE_RESEARCH_LAB,FACTORY_CONSTRUCTION_COST_RESEARCH_LAB,1U,1U,FACTORY_CONTENT_ORIENTATION_NONE,0U,FACTORY_CONTENT_RECIPE_FAMILY_NONE,FACTORY_CONTENT_POWER_ROLE_CONSUMER,0U,0U},
+    {FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT,FACTORY_CONSTRUCTION_COST_CONSTRUCTION_DEPOT,1U,1U,FACTORY_CONTENT_ORIENTATION_NONE,0U,FACTORY_CONTENT_RECIPE_FAMILY_NONE,0U,0U,0U}
 };
 
 static const FactoryRefineryRecipeDefinition refinery_recipes[] = {
@@ -143,7 +144,7 @@ return d!=NULL&&resource>FACTORY_RESOURCE_NONE&&resource<=FACTORY_RESOURCE_COPPE
     &&(d->allowed_resource_mask&(UINT32_C(1)<<(uint32_t)resource))!=0U;}
 
 static bool item_valid(FactoryItemType item)
-{ return item>FACTORY_ITEM_NONE && item<=FACTORY_ITEM_BASIC_SCIENCE; }
+{ return item>FACTORY_ITEM_NONE && item<=FACTORY_ITEM_CONSTRUCTION_MATERIAL; }
 static bool fluid_exists(const FactoryContentView *v,FactoryFluidType id)
 { for(size_t i=0U;i<v->fluid_count;++i)if(v->fluids[i].fluid_type==id)return true;return false; }
 
@@ -151,7 +152,7 @@ bool factory_content_validate_view(const FactoryContentView *v)
 {
     uint64_t unlocks=0U;
     if(v==NULL||v->entities==NULL||v->entity_count==0U
-        ||v->entity_count!=(size_t)FACTORY_ENTITY_TYPE_RESEARCH_LAB
+        ||v->entity_count!=(size_t)FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT
         ||v->refinery_recipes==NULL||v->refinery_recipe_count==0U
         ||v->assembler_recipe_count==0U||v->technology_count==0U
         ||v->fuel_count==0U||v->fluid_count==0U||v->nuclear_fuel_count==0U
@@ -171,7 +172,7 @@ bool factory_content_validate_view(const FactoryContentView *v)
             if(d->terrain_type==v->terrains[j].terrain_type)return false;}
     for(size_t i=0U;i<v->entity_count;++i){const FactoryEntityDefinition*d=&v->entities[i];
         if(d->entity_type<=FACTORY_ENTITY_TYPE_NONE
-            ||d->entity_type>FACTORY_ENTITY_TYPE_RESEARCH_LAB
+            ||d->entity_type>FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT
             ||d->construction_cost==0U||d->footprint_width==0U
             ||d->footprint_height==0U||(d->required_unlock&~FACTORY_UNLOCK_ALL)!=0U
             ||d->default_orientation<FACTORY_CONTENT_ORIENTATION_NONE

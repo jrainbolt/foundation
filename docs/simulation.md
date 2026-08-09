@@ -1,7 +1,12 @@
 # Deterministic Simulation
 
 Telemetry observes a completed step externally. It is never consulted by tick
-logic and is excluded from canonical snapshot version 18.
+logic and is excluded from canonical snapshot version 19.
+
+Construction uses the finite bootstrap reserve only until the first
+Construction Depot exists. Thereafter authoritative placement selects the
+lowest-ID covering depot that can independently pay the complete cost. See
+`construction-depots.md`.
 
 World generation is completed and validated before simulation creation seals
 the world. Simulation ticks never consult the seed, rerun generation, or retain

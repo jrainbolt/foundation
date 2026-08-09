@@ -46,7 +46,22 @@ func rotate_build() -> void:
 func preview_is_advisably_valid() -> bool:
 	return mode == InteractionMode.BUILD \
 		and canvas.terrain_is_buildable(hovered_grid) \
-		and pick_grid(hovered_grid) == 0
+		and pick_grid(hovered_grid) == 0 \
+		and _coverage_state(hovered_grid) != 0
+
+func _coverage_state(grid: Vector2i) -> int:
+	var has_depot := false
+	var covered_without_supply := false
+	for entity_id: int in canvas.entity_nodes:
+		var visual: FoundationEntityVisual = canvas.entity_nodes[entity_id]
+		if int(visual.state.get("type", 0)) != 23: continue
+		has_depot = true
+		var depot_grid := Vector2i(int(visual.state.x),int(visual.state.y))
+		if abs(grid.x-depot_grid.x)+abs(grid.y-depot_grid.y) <= int(visual.state.get("supply_radius",8)):
+			if int(visual.state.get("material_quantity",0)) > 0: return 2
+			covered_without_supply = true
+	if not has_depot: return 2
+	return 1 if covered_without_supply else 0
 
 func set_hovered_grid(grid_position: Vector2i) -> void:
 	hovered_grid = grid_position
@@ -80,6 +95,7 @@ func select_entity(entity_id: int) -> bool:
 		visual.set_selected(true)
 		inspector.show_entity(visual.state)
 	selected_entity_changed.emit(selected_entity_id)
+	queue_redraw()
 	return entity_id != 0
 
 func clear_selection() -> void:
@@ -127,11 +143,24 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _draw() -> void:
+	for entity_id: int in canvas.entity_nodes:
+		var depot: FoundationEntityVisual = canvas.entity_nodes[entity_id]
+		if int(depot.state.get("type", 0)) != 23: continue
+		if mode != InteractionMode.BUILD and entity_id != selected_entity_id: continue
+		var radius := int(depot.state.get("supply_radius", 8))
+		var center := grid_to_world(Vector2i(int(depot.state.x), int(depot.state.y))) + Vector2(CELL/2.0,CELL/2.0)
+		var reach := float(radius) * CELL
+		var supply := int(depot.state.get("material_quantity", 0))
+		var coverage_color := Color("#75cf8c",0.18) if supply > 0 else Color("#d7a95b",0.16)
+		var points := PackedVector2Array([center+Vector2(0,-reach),center+Vector2(reach,0),center+Vector2(0,reach),center+Vector2(-reach,0)])
+		draw_colored_polygon(points,coverage_color)
+		draw_polyline(PackedVector2Array([points[0],points[1],points[2],points[3],points[0]]),coverage_color.lightened(0.45),2.0)
 	draw_rect(Rect2(grid_to_world(hovered_grid), Vector2(CELL, CELL)), Color("#78c7ff", 0.10), true)
 	draw_rect(Rect2(grid_to_world(hovered_grid), Vector2(CELL, CELL)), Color("#78c7ff", 0.75), false, 2.0)
 	if mode == InteractionMode.BUILD:
 		var preview := Rect2(grid_to_world(hovered_grid)+Vector2(5,5),Vector2(CELL-10,CELL-10))
-		var color := Color("#62d98b",0.42) if preview_is_advisably_valid() else Color("#ef6262",0.42)
+		var coverage := _coverage_state(hovered_grid)
+		var color := Color("#62d98b",0.42) if preview_is_advisably_valid() else (Color("#d7a95b",0.42) if coverage == 1 else Color("#ef6262",0.42))
 		draw_rect(preview,color,true)
 		draw_rect(preview,color.lightened(0.35),false,3.0)
 		draw_string(ThemeDB.fallback_font,preview.position+Vector2(5,18),"BUILD %d" % build_entity_type,HORIZONTAL_ALIGNMENT_LEFT,-1,11)

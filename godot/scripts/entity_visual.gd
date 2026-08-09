@@ -12,6 +12,7 @@ const COLORS := {
 	16: Color("#64752b"), 17: Color("#39754f"), 18: Color("#873d8c"),
 	19: Color("#873d8c"), 20: Color("#857322"), 21: Color("#286d80"),
 	22: Color("#475d91"),
+	23: Color("#596b46"),
 }
 const TITLES := {
 	1: "EXTRACTOR", 2: "BELT", 3: "REFINERY", 4: "ASSEMBLER",
@@ -21,6 +22,7 @@ const TITLES := {
 	17: "REACTOR", 18: "HEAT PIPE", 19: "HEAT EXCHANGER",
 	20: "TURBINE", 21: "CONDENSER",
 	22: "RESEARCH LAB",
+	23: "CONSTRUCTION DEPOT",
 }
 const ABBREVIATIONS := {
 	1: "EX", 2: "BELT", 3: "REF", 4: "ASM", 5: "BOX", 6: "SPLIT",
@@ -28,6 +30,7 @@ const ABBREVIATIONS := {
 	12: "WATER", 13: "BOIL", 14: "STEAM", 15: "SOLAR", 16: "ACC",
 	17: "CORE", 18: "HEAT", 19: "HEX", 20: "TURB", 21: "COND",
 	22: "LAB",
+	23: "DEPOT",
 }
 
 var state: Dictionary = {}
@@ -111,6 +114,8 @@ func _important_status(entity_type: int) -> String:
 			return "%d WATER" % int(state.get("stored_water", 0))
 		22:
 			return "%d / %d SCI" % [int(state.get("science_quantity", 0)), int(state.get("science_capacity", 0))]
+		23:
+			return "%d / %d MAT" % [int(state.get("material_quantity", 0)), int(state.get("capacity", 0))]
 	return ""
 
 func _draw_connections(entity_type: int) -> void:

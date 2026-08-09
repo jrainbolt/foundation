@@ -23,6 +23,7 @@ typedef struct {
     uint32_t copper_wire_amount;
     uint32_t biomass_pellet_amount;
     uint32_t basic_science_amount;
+    uint32_t construction_material_amount;
     uint32_t total_capacity;
     FactoryItemType configured_output_item;
     FactoryItemType output_item;

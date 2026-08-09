@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define ITEM_COUNT ((size_t)FACTORY_ITEM_BASIC_SCIENCE + 1U)
+#define ITEM_COUNT ((size_t)FACTORY_ITEM_CONSTRUCTION_MATERIAL + 1U)
 #define TELEMETRY_MAX_WINDOW 1200U
 
 typedef struct {
@@ -48,7 +48,7 @@ struct FactoryTelemetry {
 };
 
 static bool item_valid(FactoryItemType item)
-{return item>FACTORY_ITEM_NONE&&item<=FACTORY_ITEM_BASIC_SCIENCE;}
+{return item>FACTORY_ITEM_NONE&&item<=FACTORY_ITEM_CONSTRUCTION_MATERIAL;}
 
 void factory_telemetry_default_config(FactoryTelemetryConfig *out)
 {if(out!=NULL)*out=(FactoryTelemetryConfig){60U,600U,FACTORY_TELEMETRY_DEFAULT_MAX_ENTITIES};}
@@ -77,8 +77,11 @@ FactoryTelemetry *factory_telemetry_create(const FactoryTelemetryConfig *config)
 }
 
 void factory_telemetry_destroy(FactoryTelemetry *t)
-{if(t==NULL)return;factory_presentation_snapshot_destroy(t->presentation);
-free(t->global_ticks);free(t->entity_ticks);free(t->records);free(t);}
+{
+    if(t==NULL)return;
+    factory_presentation_snapshot_destroy(t->presentation);
+    free(t->global_ticks);free(t->entity_ticks);free(t->records);free(t);
+}
 
 void factory_telemetry_clear(FactoryTelemetry *t)
 {
@@ -264,7 +267,10 @@ bool factory_telemetry_get_entity_metrics(const FactoryTelemetry *t,
         else if(v->status==FACTORY_PRESENTATION_MACHINE_STATUS_DEPLETED_RESOURCE)++out->depleted_ticks;
         if(v->occupied)++out->occupied_ticks;else if(v->observed&&(out->entity_type==FACTORY_ENTITY_TYPE_BELT||out->entity_type==FACTORY_ENTITY_TYPE_SPLITTER))++out->empty_ticks;
         if(v->blocked)++out->blocked_ticks;
-        if(v->holding)++out->holding_ticks;add64(&out->completed_cycles,v->cycles,&out->saturated);add64(&out->pickups,v->pickups,&out->saturated);add64(&out->drops,v->drops,&out->saturated);
+        if(v->holding)++out->holding_ticks;
+        add64(&out->completed_cycles,v->cycles,&out->saturated);
+        add64(&out->pickups,v->pickups,&out->saturated);
+        add64(&out->drops,v->drops,&out->saturated);
         for(size_t item=1U;item<ITEM_COUNT;++item){add64(&out->received_quantity,v->received[item],&out->saturated);add64(&out->sent_quantity,v->sent[item],&out->saturated);}
     }
     out->net_flow=net_flow(out->received_quantity,out->sent_quantity,

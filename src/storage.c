@@ -60,6 +60,7 @@ void factory_storage_store_add(
     storage->copper_wire_amount = 0U;
     storage->biomass_pellet_amount = 0U;
     storage->basic_science_amount = 0U;
+    storage->construction_material_amount = 0U;
     storage->total_capacity = FACTORY_STORAGE_CAPACITY;
     storage->configured_output_item = FACTORY_ITEM_NONE;
     storage->output_item = FACTORY_ITEM_NONE;
@@ -157,6 +158,10 @@ bool factory_storage_get_item_amount(
         *out_amount = storage->basic_science_amount;
         return true;
     }
+    if (item == FACTORY_ITEM_CONSTRUCTION_MATERIAL) {
+        *out_amount = storage->construction_material_amount;
+        return true;
+    }
     return false;
 }
 
@@ -172,7 +177,8 @@ uint32_t factory_storage_get_total_amount(const FactoryStorage *storage)
             + storage->iron_gear_amount
             + storage->copper_wire_amount
             + storage->biomass_pellet_amount
-            + storage->basic_science_amount;
+            + storage->basic_science_amount
+            + storage->construction_material_amount;
 }
 
 static uint32_t *item_amount(
@@ -199,6 +205,8 @@ static uint32_t *item_amount(
             return &storage->biomass_pellet_amount;
         case FACTORY_ITEM_BASIC_SCIENCE:
             return &storage->basic_science_amount;
+        case FACTORY_ITEM_CONSTRUCTION_MATERIAL:
+            return &storage->construction_material_amount;
         default:
             return NULL;
     }

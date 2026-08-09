@@ -26,6 +26,7 @@
 - [x] Seeded deterministic procedural world model and authoritative terrain
 - [x] Deterministic terrain generation and finite resource patches
 - [x] Deterministic production and logistics telemetry
+- [x] Physical Construction Depot supply for remote outposts
 
 Finite deposits and seeded authoritative terrain are prerequisites for
 deterministic resource patches, remote mining outposts, rail infrastructure, and eventually

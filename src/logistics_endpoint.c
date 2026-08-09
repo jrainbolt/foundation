@@ -6,7 +6,7 @@
 static bool item_is_valid(FactoryItemType item)
 {
     return item > FACTORY_ITEM_NONE
-        && item <= FACTORY_ITEM_BASIC_SCIENCE;
+        && item <= FACTORY_ITEM_CONSTRUCTION_MATERIAL;
 }
 
 bool factory_logistics_endpoint_equal(
@@ -166,10 +166,21 @@ FactoryLogisticsResult factory_logistics_endpoint_can_accept(
     const FactoryRecipe *recipe;
     const FactoryBurner *burner;
     const FactoryResearchLab *research_lab;
+    const FactoryConstructionDepot *depot;
     FactoryLogisticsResult result = validate_entity(simulation, endpoint);
 
     if (result != FACTORY_LOGISTICS_RESULT_OK) {
         return result;
+    }
+    depot=factory_construction_depot_store_find(
+        &simulation->construction_depots,endpoint.entity_id);
+    if(depot!=NULL){
+        if(endpoint.slot!=FACTORY_LOGISTICS_SLOT_CONSTRUCTION_DEPOT_INPUT)
+            return FACTORY_LOGISTICS_RESULT_INVALID_SLOT;
+        if(item!=FACTORY_ITEM_CONSTRUCTION_MATERIAL)
+            return FACTORY_LOGISTICS_RESULT_INCOMPATIBLE_ITEM;
+        return depot->material_quantity<FACTORY_CONSTRUCTION_DEPOT_CAPACITY
+            ?FACTORY_LOGISTICS_RESULT_OK:FACTORY_LOGISTICS_RESULT_BLOCKED;
     }
     if (!item_is_valid(item)) {
         return FACTORY_LOGISTICS_RESULT_INVALID_ITEM;
@@ -416,8 +427,13 @@ static void insert_unchecked(
     );
     FactoryResearchLab *research_lab=factory_research_lab_store_find_mutable(
         &simulation->research_labs,endpoint.entity_id);
+    FactoryConstructionDepot *depot=factory_construction_depot_store_find_mutable(
+        &simulation->construction_depots,endpoint.entity_id);
 
-    if(research_lab!=NULL
+    if(depot!=NULL
+        && endpoint.slot==FACTORY_LOGISTICS_SLOT_CONSTRUCTION_DEPOT_INPUT){
+        ++depot->material_quantity;
+    } else if(research_lab!=NULL
         && endpoint.slot==FACTORY_LOGISTICS_SLOT_RESEARCH_LAB_INPUT){
         ++research_lab->science_quantity;
     } else if (burner != NULL
@@ -456,8 +472,10 @@ static void insert_unchecked(
         ++storage->copper_wire_amount;
     } else if (item == FACTORY_ITEM_BIOMASS_PELLET) {
         ++storage->biomass_pellet_amount;
-    } else {
+    } else if (item == FACTORY_ITEM_BASIC_SCIENCE) {
         ++storage->basic_science_amount;
+    } else {
+        ++storage->construction_material_amount;
     }
 }
 

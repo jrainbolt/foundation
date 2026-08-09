@@ -1,5 +1,9 @@
 # Renderer-neutral presentation snapshots
 
+Construction Depot records expose material quantity, capacity, and Manhattan
+supply radius. Frontend coverage previews are advisory; Foundation performs
+the authoritative source selection.
+
 Rolling telemetry remains separate from presentation. Telemetry reuses current
 entity status for activity classification, while clients such as Godot combine
 the two read-only projections only when rendering an inspector.

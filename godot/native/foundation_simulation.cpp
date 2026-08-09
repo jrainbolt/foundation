@@ -94,6 +94,9 @@ FactoryCommand place(
     case FACTORY_COMMAND_PLACE_RESEARCH_LAB:
         command.data.place_research_lab = {x, y};
         break;
+    case FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT:
+        command.data.place_construction_depot={x,y};
+        break;
     default:
         break;
     }
@@ -173,6 +176,12 @@ const char *result_name_c(FactoryResult result)
         return "terrain blocked";
     case FACTORY_RESULT_WORLD_GENERATION_FAILED:
         return "world generation failed";
+    case FACTORY_RESULT_NO_CONSTRUCTION_SUPPLY:
+        return "no construction supply";
+    case FACTORY_RESULT_CONSTRUCTION_SUPPLY_INSUFFICIENT:
+        return "construction supply insufficient";
+    case FACTORY_RESULT_CONSTRUCTION_DEPOT_NOT_EMPTY:
+        return "construction depot not empty";
     }
     return "unknown result";
 }
@@ -605,7 +614,7 @@ int64_t FoundationSimulation::queue_place_entity(
     int64_t entity_type,int64_t x,int64_t y,int64_t direction)
 {
     if (simulation_==nullptr || entity_type<=FACTORY_ENTITY_TYPE_NONE
-        || entity_type>FACTORY_ENTITY_TYPE_RESEARCH_LAB
+        || entity_type>FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT
         || x<INT32_MIN || x>INT32_MAX || y<INT32_MIN || y>INT32_MAX
         || direction<FACTORY_DIRECTION_NORTH
         || direction>FACTORY_DIRECTION_WEST)
@@ -634,6 +643,7 @@ int64_t FoundationSimulation::queue_place_entity(
     case FACTORY_ENTITY_TYPE_STEAM_TURBINE: command_type=FACTORY_COMMAND_PLACE_STEAM_TURBINE;break;
     case FACTORY_ENTITY_TYPE_STEAM_CONDENSER: command_type=FACTORY_COMMAND_PLACE_STEAM_CONDENSER;break;
     case FACTORY_ENTITY_TYPE_RESEARCH_LAB: command_type=FACTORY_COMMAND_PLACE_RESEARCH_LAB;break;
+    case FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT: command_type=FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT;break;
     default:return FACTORY_RESULT_INVALID_ARGUMENT;
     }
     FactoryCommand command=place(command_type,(int32_t)x,(int32_t)y,
@@ -671,7 +681,8 @@ int64_t FoundationSimulation::queue_set_storage_output(
     int64_t entity_id,int64_t item_type)
 {
     if (simulation_==nullptr || entity_id<=0 || entity_id>UINT32_MAX
-        || item_type<FACTORY_ITEM_NONE || item_type>FACTORY_ITEM_BASIC_SCIENCE)
+        || item_type<FACTORY_ITEM_NONE
+        || item_type>FACTORY_ITEM_CONSTRUCTION_MATERIAL)
         return FACTORY_RESULT_INVALID_ARGUMENT;
     FactoryCommand command={};
     command.type=FACTORY_COMMAND_SET_STORAGE_OUTPUT;
@@ -698,7 +709,10 @@ Array FoundationSimulation::get_command_results() const
                 "command_result.construction_units_changed")
             || !set_unsigned(&value,"construction_units_remaining",
                 r->construction_units_remaining,
-                "command_result.construction_units_remaining"))
+                "command_result.construction_units_remaining")
+            || !set_unsigned(&value,"construction_depot_id",
+                r->construction_depot_id,
+                "command_result.construction_depot_id"))
             return Array();
         value["entity_type"]=(int64_t)r->entity_type;
         value["x"]=(int64_t)r->x; value["y"]=(int64_t)r->y;
@@ -743,7 +757,8 @@ Array FoundationSimulation::get_assembler_recipe_catalog() const
 Array FoundationSimulation::get_item_catalog() const
 {
     Array values;
-    for (int item=FACTORY_ITEM_NONE;item<=FACTORY_ITEM_BASIC_SCIENCE;++item) {
+    for(int item=FACTORY_ITEM_NONE;
+        item<=FACTORY_ITEM_CONSTRUCTION_MATERIAL;++item){
         Dictionary value;
         value["item_type"]=(int64_t)item;
         value["name"]=item==FACTORY_ITEM_NONE
@@ -1301,6 +1316,13 @@ bool FoundationSimulation::entity_to_dictionary(
             (int64_t)entity.data.research_lab.science_consumed_last_tick;
         value["work_contributed_last_tick"] =
             (int64_t)entity.data.research_lab.work_contributed_last_tick;
+        break;
+    case FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT:
+        value["material_quantity"]=(int64_t)
+            entity.data.construction_depot.material_quantity;
+        value["capacity"]=(int64_t)entity.data.construction_depot.capacity;
+        value["supply_radius"]=(int64_t)
+            entity.data.construction_depot.supply_radius;
         break;
     default:
         break;

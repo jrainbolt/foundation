@@ -4,6 +4,11 @@ Production and item-transfer events are also the authoritative committed-flow
 input for the external telemetry collector. Telemetry reads but never clears or
 changes the event batch.
 
+For constructed and demolished entities, `quantity` is the immutable
+construction cost and `related_entity_id` is the supplying or refund-receiving
+Construction Depot. Zero denotes the bootstrap reserve. Rejected commands emit
+no success event.
+
 Each `factory_simulation_tick` produces one transient, simulation-owned event
 batch. Before any authoritative mutation, the simulation reserves enough
 storage for the maximum events that step can produce. If reservation fails,

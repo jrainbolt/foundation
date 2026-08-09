@@ -127,6 +127,7 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
     RESERVE_STORE(s->heat_ports,1U);
     RESERVE_STORE(s->heat_exchangers,1U);
     RESERVE_STORE(s->research_labs,1U);
+    RESERVE_STORE(s->construction_depots,1U);
 #undef RESERVE_STORE
     ADD_BOUND(poles,s->power_poles.count,1U);
     ADD_BOUND(generators,s->power_generators.count,1U);

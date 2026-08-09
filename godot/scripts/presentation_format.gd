@@ -1,9 +1,9 @@
 class_name FoundationPresentationFormat
 extends RefCounted
 
-const ENTITY_NAMES := ["None", "Extractor", "Belt", "Refinery", "Assembler", "Storage", "Splitter", "Inserter", "Power Pole", "Burner Generator", "Fluid Tank", "Pipe", "Water Extractor", "Boiler", "Steam Engine", "Solar Generator", "Accumulator", "Reactor Core", "Heat Conductor", "Heat Exchanger", "Steam Turbine", "Steam Condenser", "Research Lab"]
+const ENTITY_NAMES := ["None", "Extractor", "Belt", "Refinery", "Assembler", "Storage", "Splitter", "Inserter", "Power Pole", "Burner Generator", "Fluid Tank", "Pipe", "Water Extractor", "Boiler", "Steam Engine", "Solar Generator", "Accumulator", "Reactor Core", "Heat Conductor", "Heat Exchanger", "Steam Turbine", "Steam Condenser", "Research Lab", "Construction Depot"]
 const DIRECTIONS := ["North", "East", "South", "West"]
-const ITEMS := ["None", "Iron Ore", "Iron Plate", "Copper Ore", "Copper Plate", "Electronic Component", "Iron Gear", "Copper Wire", "Biomass Pellet", "Basic Science"]
+const ITEMS := ["None", "Iron Ore", "Iron Plate", "Copper Ore", "Copper Plate", "Electronic Component", "Iron Gear", "Copper Wire", "Biomass Pellet", "Basic Science", "Construction Material"]
 const FLUIDS := ["None", "Water", "Steam", "Exhaust Steam"]
 const STATUSES := ["None", "Idle", "Working", "Blocked: input", "Blocked: output", "Unpowered"]
 

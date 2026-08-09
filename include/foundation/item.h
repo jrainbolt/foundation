@@ -15,7 +15,8 @@ typedef enum {
     FACTORY_ITEM_IRON_GEAR,
     FACTORY_ITEM_COPPER_WIRE,
     FACTORY_ITEM_BIOMASS_PELLET,
-    FACTORY_ITEM_BASIC_SCIENCE
+    FACTORY_ITEM_BASIC_SCIENCE,
+    FACTORY_ITEM_CONSTRUCTION_MATERIAL
 } FactoryItemType;
 
 /* Returns a stable name, or "invalid item" for an unknown value. */

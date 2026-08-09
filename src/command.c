@@ -52,7 +52,7 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
             return command->data.set_storage_output.item
                 >= FACTORY_ITEM_NONE
                 && command->data.set_storage_output.item
-                    <= FACTORY_ITEM_BASIC_SCIENCE;
+                    <= FACTORY_ITEM_CONSTRUCTION_MATERIAL;
         case FACTORY_COMMAND_PLACE_POWER_POLE:
         case FACTORY_COMMAND_PLACE_POWER_GENERATOR:
         case FACTORY_COMMAND_PLACE_FLUID_TANK:
@@ -68,6 +68,7 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
         case FACTORY_COMMAND_PLACE_STEAM_TURBINE:
         case FACTORY_COMMAND_PLACE_STEAM_CONDENSER:
         case FACTORY_COMMAND_PLACE_RESEARCH_LAB:
+        case FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT:
             return true;
         case FACTORY_COMMAND_INSERT_REACTOR_FUEL:
             return command->data.insert_reactor_fuel.reactor_entity_id != 0U

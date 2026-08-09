@@ -6,6 +6,11 @@ owns one world/simulation pair and one presentation snapshot. Godot receives
 deep-copied dictionaries and arrays; no Foundation-owned pointer crosses the
 boundary.
 
+The toolbar includes Construction Depots. Selecting a depot or entering build
+mode shows its advisory Manhattan coverage: green has known supply, amber is
+covered but empty, and red is uncovered or otherwise invalid. Normal command
+results remain authoritative.
+
 ## Pinned prerequisites
 
 - Godot 4.5 or a later compatible Godot 4.x release

@@ -14,6 +14,7 @@ extern "C" {
 #include "foundation/research_lab.h"
 #include "foundation/content.h"
 #include "foundation/telemetry.h"
+#include "foundation/construction_depot.h"
 
 #ifdef __cplusplus
 }

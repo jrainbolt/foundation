@@ -23,6 +23,8 @@ const char *factory_item_name(FactoryItemType item)
             return "biomass pellet";
         case FACTORY_ITEM_BASIC_SCIENCE:
             return "basic science";
+        case FACTORY_ITEM_CONSTRUCTION_MATERIAL:
+            return "construction material";
         default:
             return "invalid item";
     }

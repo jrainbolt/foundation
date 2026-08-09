@@ -206,6 +206,9 @@ static FactoryResult populate_entity(
         factory_heat_exchanger_store_find(&simulation->heat_exchangers,id);
     const FactoryResearchLab *research_lab=
         factory_research_lab_store_find(&simulation->research_labs,id);
+    const FactoryConstructionDepot *construction_depot=
+        factory_construction_depot_store_find(
+            &simulation->construction_depots,id);
     FactoryPipeInspection pipe;
     FactoryPowerPoleInspection pole;
     FactoryPowerGeneratorInspection generator;
@@ -283,6 +286,8 @@ static FactoryResult populate_entity(
         out->data.storage.item_quantities[7] =
             storage->biomass_pellet_amount;
         out->data.storage.item_quantities[8] = storage->basic_science_amount;
+        out->data.storage.item_quantities[9] =
+            storage->construction_material_amount;
         out->data.storage.total_capacity = storage->total_capacity;
         out->data.storage.configured_output_item =
             storage->configured_output_item;
@@ -558,6 +563,16 @@ static FactoryResult populate_entity(
             lab.science_quantity,lab.science_capacity,lab.power_network_id,
             lab.connected,lab.activity,lab.science_consumed_last_tick,
             lab.work_contributed_last_tick};
+    } else if(construction_depot!=NULL){
+        out->entity_type=FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT;
+        out->x=construction_depot->x;out->y=construction_depot->y;
+        out->status=construction_depot->material_quantity==0U
+            ?FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_INPUT
+            :FACTORY_PRESENTATION_MACHINE_STATUS_IDLE;
+        out->data.construction_depot=(FactoryPresentationConstructionDepot){
+            construction_depot->material_quantity,
+            FACTORY_CONSTRUCTION_DEPOT_CAPACITY,
+            FACTORY_CONSTRUCTION_DEPOT_RADIUS};
     } else if (fluid_storage != NULL) {
         out->entity_type = FACTORY_ENTITY_TYPE_FLUID_TANK;
         out->x = fluid_storage->x;

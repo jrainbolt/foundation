@@ -41,7 +41,7 @@ quantity per deposit tile. No patch list or PRNG state is retained.
 The public FNV-1a checksum helper hashes seed, dimensions, and every authoritative
 tile field using explicit little-endian bytes. It is intended for deterministic
 regression diagnostics, not simulation decisions. Generator version 1 is
-distinct from snapshot version 18. Snapshots store the resulting terrain and
+distinct from snapshot version 19. Snapshots store the resulting terrain and
 deposits and never rerun generation, so changing future generation algorithms
 does not change saved worlds.
 

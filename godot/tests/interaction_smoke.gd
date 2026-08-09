@@ -106,7 +106,7 @@ func run_test() -> void:
 			break
 	if not require_value(int(canvas.entity_nodes[13].state.recipe) == 1 and main.status_label.text.contains("updated"), "inspector command workflow"): return
 	controller.select_entity(19)
-	if not require_value(inspector.configuration_selector.visible and inspector.configuration_selector.item_count == 10, "storage output selector"): return
+	if not require_value(inspector.configuration_selector.visible and inspector.configuration_selector.item_count == 11, "storage output selector"): return
 	var storage_before: Dictionary = canvas.entity_nodes[19].state
 	if not require_value(simulation.queue_set_storage_output(19,9) == 0, "storage configuration queue"): return
 	if not require_value(int(canvas.entity_nodes[19].state.configured_output) == int(storage_before.configured_output), "storage configuration mutated before tick"): return

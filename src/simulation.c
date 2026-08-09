@@ -22,6 +22,10 @@ typedef struct {
     bool wins;
 } TransferIntent;
 
+static FactoryConstructionDepot *select_construction_depot(
+    FactorySimulation *s,int32_t x,int32_t y,uint32_t amount,
+    FactoryEntityId excluded,bool require_capacity);
+
 static void adjacent_coordinate(
     int32_t x,
     int32_t y,
@@ -126,6 +130,7 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     factory_inserter_store_destroy(&simulation->inserters);
     factory_splitter_store_destroy(&simulation->splitters);
     factory_assembler_store_destroy(&simulation->assemblers);
+    factory_construction_depot_store_destroy(&simulation->construction_depots);
     factory_research_lab_store_destroy(&simulation->research_labs);
     factory_refinery_store_destroy(&simulation->refineries);
     factory_extractor_store_destroy(&simulation->extractors);
@@ -803,6 +808,22 @@ static FactoryResult place_research_lab(FactorySimulation *simulation,
     return FACTORY_RESULT_OK;
 }
 
+static FactoryResult place_construction_depot(FactorySimulation *simulation,
+    const FactoryCommand *command,FactoryEntityId *out_id)
+{
+    int32_t x=command->data.place_construction_depot.x;
+    int32_t y=command->data.place_construction_depot.y;
+    FactoryResult result=validate_empty_tile(simulation,x,y);
+    if(result!=FACTORY_RESULT_OK)return result;
+    if(!factory_construction_depot_store_reserve_one(
+            &simulation->construction_depots))return FACTORY_RESULT_OUT_OF_MEMORY;
+    result=occupy_with_entity(simulation,x,y,out_id);
+    if(result!=FACTORY_RESULT_OK)return result;
+    factory_construction_depot_store_add(&simulation->construction_depots,
+        *out_id,x,y);
+    return FACTORY_RESULT_OK;
+}
+
 static FactoryResult place_splitter(
     FactorySimulation *simulation,
     const FactoryCommand *command,
@@ -915,6 +936,9 @@ static FactoryResult validate_demolition(
         factory_heat_exchanger_store_find(&simulation->heat_exchangers, id);
     const FactoryResearchLab *research_lab=
         factory_research_lab_store_find(&simulation->research_labs,id);
+    const FactoryConstructionDepot *construction_depot=
+        factory_construction_depot_store_find(
+            &simulation->construction_depots,id);
     const FactoryTile *tile;
 
     if (id == 0U) {
@@ -995,6 +1019,11 @@ static FactoryResult validate_demolition(
         *out_type = FACTORY_ENTITY_TYPE_INSERTER;
         *out_x = inserter->x;
         *out_y = inserter->y;
+    } else if(construction_depot!=NULL){
+        if(construction_depot->material_quantity!=0U)
+            return FACTORY_RESULT_CONSTRUCTION_DEPOT_NOT_EMPTY;
+        *out_type=FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT;
+        *out_x=construction_depot->x;*out_y=construction_depot->y;
     } else if(research_lab!=NULL){
         if(research_lab->science_quantity!=0U)
             return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
@@ -1265,6 +1294,9 @@ static bool remove_subsystem_record(
         case FACTORY_ENTITY_TYPE_RESEARCH_LAB:
             return factory_research_lab_store_remove(
                 &simulation->research_labs,id);
+        case FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT:
+            return factory_construction_depot_store_remove(
+                &simulation->construction_depots,id);
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;
@@ -1276,11 +1308,13 @@ static FactoryResult demolish_entity(
     const FactoryCommand *command,
     FactoryEntityType *out_type,
     int32_t *out_x,
-    int32_t *out_y
+    int32_t *out_y,
+    FactoryEntityId *out_depot_id
 )
 {
     FactoryEntityId id = command->data.demolish_entity.entity_id;
     FactoryConstructionMaterial refund;
+    FactoryConstructionDepot *refund_depot=NULL;
     FactoryResult result = validate_demolition(
         simulation, id, out_type, out_x, out_y
     );
@@ -1291,7 +1325,18 @@ static FactoryResult demolish_entity(
     if (!factory_entity_construction_cost(*out_type, &refund)) {
         return FACTORY_RESULT_UNSUPPORTED_ENTITY;
     }
-    if (!factory_construction_inventory_can_credit(
+    if(simulation->construction_depots.count!=0U){
+        refund_depot=select_construction_depot(simulation,*out_x,*out_y,refund,
+            *out_type==FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT?id:0U,true);
+        if(refund_depot==NULL){
+            if(*out_type!=FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT
+                ||simulation->construction_depots.count!=1U)
+                return FACTORY_RESULT_NO_CONSTRUCTION_SUPPLY;
+            if(!factory_construction_inventory_can_credit(
+                    &simulation->construction_inventory,refund))
+                return FACTORY_RESULT_CONSTRUCTION_INVENTORY_OVERFLOW;
+        }
+    } else if (!factory_construction_inventory_can_credit(
             &simulation->construction_inventory, refund)) {
         return FACTORY_RESULT_CONSTRUCTION_INVENTORY_OVERFLOW;
     }
@@ -1305,9 +1350,10 @@ static FactoryResult demolish_entity(
         return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
     }
     factory_entity_destroy(simulation->entities, id);
-    factory_construction_inventory_credit_validated(
-        &simulation->construction_inventory, refund
-    );
+    if(refund_depot!=NULL){refund_depot->material_quantity+=refund;
+        *out_depot_id=refund_depot->entity_id;}
+    else factory_construction_inventory_credit_validated(
+        &simulation->construction_inventory, refund);
     return FACTORY_RESULT_OK;
 }
 
@@ -1378,9 +1424,36 @@ static bool placement_type(
             *out_type=FACTORY_ENTITY_TYPE_STEAM_CONDENSER; return true;
         case FACTORY_COMMAND_PLACE_RESEARCH_LAB:
             *out_type=FACTORY_ENTITY_TYPE_RESEARCH_LAB; return true;
+        case FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT:
+            *out_type=FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT; return true;
         default:
             return false;
     }
+}
+
+static uint64_t coordinate_distance(int32_t ax,int32_t ay,int32_t bx,int32_t by)
+{
+    int64_t dx=(int64_t)ax-(int64_t)bx;
+    int64_t dy=(int64_t)ay-(int64_t)by;
+    return (uint64_t)(dx<0?-dx:dx)+(uint64_t)(dy<0?-dy:dy);
+}
+
+static FactoryConstructionDepot *select_construction_depot(
+    FactorySimulation *s,int32_t x,int32_t y,uint32_t amount,
+    FactoryEntityId excluded,bool require_capacity)
+{
+    FactoryConstructionDepot *selected=NULL;
+    for(size_t i=0U;i<s->construction_depots.count;++i){
+        FactoryConstructionDepot *d=&s->construction_depots.items[i];
+        bool enough=require_capacity
+            ?d->material_quantity<=FACTORY_CONSTRUCTION_DEPOT_CAPACITY-amount
+            :d->material_quantity>=amount;
+        if(d->entity_id==excluded||!enough
+            ||coordinate_distance(d->x,d->y,x,y)>FACTORY_CONSTRUCTION_DEPOT_RADIUS)
+            continue;
+        if(selected==NULL||d->entity_id<selected->entity_id)selected=d;
+    }
+    return selected;
 }
 
 static FactoryResult validate_placement_footprint(
@@ -1545,7 +1618,7 @@ static FactoryResult set_storage_output(
     FactoryStorage *storage;
 
     if (item < FACTORY_ITEM_NONE
-        || item > FACTORY_ITEM_BASIC_SCIENCE) {
+        || item > FACTORY_ITEM_CONSTRUCTION_MATERIAL) {
         return FACTORY_RESULT_INVALID_ARGUMENT;
     }
     if (!factory_entity_is_valid(simulation->entities, id)) {
@@ -1585,6 +1658,7 @@ static void apply_commands(FactorySimulation *simulation)
         result->construction_units_changed = 0U;
         result->construction_units_remaining =
             simulation->construction_inventory.units;
+        result->construction_depot_id=0U;
         result->previous_assembler_recipe = FACTORY_ASSEMBLER_RECIPE_NONE;
         result->new_assembler_recipe = FACTORY_ASSEMBLER_RECIPE_NONE;
         result->previous_storage_output = FACTORY_ITEM_NONE;
@@ -1606,10 +1680,27 @@ static void apply_commands(FactorySimulation *simulation)
             result->result=validate_placement_footprint(
                 simulation,&result->command,result->entity_type);
             if(result->result!=FACTORY_RESULT_OK)continue;
-            if (!factory_construction_inventory_can_spend(
+            if(simulation->construction_depots.count!=0U){
+                int32_t x=result->command.data.place_extractor.x;
+                int32_t y=result->command.data.place_extractor.y;
+                FactoryConstructionDepot *depot=select_construction_depot(
+                    simulation,x,y,cost,0U,false);
+                if(depot==NULL){
+                    bool covered=false;
+                    for(size_t d=0U;d<simulation->construction_depots.count;++d)
+                        if(coordinate_distance(
+                            simulation->construction_depots.items[d].x,
+                            simulation->construction_depots.items[d].y,x,y)
+                            <=FACTORY_CONSTRUCTION_DEPOT_RADIUS)covered=true;
+                    result->result=covered
+                        ?FACTORY_RESULT_CONSTRUCTION_SUPPLY_INSUFFICIENT
+                        :FACTORY_RESULT_NO_CONSTRUCTION_SUPPLY;
+                    continue;
+                }
+                result->construction_depot_id=depot->entity_id;
+            } else if (!factory_construction_inventory_can_spend(
                     &simulation->construction_inventory, cost)) {
-                result->result =
-                    FACTORY_RESULT_INSUFFICIENT_CONSTRUCTION_UNITS;
+                result->result=FACTORY_RESULT_INSUFFICIENT_CONSTRUCTION_UNITS;
                 continue;
             }
         }
@@ -1662,7 +1753,8 @@ static void apply_commands(FactorySimulation *simulation)
                     &result->command,
                     &result->entity_type,
                     &result->x,
-                    &result->y
+                    &result->y,
+                    &result->construction_depot_id
                 );
                 break;
             case FACTORY_COMMAND_GRANT_CONSTRUCTION_UNITS:
@@ -1763,6 +1855,10 @@ static void apply_commands(FactorySimulation *simulation)
                 result->result=place_research_lab(
                     simulation,&result->command,&result->entity_id);
                 break;
+            case FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT:
+                result->result=place_construction_depot(
+                    simulation,&result->command,&result->entity_id);
+                break;
             case FACTORY_COMMAND_SELECT_RESEARCH:
                 result->result=factory_research_select(simulation,
                     result->command.data.select_research.technology_id);
@@ -1781,14 +1877,33 @@ static void apply_commands(FactorySimulation *simulation)
                     result->command.type, &result->entity_type)
                 && factory_entity_construction_cost(
                     result->entity_type, &amount)) {
-                factory_construction_inventory_spend_validated(
-                    &simulation->construction_inventory, amount
-                );
+                if(result->construction_depot_id!=0U){
+                    FactoryConstructionDepot *depot=
+                        factory_construction_depot_store_find_mutable(
+                            &simulation->construction_depots,
+                            result->construction_depot_id);
+                    depot->material_quantity-=amount;
+                }else{
+                    factory_construction_inventory_spend_validated(
+                        &simulation->construction_inventory, amount);
+                    if(result->entity_type==FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT
+                        &&simulation->construction_depots.count==1U){
+                        FactoryConstructionDepot *depot=
+                            &simulation->construction_depots.items[0];
+                        uint32_t moved=simulation->construction_inventory.units;
+                        if(moved>FACTORY_CONSTRUCTION_DEPOT_CAPACITY)
+                            moved=FACTORY_CONSTRUCTION_DEPOT_CAPACITY;
+                        depot->material_quantity=moved;
+                        simulation->construction_inventory.units-=moved;
+                    }
+                }
                 result->construction_units_changed = amount;
                 factory_simulation_emit_event(simulation, (FactoryEvent){
                     .type = FACTORY_EVENT_ENTITY_CONSTRUCTED,
                     .entity_id = result->entity_id,
-                    .entity_type = result->entity_type
+                    .entity_type = result->entity_type,
+                    .related_entity_id=result->construction_depot_id,
+                    .quantity=amount
                 });
             } else if (result->command.type
                 == FACTORY_COMMAND_GRANT_CONSTRUCTION_UNITS) {
@@ -1802,7 +1917,9 @@ static void apply_commands(FactorySimulation *simulation)
                 factory_simulation_emit_event(simulation, (FactoryEvent){
                     .type = FACTORY_EVENT_ENTITY_DEMOLISHED,
                     .entity_id = result->entity_id,
-                    .entity_type = result->entity_type
+                    .entity_type = result->entity_type,
+                    .related_entity_id=result->construction_depot_id,
+                    .quantity=amount
                 });
             } else if (result->command.type
                     == FACTORY_COMMAND_SET_ASSEMBLER_RECIPE
@@ -1842,6 +1959,37 @@ FactoryConstructionMaterial factory_simulation_construction_units(
     return simulation == NULL
         ? 0U
         : simulation->construction_inventory.units;
+}
+
+bool factory_simulation_get_construction_depot(const FactorySimulation *s,
+    FactoryEntityId id,FactoryConstructionDepot *out)
+{
+    const FactoryConstructionDepot *d;
+    if(s==NULL||out==NULL)return false;
+    d=factory_construction_depot_store_find(&s->construction_depots,id);
+    if(d==NULL)return false;
+    *out=*d;
+    return true;
+}
+
+bool factory_simulation_position_has_construction_coverage(
+    const FactorySimulation *s,int32_t x,int32_t y,
+    FactoryEntityId *out_id,bool *out_complete)
+{
+    const FactoryConstructionDepot *selected=NULL;
+    if(out_id!=NULL)*out_id=0U;
+    if(out_complete!=NULL)*out_complete=false;
+    if(s==NULL)return false;
+    for(size_t i=0U;i<s->construction_depots.count;++i){
+        const FactoryConstructionDepot *d=&s->construction_depots.items[i];
+        if(coordinate_distance(d->x,d->y,x,y)>FACTORY_CONSTRUCTION_DEPOT_RADIUS)
+            continue;
+        if(selected==NULL||d->entity_id<selected->entity_id)selected=d;
+    }
+    if(selected==NULL)return false;
+    if(out_id!=NULL)*out_id=selected->entity_id;
+    if(out_complete!=NULL)*out_complete=selected->material_quantity!=0U;
+    return true;
 }
 
 static void add_producer_intent(
@@ -2080,6 +2228,7 @@ static size_t plan_belt_transfers(
         const FactoryStorage *destination_storage;
         const FactoryPowerGenerator *destination_generator;
         const FactoryResearchLab *destination_research_lab;
+        const FactoryConstructionDepot *destination_depot;
         FactoryLogisticsEndpoint destination = {0};
         int32_t target_x;
         int32_t target_y;
@@ -2118,6 +2267,8 @@ static size_t plan_belt_transfers(
         destination_research_lab = factory_research_lab_store_find(
             &simulation->research_labs, tile->occupying_entity
         );
+        destination_depot=factory_construction_depot_store_find(
+            &simulation->construction_depots,tile->occupying_entity);
         if (destination_belt != NULL) {
             destination = (FactoryLogisticsEndpoint){
                 destination_belt->entity_id, FACTORY_LOGISTICS_SLOT_MAIN
@@ -2137,6 +2288,9 @@ static size_t plan_belt_transfers(
                 destination_research_lab->entity_id,
                 FACTORY_LOGISTICS_SLOT_RESEARCH_LAB_INPUT
             };
+        } else if(destination_depot!=NULL){
+            destination=(FactoryLogisticsEndpoint){destination_depot->entity_id,
+                FACTORY_LOGISTICS_SLOT_CONSTRUCTION_DEPOT_INPUT};
         } else if (destination_refinery != NULL) {
             adjacent_coordinate(
                 destination_refinery->x,
@@ -2514,6 +2668,7 @@ static bool inspect_inserter_destination(
     const FactoryAssembler *assembler;
     const FactoryPowerGenerator *generator;
     const FactoryResearchLab *research_lab;
+    const FactoryConstructionDepot *depot;
 
     *out_endpoint = (FactoryLogisticsEndpoint){
         0U, FACTORY_LOGISTICS_SLOT_NONE
@@ -2605,6 +2760,12 @@ static bool inspect_inserter_destination(
             research_lab->entity_id,
             FACTORY_LOGISTICS_SLOT_RESEARCH_LAB_INPUT
         };
+    }
+    depot=factory_construction_depot_store_find(
+        &simulation->construction_depots,tile->occupying_entity);
+    if(depot!=NULL){
+        *out_endpoint=(FactoryLogisticsEndpoint){depot->entity_id,
+            FACTORY_LOGISTICS_SLOT_CONSTRUCTION_DEPOT_INPUT};
     }
     return out_endpoint->entity_id != 0U
         && factory_logistics_endpoint_can_accept(

@@ -54,6 +54,7 @@ add_library(factory_engine
     src/content.c
     src/command.c
     src/construction.c
+    src/construction_depot.c
     src/construction_inventory.c
     src/entity.c
     src/event.c
@@ -392,5 +393,9 @@ if(BUILD_TESTING)
     target_include_directories(factory_telemetry_tests PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/tests)
     target_link_libraries(factory_telemetry_tests PRIVATE factory_engine)
-    add_test(NAME factory_telemetry_tests COMMAND factory_telemetry_tests)
+add_test(NAME factory_telemetry_tests COMMAND factory_telemetry_tests)
+
+add_executable(factory_construction_depot_tests tests/test_construction_depot.c)
+target_link_libraries(factory_construction_depot_tests PRIVATE factory_engine foundation_project_options)
+add_test(NAME factory_construction_depot_tests COMMAND factory_construction_depot_tests)
 endif()

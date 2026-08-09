@@ -9,7 +9,7 @@
 #include "foundation/research_lab.h"
 
 #define FACTORY_PRESENTATION_DIRECTION_NONE (-1)
-#define FACTORY_PRESENTATION_STORAGE_ITEM_COUNT 9U
+#define FACTORY_PRESENTATION_STORAGE_ITEM_COUNT 10U
 
 typedef enum {
     FACTORY_PRESENTATION_MACHINE_STATUS_NONE = 0,
@@ -261,6 +261,12 @@ typedef struct {
 } FactoryPresentationResearchLab;
 
 typedef struct {
+    uint32_t material_quantity;
+    uint32_t capacity;
+    uint32_t supply_radius;
+} FactoryPresentationConstructionDepot;
+
+typedef struct {
     FactoryEntityId entity_id;
     FactoryEntityType entity_type;
     int32_t x;
@@ -291,6 +297,7 @@ typedef struct {
         FactoryPresentationSteamTurbine steam_turbine;
         FactoryPresentationSteamCondenser steam_condenser;
         FactoryPresentationResearchLab research_lab;
+        FactoryPresentationConstructionDepot construction_depot;
     } data;
 } FactoryPresentationEntity;
 

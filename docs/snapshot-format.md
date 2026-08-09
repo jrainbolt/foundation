@@ -1,4 +1,8 @@
-# Snapshot format version 18
+# Snapshot format version 19
+
+Version 19 adds the authoritative Construction Depot section, construction
+material in Storage records, and the supplying/refund depot ID in command
+results. The bootstrap construction reserve remains in metadata.
 
 Version 18 adds the authoritative 64-bit world seed to the world section.
 Terrain was already stored per tile; the section now explicitly restores the
@@ -33,12 +37,12 @@ timestamp, or process-specific value enters the format.
 | Offset | Width | Field |
 |---:|---:|---|
 | 0 | 8 | Magic bytes `FOUNDATN` |
-| 8 | 4 | Version (`18`) |
+| 8 | 4 | Version (`19`) |
 | 12 | 4 | Header size (`48`) |
 | 16 | 8 | Total snapshot size |
 | 24 | 8 | Payload size |
 | 32 | 8 | Simulation tick |
-| 40 | 4 | Section count (`27`) |
+| 40 | 4 | Section count (`28`) |
 | 44 | 4 | Reserved zero |
 
 Unsigned and signed integers use 32-bit or 64-bit two's-complement
@@ -56,7 +60,7 @@ Each section starts with four 32-bit fields:
 | Record count | Number of fixed-width records |
 | Payload size | Bytes following the section header |
 
-Version 18 requires each section exactly once in this order:
+Version 19 requires each section exactly once in this order:
 
 | Type | Section | Record width |
 |---:|---|---:|
@@ -69,7 +73,7 @@ Version 18 requires each section exactly once in this order:
 | 7 | Refineries | 48 |
 | 8 | Assemblers | 64 |
 | 9 | Inserters | 48 |
-| 10 | Storage | 64 |
+| 10 | Storage | 68 |
 | 11 | Power poles | 12 |
 | 12 | Power generators and optional burner payload | 44 |
 | 13 | Fluid storages | 32 |
@@ -85,8 +89,9 @@ Version 18 requires each section exactly once in this order:
 | 23 | Steam turbines | 16 |
 | 24 | Steam condensers | 16 |
 | 25 | Research Labs | 16 |
-| 26 | Pending commands | 24 |
-| 27 | Command results | 68 |
+| 26 | Construction Depots | 16 |
+| 27 | Pending commands | 24 |
+| 28 | Command results | 72 |
 
 Unknown, reordered, duplicated, missing, incorrectly sized, or unsupported
 sections are rejected. Exact full-buffer consumption is required.
@@ -100,7 +105,7 @@ entity, position, construction, assembler-recipe, and storage-output fields.
 Metadata contains tick, construction units, active research, completed bits,
 and two fixed progress records. Unconsumed science exists only in ordinary
 item inventories and Research Lab records. Storage records include all
-nine item counters, capacity, output configuration, buffer item, and occupancy.
+ten item counters, capacity, output configuration, buffer item, and occupancy.
 Assembler records include recipe, both generic
 counted slots, processing fields, and counted output. Inserter records include
 the complete state-machine state and source/destination coordinates.
