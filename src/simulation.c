@@ -135,6 +135,7 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     factory_rail_station_store_destroy(&simulation->rail_stations);
     factory_rail_switch_store_destroy(&simulation->rail_switches);
     factory_locomotive_store_destroy(&simulation->locomotives);
+    factory_cargo_wagon_store_destroy(&simulation->cargo_wagons);
     factory_rail_topology_destroy(&simulation->rail_topology);
     factory_research_lab_store_destroy(&simulation->research_labs);
     factory_refinery_store_destroy(&simulation->refineries);
@@ -924,9 +925,86 @@ static FactoryResult place_locomotive(FactorySimulation*s,
     FactoryEntityId id=factory_entity_create(s->entities);
     if(id==0U)return FACTORY_RESULT_OUT_OF_MEMORY;
     s->locomotives.items[s->locomotives.count++]=(FactoryLocomotive){
-        id,rail_id,entry,0U,FACTORY_LOCOMOTIVE_MOVING};
+        id,rail_id,entry,0U,FACTORY_LOCOMOTIVE_MOVING,0U,1U};
     *out_id=id;return FACTORY_RESULT_OK;
 }
+
+static FactoryResult place_cargo_wagon(FactorySimulation*s,
+    const FactoryCommand*c,FactoryEntityId*out_id)
+{
+    FactoryEntityId rail_id=c->data.place_cargo_wagon.rail_entity_id;
+    FactoryDirection travel=c->data.place_cargo_wagon.direction;
+    FactoryDirection entry=FACTORY_DIRECTION_NORTH;bool compatible=false;
+    FactoryRailTraversal traversal={0};
+    if(!factory_entity_is_valid(s->entities,rail_id))return FACTORY_RESULT_ENTITY_NOT_FOUND;
+    if(factory_rail_store_find(&s->rails,rail_id)==NULL
+        &&factory_rail_switch_store_find(&s->rail_switches,rail_id)==NULL)
+        return FACTORY_RESULT_UNSUPPORTED_ENTITY;
+    if(factory_simulation_get_rail_vehicle_occupant(s,rail_id)!=0U)
+        return FACTORY_RESULT_ENTITY_BUSY;
+    for(uint32_t candidate=0U;candidate<4U;++candidate)
+        if(factory_simulation_get_rail_traversal(s,rail_id,
+            (FactoryDirection)candidate,&traversal)&&traversal.allowed
+            &&traversal.exit_direction==travel){entry=(FactoryDirection)candidate;
+            compatible=true;break;}
+    if(!compatible)return FACTORY_RESULT_INVALID_STATE;
+    FactoryEntityId id=factory_entity_create(s->entities);
+    if(id==0U)return FACTORY_RESULT_OUT_OF_MEMORY;
+    s->cargo_wagons.items[s->cargo_wagons.count++]=(FactoryCargoWagon){
+        .entity_id=id,.rail_entity_id=rail_id,.entry_direction=entry};
+    *out_id=id;return FACTORY_RESULT_OK;
+}
+
+static FactoryEntityId rail_neighbor(const FactorySimulation*s,
+    FactoryEntityId rail_id,FactoryDirection direction)
+{FactoryRailInspection r;FactoryRailSwitchInspection w;
+ if(factory_simulation_get_rail(s,rail_id,&r))return r.neighbors[direction];
+ if(factory_simulation_get_rail_switch(s,rail_id,&w))return w.neighbors[direction];
+ return 0U;}
+
+static FactoryResult couple_rear_wagon(FactorySimulation*s,
+    const FactoryCommand*c,FactoryEntityId*out_id)
+{FactoryLocomotive*l=factory_locomotive_store_find_mutable(&s->locomotives,
+    c->data.couple_rear_wagon.locomotive_entity_id);
+ FactoryCargoWagon*w=factory_cargo_wagon_store_find_mutable(&s->cargo_wagons,
+    c->data.couple_rear_wagon.wagon_entity_id);
+ if(l==NULL||w==NULL)return FACTORY_RESULT_ENTITY_NOT_FOUND;
+ if(w->train_id!=FACTORY_TRAIN_NONE)return FACTORY_RESULT_ENTITY_BUSY;
+ FactoryEntityId previous=l->entity_id;FactoryEntityId rear_rail=l->rail_entity_id;
+ FactoryDirection rear_entry=l->entry_direction;FactoryCargoWagon*rear=NULL;
+ for(FactoryEntityId cursor=l->rear_vehicle_id;cursor!=0U;){rear=
+    factory_cargo_wagon_store_find_mutable(&s->cargo_wagons,cursor);
+    if(rear==NULL)return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+    previous=rear->entity_id;rear_rail=rear->rail_entity_id;
+    rear_entry=rear->entry_direction;cursor=rear->next_vehicle_id;}
+ FactoryRailTraversal wagon_path={0};
+ if(w->rail_entity_id!=rail_neighbor(s,rear_rail,rear_entry)
+    ||!factory_simulation_get_rail_traversal(s,w->rail_entity_id,
+        w->entry_direction,&wagon_path)||!wagon_path.allowed
+    ||wagon_path.exit_entity_id!=rear_rail)return FACTORY_RESULT_INVALID_STATE;
+ w->train_id=l->entity_id;w->previous_vehicle_id=previous;
+ if(rear!=NULL)rear->next_vehicle_id=w->entity_id;else l->rear_vehicle_id=w->entity_id;
+ ++l->vehicle_count;*out_id=w->entity_id;
+ factory_simulation_emit_event(s,(FactoryEvent){
+    .type=FACTORY_EVENT_RAIL_VEHICLES_COUPLED,.entity_id=l->entity_id,
+    .related_entity_id=w->entity_id,.quantity=l->vehicle_count});return FACTORY_RESULT_OK;}
+
+static FactoryResult decouple_rear_wagon(FactorySimulation*s,
+    const FactoryCommand*c,FactoryEntityId*out_id)
+{FactoryLocomotive*l=factory_locomotive_store_find_mutable(&s->locomotives,
+    c->data.decouple_rear_wagon.locomotive_entity_id);
+ if(l==NULL)return FACTORY_RESULT_ENTITY_NOT_FOUND;
+ if(l->vehicle_count<=1U||l->rear_vehicle_id==0U)return FACTORY_RESULT_INVALID_STATE;
+ FactoryCargoWagon*w=NULL,*previous=NULL;
+ for(FactoryEntityId cursor=l->rear_vehicle_id;cursor!=0U;){w=
+    factory_cargo_wagon_store_find_mutable(&s->cargo_wagons,cursor);
+    if(w==NULL)return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+    if(w->next_vehicle_id==0U)break;previous=w;cursor=w->next_vehicle_id;}
+ if(previous!=NULL)previous->next_vehicle_id=0U;else l->rear_vehicle_id=0U;
+ w->train_id=0U;w->previous_vehicle_id=0U;--l->vehicle_count;*out_id=w->entity_id;
+ factory_simulation_emit_event(s,(FactoryEvent){
+    .type=FACTORY_EVENT_RAIL_VEHICLES_DECOUPLED,.entity_id=l->entity_id,
+    .related_entity_id=w->entity_id,.quantity=l->vehicle_count});return FACTORY_RESULT_OK;}
 
 static FactoryResult place_splitter(
     FactorySimulation *simulation,
@@ -1050,6 +1128,8 @@ static FactoryResult validate_demolition(
         factory_rail_switch_store_find(&simulation->rail_switches,id);
     const FactoryLocomotive *locomotive=
         factory_locomotive_store_find(&simulation->locomotives,id);
+    const FactoryCargoWagon *cargo_wagon=
+        factory_cargo_wagon_store_find(&simulation->cargo_wagons,id);
     const FactoryTile *tile;
 
     if (id == 0U) {
@@ -1059,9 +1139,17 @@ static FactoryResult validate_demolition(
         return FACTORY_RESULT_ENTITY_NOT_FOUND;
     }
     if(locomotive!=NULL){FactoryLocomotiveInspection inspection;
+        if(locomotive->vehicle_count!=1U)return FACTORY_RESULT_ENTITY_BUSY;
         if(!factory_simulation_get_locomotive(simulation,id,&inspection))
             return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
         *out_type=FACTORY_ENTITY_TYPE_LOCOMOTIVE;
+        *out_x=inspection.x;*out_y=inspection.y;
+    } else if(cargo_wagon!=NULL){FactoryCargoWagonInspection inspection;
+        if(cargo_wagon->train_id!=0U)return FACTORY_RESULT_ENTITY_BUSY;
+        if(cargo_wagon->cargo_quantity!=0U)return FACTORY_RESULT_ENTITY_HAS_MATERIAL;
+        if(!factory_simulation_get_cargo_wagon(simulation,id,&inspection))
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        *out_type=FACTORY_ENTITY_TYPE_CARGO_WAGON;
         *out_x=inspection.x;*out_y=inspection.y;
     } else if (extractor != NULL) {
         if (extractor->output_item != FACTORY_ITEM_NONE
@@ -1286,7 +1374,8 @@ static FactoryResult validate_demolition(
         return FACTORY_RESULT_UNSUPPORTED_ENTITY;
     }
     tile = factory_world_get_tile(simulation->world, *out_x, *out_y);
-    if (tile == NULL || (*out_type!=FACTORY_ENTITY_TYPE_LOCOMOTIVE
+    if (tile == NULL || ((*out_type!=FACTORY_ENTITY_TYPE_LOCOMOTIVE
+        &&*out_type!=FACTORY_ENTITY_TYPE_CARGO_WAGON)
         &&tile->occupying_entity != id)) {
         return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
     }
@@ -1437,6 +1526,8 @@ static bool remove_subsystem_record(
             return factory_rail_switch_store_remove(&simulation->rail_switches,id);
         case FACTORY_ENTITY_TYPE_LOCOMOTIVE:
             return factory_locomotive_store_remove(&simulation->locomotives,id);
+        case FACTORY_ENTITY_TYPE_CARGO_WAGON:
+            return factory_cargo_wagon_store_remove(&simulation->cargo_wagons,id);
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;
@@ -1473,7 +1564,8 @@ static FactoryResult demolish_entity(
             &simulation->construction_inventory, refund)) {
         return FACTORY_RESULT_CONSTRUCTION_INVENTORY_OVERFLOW;
     }
-    if(*out_type!=FACTORY_ENTITY_TYPE_LOCOMOTIVE){
+    if(*out_type!=FACTORY_ENTITY_TYPE_LOCOMOTIVE
+        &&*out_type!=FACTORY_ENTITY_TYPE_CARGO_WAGON){
         result=factory_world_clear_occupying_entity(
             simulation->world,*out_x,*out_y,id);
         if(result!=FACTORY_RESULT_OK)return result;
@@ -1566,6 +1658,8 @@ static bool placement_type(
             *out_type=FACTORY_ENTITY_TYPE_RAIL_SWITCH;return true;
         case FACTORY_COMMAND_PLACE_LOCOMOTIVE:
             *out_type=FACTORY_ENTITY_TYPE_LOCOMOTIVE;return true;
+        case FACTORY_COMMAND_PLACE_CARGO_WAGON:
+            *out_type=FACTORY_ENTITY_TYPE_CARGO_WAGON;return true;
         default:
             return false;
     }
@@ -1821,9 +1915,12 @@ static void apply_commands(FactorySimulation *simulation)
                 result->result=FACTORY_RESULT_TECHNOLOGY_LOCKED;
                 continue;
             }
-            if(result->entity_type==FACTORY_ENTITY_TYPE_LOCOMOTIVE){
+            if(result->entity_type==FACTORY_ENTITY_TYPE_LOCOMOTIVE
+                ||result->entity_type==FACTORY_ENTITY_TYPE_CARGO_WAGON){
                 FactoryRailInspection rail;FactoryRailSwitchInspection sw;
-                FactoryEntityId target=result->command.data.place_locomotive.rail_entity_id;
+                FactoryEntityId target=result->entity_type==FACTORY_ENTITY_TYPE_LOCOMOTIVE
+                    ?result->command.data.place_locomotive.rail_entity_id
+                    :result->command.data.place_cargo_wagon.rail_entity_id;
                 if(factory_simulation_get_rail(simulation,target,&rail)){
                     placement_x=rail.x;placement_y=rail.y;result->result=FACTORY_RESULT_OK;
                 }else if(factory_simulation_get_rail_switch(simulation,target,&sw)){
@@ -2034,6 +2131,15 @@ static void apply_commands(FactorySimulation *simulation)
                     &result->command,&result->entity_id);break;
             case FACTORY_COMMAND_PLACE_LOCOMOTIVE:
                 result->result=place_locomotive(simulation,&result->command,
+                    &result->entity_id);break;
+            case FACTORY_COMMAND_PLACE_CARGO_WAGON:
+                result->result=place_cargo_wagon(simulation,&result->command,
+                    &result->entity_id);break;
+            case FACTORY_COMMAND_COUPLE_REAR_WAGON:
+                result->result=couple_rear_wagon(simulation,&result->command,
+                    &result->entity_id);break;
+            case FACTORY_COMMAND_DECOUPLE_REAR_WAGON:
+                result->result=decouple_rear_wagon(simulation,&result->command,
                     &result->entity_id);break;
             case FACTORY_COMMAND_SELECT_RESEARCH:
                 result->result=factory_research_select(simulation,

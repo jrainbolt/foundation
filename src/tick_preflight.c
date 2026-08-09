@@ -82,6 +82,8 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
         case FACTORY_COMMAND_INSERT_REACTOR_FUEL:
         case FACTORY_COMMAND_SELECT_RESEARCH:
         case FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH:
+        case FACTORY_COMMAND_COUPLE_REAR_WAGON:
+        case FACTORY_COMMAND_DECOUPLE_REAR_WAGON:
             break;
         default:
             ++additions;
@@ -138,6 +140,13 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
         if(s->locomotives.count>SIZE_MAX-q)goto overflow;
         required=s->locomotives.count+q;
         if(!factory_locomotive_store_reserve(&s->locomotives,required))
+            goto allocation_failed;
+    }
+    {
+        size_t required;
+        if(s->cargo_wagons.count>SIZE_MAX-q)goto overflow;
+        required=s->cargo_wagons.count+q;
+        if(!factory_cargo_wagon_store_reserve(&s->cargo_wagons,required))
             goto allocation_failed;
     }
 #undef RESERVE_STORE

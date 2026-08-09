@@ -41,9 +41,12 @@ enum {
 };
 
 typedef FactoryEntityId FactoryRailNetworkId;
+typedef FactoryEntityId FactoryTrainId;
 #define FACTORY_RAIL_NETWORK_NONE 0U
+#define FACTORY_TRAIN_NONE 0U
 #define FACTORY_RAIL_NEIGHBOR_COUNT 4U
 #define FACTORY_LOCOMOTIVE_MOVE_TICKS 4U
+#define FACTORY_CARGO_WAGON_CAPACITY 100U
 
 typedef enum {
     FACTORY_LOCOMOTIVE_MOVING=0,
@@ -64,7 +67,23 @@ typedef struct {
     FactoryEntityId next_rail_id;
     FactoryRailNetworkId network_id;
     FactoryLocomotiveActivity activity;
+    FactoryTrainId train_id;
+    uint32_t vehicle_count;
 } FactoryLocomotiveInspection;
+
+typedef struct {
+    FactoryEntityId entity_id;
+    FactoryEntityId rail_entity_id;
+    int32_t x,y;
+    FactoryDirection entry_direction;
+    FactoryRailNetworkId network_id;
+    FactoryTrainId train_id;
+    uint32_t consist_index;
+    bool coupled;
+    FactoryItemType cargo_item;
+    uint32_t cargo_quantity;
+    uint32_t cargo_capacity;
+} FactoryCargoWagonInspection;
 
 typedef struct {
     FactoryEntityId entity_id;
@@ -141,6 +160,12 @@ const FactoryRailNetworkInspection *factory_simulation_get_rail_network(
     const FactorySimulation *simulation,size_t index);
 bool factory_simulation_get_locomotive(const FactorySimulation *simulation,
     FactoryEntityId id,FactoryLocomotiveInspection *out_locomotive);
+bool factory_simulation_get_cargo_wagon(const FactorySimulation *simulation,
+    FactoryEntityId id,FactoryCargoWagonInspection *out_wagon);
+FactoryResult factory_simulation_cargo_wagon_insert(FactorySimulation *simulation,
+    FactoryEntityId id,FactoryItemType item,uint32_t quantity);
+FactoryResult factory_simulation_cargo_wagon_remove(FactorySimulation *simulation,
+    FactoryEntityId id,FactoryItemType item,uint32_t quantity);
 FactoryEntityId factory_simulation_get_rail_vehicle_occupant(
     const FactorySimulation *simulation,FactoryEntityId rail_entity_id);
 

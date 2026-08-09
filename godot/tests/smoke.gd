@@ -53,8 +53,11 @@ func _initialize() -> void:
 		and simulation.has_method("queue_set_storage_output")
 		and simulation.has_method("queue_set_rail_switch_branch")
 		and simulation.has_method("queue_place_locomotive")
+		and simulation.has_method("queue_place_cargo_wagon")
+		and simulation.has_method("queue_couple_rear_wagon")
+		and simulation.has_method("queue_decouple_rear_wagon")
 		and simulation.has_method("get_command_results")
-		and simulation.get_build_catalog().size() == 27
+		and simulation.get_build_catalog().size() == 28
 		and simulation.get_assembler_recipe_catalog().size() == 4
 		and simulation.get_item_catalog().size() == 11
 		and simulation.get_construction_units() >= 0,
@@ -76,7 +79,7 @@ func _initialize() -> void:
 	if not _require(not simulation.has_error(), simulation.get_last_error()):
 		return
 	if not _require(
-		entities.size() == 63,
+		entities.size() == 65,
 		"missing presentation entities: got %d" % entities.size()
 	):
 		return
@@ -92,7 +95,7 @@ func _initialize() -> void:
 		12, 11, 13, 11, 14, 15, 8, 16, 7, 17,
 		18, 18, 18, 19, 11, 10, 11, 20,
 		11, 21,
-		24, 24, 24, 24, 24, 26, 24, 24, 25, 27
+		24, 24, 24, 24, 24, 26, 24, 24, 25, 27, 28, 28
 	]
 	var seen_ids := {}
 	for index in entities.size():
@@ -106,7 +109,7 @@ func _initialize() -> void:
 		):
 			return
 		seen_ids[entity_id] = true
-	if not _require(seen_ids.size() == 63, "duplicate or missing stable IDs"):
+	if not _require(seen_ids.size() == 65, "duplicate or missing stable IDs"):
 		return
 	var rail_switch: Dictionary = entities[58]
 	if not _require(
@@ -124,9 +127,16 @@ func _initialize() -> void:
 		and int(locomotive.travel_direction) == 1
 		and int(locomotive.movement_progress) == 1
 		and int(locomotive.movement_interval) == 4
-		and int(locomotive.rail_network_id) == 54,
+		and int(locomotive.rail_network_id) == 54
+		and int(locomotive.train_id) == 63
+		and int(locomotive.vehicle_count) == 3,
 		"locomotive presentation: %s" % locomotive
 	):
+		return
+	var wagon: Dictionary = entities[63]
+	if not _require(int(wagon.type) == 28 and int(wagon.train_id) == 63
+		and int(wagon.consist_index) == 1 and bool(wagon.coupled),
+		"cargo wagon presentation: %s" % wagon):
 		return
 	var tank: Dictionary = {}
 	for entity: Dictionary in entities:

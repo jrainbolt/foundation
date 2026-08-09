@@ -10,7 +10,7 @@
 
 #define SNAPSHOT_HEADER_SIZE 48U
 #define SNAPSHOT_SECTION_HEADER_SIZE 16U
-#define SNAPSHOT_SECTION_COUNT 32U
+#define SNAPSHOT_SECTION_COUNT 33U
 
 static const uint8_t snapshot_magic[8] = {
     'F', 'O', 'U', 'N', 'D', 'A', 'T', 'N'
@@ -47,6 +47,7 @@ typedef enum {
     SNAPSHOT_SECTION_RAIL_STATIONS,
     SNAPSHOT_SECTION_RAIL_SWITCHES,
     SNAPSHOT_SECTION_LOCOMOTIVES,
+    SNAPSHOT_SECTION_CARGO_WAGONS,
     SNAPSHOT_SECTION_COMMANDS,
     SNAPSHOT_SECTION_RESULTS
 } SnapshotSection;
@@ -297,7 +298,8 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_records(&size,simulation->rails.count,16U)
         || !checked_records(&size,simulation->rail_stations.count,16U)
         || !checked_records(&size,simulation->rail_switches.count,20U)
-        || !checked_records(&size,simulation->locomotives.count,16U)
+        || !checked_records(&size,simulation->locomotives.count,24U)
+        || !checked_records(&size,simulation->cargo_wagons.count,36U)
         || !checked_records(&size, simulation->command_count, 24U)
         || !checked_records(&size, simulation->result_count, 72U)
         || !size_to_u32(simulation->entities->count)
@@ -329,6 +331,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !size_to_u32(simulation->rail_stations.count)
         || !size_to_u32(simulation->rail_switches.count)
         || !size_to_u32(simulation->locomotives.count)
+        || !size_to_u32(simulation->cargo_wagons.count)
         || !section_size_valid(
             simulation->entities->count, 4U, 8U)
         || !section_size_valid(tiles, 16U, 16U)
@@ -358,7 +361,8 @@ static FactoryResult snapshot_size_unvalidated(
         || !section_size_valid(simulation->rails.count,16U,0U)
         || !section_size_valid(simulation->rail_stations.count,16U,0U)
         || !section_size_valid(simulation->rail_switches.count,20U,0U)
-        || !section_size_valid(simulation->locomotives.count,16U,0U)
+        || !section_size_valid(simulation->locomotives.count,24U,0U)
+        || !section_size_valid(simulation->cargo_wagons.count,36U,0U)
         || size > UINT64_MAX) {
         return FACTORY_RESULT_SNAPSHOT_SIZE_OVERFLOW;
     }
@@ -417,6 +421,8 @@ static bool entity_has_subsystem(
         factory_rail_switch_store_find(&simulation->rail_switches,id);
     const FactoryLocomotive *locomotive=
         factory_locomotive_store_find(&simulation->locomotives,id);
+    const FactoryCargoWagon *cargo_wagon=
+        factory_cargo_wagon_store_find(&simulation->cargo_wagons,id);
     const FactorySolarGenerator *solar_generator =
         factory_solar_generator_store_find(&simulation->solar_generators, id);
     const FactoryAccumulator *accumulator =
@@ -447,6 +453,7 @@ static bool entity_has_subsystem(
     found += rail_station != NULL;
     found += rail_switch != NULL;
     found += locomotive != NULL;
+    found += cargo_wagon != NULL;
     if (steam_engine != NULL && generator != NULL) --found;
     if (steam_turbine != NULL && generator != NULL) --found;
     if (solar_generator != NULL && generator != NULL) --found;
@@ -494,6 +501,12 @@ static bool entity_has_subsystem(
             &simulation->rails,locomotive->rail_entity_id);
         const FactoryRailSwitch*w=factory_rail_switch_store_find(
             &simulation->rail_switches,locomotive->rail_entity_id);
+        if(r!=NULL){*out_x=r->x;*out_y=r->y;}
+        else if(w!=NULL){*out_x=w->x;*out_y=w->y;}else return false;
+    } else if(cargo_wagon!=NULL){const FactoryRail*r=factory_rail_store_find(
+            &simulation->rails,cargo_wagon->rail_entity_id);
+        const FactoryRailSwitch*w=factory_rail_switch_store_find(
+            &simulation->rail_switches,cargo_wagon->rail_entity_id);
         if(r!=NULL){*out_x=r->x;*out_y=r->y;}
         else if(w!=NULL){*out_x=w->x;*out_y=w->y;}else return false;
     } else if(construction_depot!=NULL){
@@ -620,6 +633,7 @@ static FactoryResult validate_simulation(
         + simulation->rails.count + simulation->rail_stations.count
         + simulation->rail_switches.count
         + simulation->locomotives.count
+        + simulation->cargo_wagons.count
         + simulation->solar_generators.count
         + simulation->accumulators.count
         + simulation->reactors.count
@@ -645,9 +659,11 @@ static FactoryResult validate_simulation(
 
         const FactoryLocomotive*l=factory_locomotive_store_find(
             &simulation->locomotives,id);
+        const FactoryCargoWagon*w=factory_cargo_wagon_store_find(
+            &simulation->cargo_wagons,id);
         if (id == 0U || !entity_has_subsystem(simulation, id, &x, &y)
             || !factory_world_is_in_bounds(simulation->world, x, y)
-            || (l==NULL&&factory_world_get_tile(
+            || (l==NULL&&w==NULL&&factory_world_get_tile(
                 simulation->world,x,y)->occupying_entity!=id)) {
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
         }
@@ -859,6 +875,57 @@ static FactoryResult validate_simulation(
         for(size_t other=index+1U;other<simulation->locomotives.count;++other)
             if(l->rail_entity_id==simulation->locomotives.items[other].rail_entity_id)
                 return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
+    for(index=0U;index<simulation->cargo_wagons.count;++index){
+        const FactoryCargoWagon*w=&simulation->cargo_wagons.items[index];
+        if(!direction_valid((uint32_t)w->entry_direction)
+            ||w->cargo_quantity>FACTORY_CARGO_WAGON_CAPACITY
+            ||(w->cargo_quantity==0U)!=(w->cargo_item==FACTORY_ITEM_NONE)
+            ||!item_valid_or_none(w->cargo_item)
+            ||(factory_rail_store_find(&simulation->rails,w->rail_entity_id)==NULL
+              &&factory_rail_switch_store_find(&simulation->rail_switches,
+                w->rail_entity_id)==NULL))return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+        for(size_t other=index+1U;other<simulation->cargo_wagons.count;++other)
+            if(w->rail_entity_id==simulation->cargo_wagons.items[other].rail_entity_id)
+                return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+        for(size_t other=0U;other<simulation->locomotives.count;++other)
+            if(w->rail_entity_id==simulation->locomotives.items[other].rail_entity_id)
+                return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+        if(w->train_id!=0U&&factory_locomotive_store_find(
+            &simulation->locomotives,w->train_id)==NULL)
+            return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
+    {
+        size_t linked=0U;
+        for(index=0U;index<simulation->locomotives.count;++index){
+            const FactoryLocomotive*l=&simulation->locomotives.items[index];
+            FactoryEntityId cursor=l->rear_vehicle_id,previous=l->entity_id;
+            FactoryEntityId previous_rail=l->rail_entity_id;uint32_t count=1U;
+            if(l->vehicle_count==0U||(l->vehicle_count==1U)!=(cursor==0U))
+                return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+            while(cursor!=0U){const FactoryCargoWagon*w=
+                factory_cargo_wagon_store_find(&simulation->cargo_wagons,cursor);
+                int32_t px=0,py=0,wx=0,wy=0;bool pf=false,wf=false;
+                if(w==NULL||w->train_id!=l->entity_id
+                    ||w->previous_vehicle_id!=previous
+                    ||count>=l->vehicle_count)return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+                const FactoryRail*pr=factory_rail_store_find(&simulation->rails,previous_rail);
+                const FactoryRailSwitch*ps=factory_rail_switch_store_find(&simulation->rail_switches,previous_rail);
+                const FactoryRail*wr=factory_rail_store_find(&simulation->rails,w->rail_entity_id);
+                const FactoryRailSwitch*ws=factory_rail_switch_store_find(&simulation->rail_switches,w->rail_entity_id);
+                if(pr!=NULL){px=pr->x;py=pr->y;pf=true;}else if(ps!=NULL){px=ps->x;py=ps->y;pf=true;}
+                if(wr!=NULL){wx=wr->x;wy=wr->y;wf=true;}else if(ws!=NULL){wx=ws->x;wy=ws->y;wf=true;}
+                int64_t dx=(int64_t)px-wx,dy=(int64_t)py-wy;
+                if(!pf||!wf||(dx<0?-dx:dx)+(dy<0?-dy:dy)!=1)
+                    return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+                previous=w->entity_id;previous_rail=w->rail_entity_id;
+                cursor=w->next_vehicle_id;++count;++linked;
+            }
+            if(count!=l->vehicle_count)return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+        }
+        size_t claimed=0U;for(index=0U;index<simulation->cargo_wagons.count;++index)
+            if(simulation->cargo_wagons.items[index].train_id!=0U)++claimed;
+        if(linked!=claimed)return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
     for (index = 0U; index < simulation->power_generators.count; ++index) {
         const FactoryPowerGenerator *generator =
@@ -1223,7 +1290,7 @@ static FactoryResult validate_simulation(
         const FactoryCommandResult *value = &simulation->results[index];
         if (!snapshot_command_valid(&value->command)
             || value->result > FACTORY_RESULT_CONSTRUCTION_DEPOT_NOT_EMPTY
-            || value->entity_type > FACTORY_ENTITY_TYPE_LOCOMOTIVE
+            || value->entity_type > FACTORY_ENTITY_TYPE_CARGO_WAGON
             || value->previous_assembler_recipe
                 >= FACTORY_ASSEMBLER_RECIPE_COUNT
             || value->new_assembler_recipe
@@ -1404,6 +1471,14 @@ static void write_command(
         case FACTORY_COMMAND_PLACE_LOCOMOTIVE:
             fields[0]=command->data.place_locomotive.rail_entity_id;
             fields[1]=command->data.place_locomotive.direction;break;
+        case FACTORY_COMMAND_PLACE_CARGO_WAGON:
+            fields[0]=command->data.place_cargo_wagon.rail_entity_id;
+            fields[1]=command->data.place_cargo_wagon.direction;break;
+        case FACTORY_COMMAND_COUPLE_REAR_WAGON:
+            fields[0]=command->data.couple_rear_wagon.locomotive_entity_id;
+            fields[1]=command->data.couple_rear_wagon.wagon_entity_id;break;
+        case FACTORY_COMMAND_DECOUPLE_REAR_WAGON:
+            fields[0]=command->data.decouple_rear_wagon.locomotive_entity_id;break;
     }
     write_u32(writer, (uint32_t)command->type);
     for (index = 0U; index < 5U; ++index) {
@@ -1426,7 +1501,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             return false;
         }
     }
-    if (type > FACTORY_COMMAND_PLACE_LOCOMOTIVE) {
+    if (type > FACTORY_COMMAND_DECOUPLE_REAR_WAGON) {
         return false;
     }
     command->type = (FactoryCommandType)type;
@@ -1472,11 +1547,14 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             case FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT:
             case FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH:
             case FACTORY_COMMAND_PLACE_LOCOMOTIVE:
+            case FACTORY_COMMAND_PLACE_CARGO_WAGON:
+            case FACTORY_COMMAND_COUPLE_REAR_WAGON:
                 used = 2U;
                 break;
             case FACTORY_COMMAND_DEMOLISH_ENTITY:
             case FACTORY_COMMAND_GRANT_CONSTRUCTION_UNITS:
             case FACTORY_COMMAND_SELECT_RESEARCH:
+            case FACTORY_COMMAND_DECOUPLE_REAR_WAGON:
                 used = 1U;
                 break;
         }
@@ -1655,6 +1733,14 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
         case FACTORY_COMMAND_PLACE_LOCOMOTIVE:
             command->data.place_locomotive.rail_entity_id=fields[0];
             command->data.place_locomotive.direction=(FactoryDirection)fields[1];break;
+        case FACTORY_COMMAND_PLACE_CARGO_WAGON:
+            command->data.place_cargo_wagon.rail_entity_id=fields[0];
+            command->data.place_cargo_wagon.direction=(FactoryDirection)fields[1];break;
+        case FACTORY_COMMAND_COUPLE_REAR_WAGON:
+            command->data.couple_rear_wagon.locomotive_entity_id=fields[0];
+            command->data.couple_rear_wagon.wagon_entity_id=fields[1];break;
+        case FACTORY_COMMAND_DECOUPLE_REAR_WAGON:
+            command->data.decouple_rear_wagon.locomotive_entity_id=fields[0];break;
     }
     return snapshot_command_valid(command);
 }
@@ -2110,11 +2196,22 @@ static void write_snapshot(
         write_u32(writer,v->selected_branch);
     }
     write_section_header(writer,SNAPSHOT_SECTION_LOCOMOTIVES,
-        simulation->locomotives.count,simulation->locomotives.count*16U);
+        simulation->locomotives.count,simulation->locomotives.count*24U);
     for(index=0U;index<simulation->locomotives.count;++index){
         const FactoryLocomotive*v=&simulation->locomotives.items[index];
         write_u32(writer,v->entity_id);write_u32(writer,v->rail_entity_id);
         write_u32(writer,v->entry_direction);write_u32(writer,v->progress);
+        write_u32(writer,v->rear_vehicle_id);write_u32(writer,v->vehicle_count);
+    }
+    write_section_header(writer,SNAPSHOT_SECTION_CARGO_WAGONS,
+        simulation->cargo_wagons.count,simulation->cargo_wagons.count*36U);
+    for(index=0U;index<simulation->cargo_wagons.count;++index){
+        const FactoryCargoWagon*v=&simulation->cargo_wagons.items[index];
+        write_u32(writer,v->entity_id);write_u32(writer,v->rail_entity_id);
+        write_u32(writer,v->entry_direction);write_u32(writer,v->train_id);
+        write_u32(writer,v->previous_vehicle_id);write_u32(writer,v->next_vehicle_id);
+        write_u32(writer,v->cargo_item);write_u32(writer,v->cargo_quantity);
+        write_u32(writer,0U);
     }
 
     write_section_header(
@@ -2846,7 +2943,7 @@ static bool load_sections(
         v->geometry=(FactoryRailSwitchGeometry)value;
         v->selected_branch=(FactoryRailSwitchBranch)branch;
     }
-    if(!read_section_header(reader,SNAPSHOT_SECTION_LOCOMOTIVES,16U,0U,&count)
+    if(!read_section_header(reader,SNAPSHOT_SECTION_LOCOMOTIVES,24U,0U,&count)
         ||!factory_locomotive_store_reserve(&simulation->locomotives,count))
         return false;
     simulation->locomotives.count=count;
@@ -2854,10 +2951,28 @@ static bool load_sections(
         &simulation->locomotives.items[index];uint32_t direction,progress;
         if(!read_u32(reader,&v->entity_id)||!read_u32(reader,&v->rail_entity_id)
             ||!read_u32(reader,&direction)||!read_u32(reader,&progress)
+            ||!read_u32(reader,&v->rear_vehicle_id)||!read_u32(reader,&v->vehicle_count)
             ||!direction_valid(direction)||progress>FACTORY_LOCOMOTIVE_MOVE_TICKS)
             return false;
         v->entry_direction=(FactoryDirection)direction;v->progress=progress;
         v->activity=FACTORY_LOCOMOTIVE_MOVING;
+    }
+    if(!read_section_header(reader,SNAPSHOT_SECTION_CARGO_WAGONS,36U,0U,&count)
+        ||!factory_cargo_wagon_store_reserve(&simulation->cargo_wagons,count))
+        return false;
+    simulation->cargo_wagons.count=count;
+    for(index=0U;index<count;++index){FactoryCargoWagon*v=
+        &simulation->cargo_wagons.items[index];uint32_t direction,item,reserved;
+        if(!read_u32(reader,&v->entity_id)||!read_u32(reader,&v->rail_entity_id)
+            ||!read_u32(reader,&direction)||!read_u32(reader,&v->train_id)
+            ||!read_u32(reader,&v->previous_vehicle_id)
+            ||!read_u32(reader,&v->next_vehicle_id)||!read_u32(reader,&item)
+            ||!read_u32(reader,&v->cargo_quantity)||!read_u32(reader,&reserved)
+            ||!direction_valid(direction)||!item_valid_or_none((FactoryItemType)item)
+            ||v->cargo_quantity>FACTORY_CARGO_WAGON_CAPACITY||reserved!=0U
+            ||(v->cargo_quantity==0U)!=(item==FACTORY_ITEM_NONE))return false;
+        v->entry_direction=(FactoryDirection)direction;
+        v->cargo_item=(FactoryItemType)item;
     }
 
     if (!read_section_header(

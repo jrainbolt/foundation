@@ -219,6 +219,12 @@ void FoundationSimulation::_bind_methods()
     ClassDB::bind_method(
         D_METHOD("queue_place_locomotive","rail_entity_id","direction"),
         &FoundationSimulation::queue_place_locomotive);
+    ClassDB::bind_method(D_METHOD("queue_place_cargo_wagon","rail_entity_id","direction"),
+        &FoundationSimulation::queue_place_cargo_wagon);
+    ClassDB::bind_method(D_METHOD("queue_couple_rear_wagon","locomotive_id","wagon_id"),
+        &FoundationSimulation::queue_couple_rear_wagon);
+    ClassDB::bind_method(D_METHOD("queue_decouple_rear_wagon","locomotive_id"),
+        &FoundationSimulation::queue_decouple_rear_wagon);
     ClassDB::bind_method(D_METHOD("get_command_results"),
         &FoundationSimulation::get_command_results);
     ClassDB::bind_method(D_METHOD("get_build_catalog"),
@@ -616,13 +622,23 @@ FactoryResult FoundationSimulation::build_demo()
     FactoryCommand locomotive={};locomotive.type=FACTORY_COMMAND_PLACE_LOCOMOTIVE;
     locomotive.data.place_locomotive={57U,FACTORY_DIRECTION_EAST};
     result=submit(locomotive);if(result!=FACTORY_RESULT_OK)return result;
+    FactoryCommand wagon1={};wagon1.type=FACTORY_COMMAND_PLACE_CARGO_WAGON;
+    wagon1.data.place_cargo_wagon={56U,FACTORY_DIRECTION_EAST};
+    FactoryCommand wagon2={};wagon2.type=FACTORY_COMMAND_PLACE_CARGO_WAGON;
+    wagon2.data.place_cargo_wagon={54U,FACTORY_DIRECTION_EAST};
+    result=submit(wagon1);if(result!=FACTORY_RESULT_OK)return result;
+    result=submit(wagon2);if(result!=FACTORY_RESULT_OK)return result;
+    FactoryCommand couple1={};couple1.type=FACTORY_COMMAND_COUPLE_REAR_WAGON;
+    couple1.data.couple_rear_wagon={63U,64U};
+    FactoryCommand couple2={};couple2.type=FACTORY_COMMAND_COUPLE_REAR_WAGON;
+    couple2.data.couple_rear_wagon={63U,65U};
+    result=submit(couple1);if(result!=FACTORY_RESULT_OK)return result;
+    result=submit(couple2);if(result!=FACTORY_RESULT_OK)return result;
     result=factory_simulation_tick(simulation_);if(result!=FACTORY_RESULT_OK)return result;
-    const FactoryCommandResult*locomotive_result=
-        factory_simulation_get_command_result(simulation_,0U);
-    if(locomotive_result==nullptr||locomotive_result->result!=FACTORY_RESULT_OK
-        ||locomotive_result->entity_id!=63U)
-        return locomotive_result==nullptr?FACTORY_RESULT_INTERNAL_STATE_MISMATCH
-            :locomotive_result->result;
+    for(size_t i=0U;i<5U;++i){const FactoryCommandResult*r=
+        factory_simulation_get_command_result(simulation_,i);
+        if(r==nullptr||r->result!=FACTORY_RESULT_OK)
+            return r==nullptr?FACTORY_RESULT_INTERNAL_STATE_MISMATCH:r->result;}
     return factory_presentation_snapshot_rebuild(presentation_, simulation_);
 }
 
@@ -777,6 +793,33 @@ int64_t FoundationSimulation::queue_place_locomotive(
         (FactoryDirection)direction};
     return factory_simulation_submit_command(simulation_,&command);
 }
+
+int64_t FoundationSimulation::queue_place_cargo_wagon(
+    int64_t rail_entity_id,int64_t direction)
+{
+    if(simulation_==nullptr||rail_entity_id<=0||rail_entity_id>UINT32_MAX
+        ||direction<FACTORY_DIRECTION_NORTH||direction>FACTORY_DIRECTION_WEST)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};command.type=FACTORY_COMMAND_PLACE_CARGO_WAGON;
+    command.data.place_cargo_wagon={(FactoryEntityId)rail_entity_id,
+        (FactoryDirection)direction};
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
+int64_t FoundationSimulation::queue_couple_rear_wagon(
+    int64_t locomotive_id,int64_t wagon_id)
+{if(simulation_==nullptr||locomotive_id<=0||locomotive_id>UINT32_MAX
+    ||wagon_id<=0||wagon_id>UINT32_MAX)return FACTORY_RESULT_INVALID_ARGUMENT;
+ FactoryCommand command={};command.type=FACTORY_COMMAND_COUPLE_REAR_WAGON;
+ command.data.couple_rear_wagon={(FactoryEntityId)locomotive_id,
+    (FactoryEntityId)wagon_id};return factory_simulation_submit_command(simulation_,&command);}
+
+int64_t FoundationSimulation::queue_decouple_rear_wagon(int64_t locomotive_id)
+{if(simulation_==nullptr||locomotive_id<=0||locomotive_id>UINT32_MAX)
+    return FACTORY_RESULT_INVALID_ARGUMENT;FactoryCommand command={};
+ command.type=FACTORY_COMMAND_DECOUPLE_REAR_WAGON;
+ command.data.decouple_rear_wagon={(FactoryEntityId)locomotive_id};
+ return factory_simulation_submit_command(simulation_,&command);}
 
 Array FoundationSimulation::get_command_results() const
 {
@@ -1447,6 +1490,19 @@ bool FoundationSimulation::entity_to_dictionary(
         value["next_rail_id"]=(int64_t)entity.data.locomotive.next_rail_id;
         value["rail_network_id"]=(int64_t)entity.data.locomotive.network_id;
         value["locomotive_activity"]=(int64_t)entity.data.locomotive.activity;
+        value["train_id"]=(int64_t)entity.data.locomotive.train_id;
+        value["vehicle_count"]=(int64_t)entity.data.locomotive.vehicle_count;
+        break;
+    case FACTORY_ENTITY_TYPE_CARGO_WAGON:
+        value["rail_entity_id"]=(int64_t)entity.data.cargo_wagon.rail_entity_id;
+        value["entry_direction"]=(int64_t)entity.data.cargo_wagon.entry_direction;
+        value["rail_network_id"]=(int64_t)entity.data.cargo_wagon.network_id;
+        value["train_id"]=(int64_t)entity.data.cargo_wagon.train_id;
+        value["consist_index"]=(int64_t)entity.data.cargo_wagon.consist_index;
+        value["coupled"]=entity.data.cargo_wagon.coupled;
+        value["cargo_item"]=(int64_t)entity.data.cargo_wagon.cargo_item;
+        value["cargo_quantity"]=(int64_t)entity.data.cargo_wagon.cargo_quantity;
+        value["cargo_capacity"]=(int64_t)entity.data.cargo_wagon.cargo_capacity;
         break;
     default:
         break;

@@ -33,7 +33,7 @@ func _run() -> void:
 		return
 	var initial_tick := int(main.simulation.get_tick())
 	var canvas: Node = main.canvas
-	if initial_tick != 56 or canvas.entity_nodes.size() != 63:
+	if initial_tick != 56 or canvas.entity_nodes.size() != 65:
 		_fail("deterministic demo or entity visuals are incorrect")
 		return
 	var research: Dictionary = main.simulation.get_research()
@@ -189,7 +189,7 @@ func _run() -> void:
 	if int(main.simulation.get_tick()) != initial_tick:
 		_fail("reset did not restore initial tick")
 		return
-	if canvas.entity_nodes.size() != 63 or canvas.resources.size() <= 2:
+	if canvas.entity_nodes.size() != 65 or canvas.resources.size() <= 2:
 		_fail("reset did not restore deterministic visuals")
 		return
 

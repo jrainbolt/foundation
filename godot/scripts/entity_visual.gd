@@ -13,7 +13,7 @@ const COLORS := {
 	19: Color("#873d8c"), 20: Color("#857322"), 21: Color("#286d80"),
 	22: Color("#475d91"),
 	23: Color("#596b46"),
-	24: Color("#9ea7af"), 25: Color("#506a78"), 26: Color("#a88946"), 27: Color("#b64b3b"),
+	24: Color("#9ea7af"), 25: Color("#506a78"), 26: Color("#a88946"), 27: Color("#b64b3b"), 28: Color("#3f7294"),
 }
 const TITLES := {
 	1: "EXTRACTOR", 2: "BELT", 3: "REFINERY", 4: "ASSEMBLER",
@@ -24,7 +24,7 @@ const TITLES := {
 	20: "TURBINE", 21: "CONDENSER",
 	22: "RESEARCH LAB",
 	23: "CONSTRUCTION DEPOT",
-	24: "RAIL", 25: "RAIL STATION", 26: "RAIL SWITCH", 27: "LOCOMOTIVE",
+	24: "RAIL", 25: "RAIL STATION", 26: "RAIL SWITCH", 27: "LOCOMOTIVE", 28: "CARGO WAGON",
 }
 const ABBREVIATIONS := {
 	1: "EX", 2: "BELT", 3: "REF", 4: "ASM", 5: "BOX", 6: "SPLIT",
@@ -33,7 +33,7 @@ const ABBREVIATIONS := {
 	17: "CORE", 18: "HEAT", 19: "HEX", 20: "TURB", 21: "COND",
 	22: "LAB",
 	23: "DEPOT",
-	24: "", 25: "STN", 26: "SW", 27: "LOCO",
+	24: "", 25: "STN", 26: "SW", 27: "LOCO", 28: "CARGO",
 }
 
 var state: Dictionary = {}
@@ -75,6 +75,10 @@ func _draw() -> void:
 		return
 	if entity_type == 27:
 		_draw_locomotive(color)
+		_draw_selection()
+		return
+	if entity_type == 28:
+		_draw_cargo_wagon(color)
 		_draw_selection()
 		return
 	if not bool(state.get("powered", true)) and entity_type in [1, 3, 4, 7, 21, 22]:
@@ -125,6 +129,21 @@ func _draw_locomotive(color: Color) -> void:
 	draw_circle(Vector2(-14,19),5,Color("#242a2f"));draw_circle(Vector2(13,19),5,Color("#242a2f"))
 	draw_set_transform(Vector2.ZERO,0.0,Vector2.ONE)
 	draw_string(title_font,Vector2(8,12),"LOCO",HORIZONTAL_ALIGNMENT_CENTER,60,10,Color.WHITE)
+
+func _draw_cargo_wagon(color: Color) -> void:
+	var center := Vector2(38,38)
+	var direction := int(state.get("entry_direction",state.get("direction",3)))
+	var angle: float = [ -PI/2.0, 0.0, PI/2.0, PI ][direction]
+	draw_set_transform(center,angle,Vector2.ONE)
+	draw_rect(Rect2(-27,-18,54,36),Color("#14191e"),true)
+	draw_rect(Rect2(-23,-14,46,28),color,true)
+	var capacity: int = maxi(1,int(state.get("cargo_capacity",100)))
+	var fill: float = float(state.get("cargo_quantity",0))/float(capacity)
+	draw_rect(Rect2(-20,8,40*fill,4),color.lightened(0.35),true)
+	draw_circle(Vector2(-15,-19),5,Color("#242a2f"));draw_circle(Vector2(15,-19),5,Color("#242a2f"))
+	draw_circle(Vector2(-15,19),5,Color("#242a2f"));draw_circle(Vector2(15,19),5,Color("#242a2f"))
+	draw_set_transform(Vector2.ZERO,0.0,Vector2.ONE)
+	draw_string(title_font,Vector2(8,12),"CARGO",HORIZONTAL_ALIGNMENT_CENTER,60,10,Color.WHITE)
 
 func _draw_station(color: Color) -> void:
 	draw_rect(Rect2(8,14,60,48),Color("#111820"),true)

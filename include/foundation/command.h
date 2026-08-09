@@ -59,7 +59,10 @@ typedef enum {
     FACTORY_COMMAND_PLACE_RAIL_STATION,
     FACTORY_COMMAND_PLACE_RAIL_SWITCH,
     FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH,
-    FACTORY_COMMAND_PLACE_LOCOMOTIVE
+    FACTORY_COMMAND_PLACE_LOCOMOTIVE,
+    FACTORY_COMMAND_PLACE_CARGO_WAGON,
+    FACTORY_COMMAND_COUPLE_REAR_WAGON,
+    FACTORY_COMMAND_DECOUPLE_REAR_WAGON
 } FactoryCommandType;
 
 typedef struct {
@@ -174,6 +177,12 @@ typedef struct {
             set_rail_switch_branch;
         struct { FactoryEntityId rail_entity_id; FactoryDirection direction; }
             place_locomotive;
+        struct { FactoryEntityId rail_entity_id; FactoryDirection direction; }
+            place_cargo_wagon;
+        struct { FactoryEntityId locomotive_entity_id; FactoryEntityId wagon_entity_id; }
+            couple_rear_wagon;
+        struct { FactoryEntityId locomotive_entity_id; }
+            decouple_rear_wagon;
     } data;
 } FactoryCommand;
 

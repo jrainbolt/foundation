@@ -312,10 +312,35 @@ FactoryLocomotive *factory_locomotive_store_find_mutable(
 bool factory_locomotive_store_remove(FactoryLocomotiveStore*s,FactoryEntityId id)
 {if(s!=NULL)for(size_t i=0;i<s->count;++i)if(s->items[i].entity_id==id){--s->count;s->items[i]=s->items[s->count];return true;}return false;}
 
+void factory_cargo_wagon_store_destroy(FactoryCargoWagonStore*s)
+{if(s!=NULL){free(s->items);*s=(FactoryCargoWagonStore){0};}}
+bool factory_cargo_wagon_store_reserve(FactoryCargoWagonStore*s,size_t required)
+{if(s==NULL||required>SIZE_MAX/sizeof(*s->items))return false;
+ if(required>s->capacity){FactoryCargoWagon*p=realloc(s->items,required*sizeof(*p));
+  if(p==NULL)return false;s->items=p;s->capacity=required;}return true;}
+const FactoryCargoWagon *factory_cargo_wagon_store_find(
+    const FactoryCargoWagonStore*s,FactoryEntityId id)
+{if(s!=NULL)for(size_t i=0;i<s->count;++i)if(s->items[i].entity_id==id)return s->items+i;return NULL;}
+FactoryCargoWagon *factory_cargo_wagon_store_find_mutable(
+    FactoryCargoWagonStore*s,FactoryEntityId id)
+{return (FactoryCargoWagon*)factory_cargo_wagon_store_find(s,id);}
+bool factory_cargo_wagon_store_remove(FactoryCargoWagonStore*s,FactoryEntityId id)
+{if(s!=NULL)for(size_t i=0;i<s->count;++i)if(s->items[i].entity_id==id){--s->count;s->items[i]=s->items[s->count];return true;}return false;}
+
 FactoryEntityId factory_simulation_get_rail_vehicle_occupant(
     const FactorySimulation*s,FactoryEntityId rail_id)
-{if(s!=NULL)for(size_t i=0;i<s->locomotives.count;++i)
-    if(s->locomotives.items[i].rail_entity_id==rail_id)return s->locomotives.items[i].entity_id;return 0U;}
+{
+    if(s==NULL)return 0U;
+    for(size_t i=0U;i<s->locomotives.count;++i){
+        if(s->locomotives.items[i].rail_entity_id==rail_id)
+            return s->locomotives.items[i].entity_id;
+    }
+    for(size_t i=0U;i<s->cargo_wagons.count;++i){
+        if(s->cargo_wagons.items[i].rail_entity_id==rail_id)
+            return s->cargo_wagons.items[i].entity_id;
+    }
+    return 0U;
+}
 
 static bool rail_node_position(const FactorySimulation*s,FactoryEntityId id,
     int32_t*x,int32_t*y,FactoryRailNetworkId*network)
@@ -345,8 +370,50 @@ bool factory_simulation_get_locomotive(const FactorySimulation*s,
     *out=(FactoryLocomotiveInspection){l->entity_id,l->rail_entity_id,x,y,
         l->entry_direction,traversed?t.exit_direction:l->entry_direction,
         l->progress,FACTORY_LOCOMOTIVE_MOVE_TICKS,traversed?t.exit_entity_id:0U,
-        network,activity};return true;
+        network,activity,l->entity_id,l->vehicle_count};return true;
 }
+
+bool factory_simulation_get_cargo_wagon(const FactorySimulation*s,
+    FactoryEntityId id,FactoryCargoWagonInspection*out)
+{
+    if(s==NULL||out==NULL)return false;const FactoryCargoWagon*w=
+        factory_cargo_wagon_store_find(&s->cargo_wagons,id);if(w==NULL)return false;
+    int32_t x=0,y=0;FactoryRailNetworkId network=0;uint32_t index=0U;
+    (void)rail_node_position(s,w->rail_entity_id,&x,&y,&network);
+    if(w->train_id!=0U){const FactoryLocomotive*l=factory_locomotive_store_find(
+        &s->locomotives,w->train_id);FactoryEntityId next=l!=NULL?l->rear_vehicle_id:0U;
+        index=1U;while(next!=0U&&next!=id){const FactoryCargoWagon*cursor=
+            factory_cargo_wagon_store_find(&s->cargo_wagons,next);
+            if(cursor==NULL)break;next=cursor->next_vehicle_id;++index;}}
+    *out=(FactoryCargoWagonInspection){w->entity_id,w->rail_entity_id,x,y,
+        w->entry_direction,network,w->train_id,index,w->train_id!=0U,
+        w->cargo_item,w->cargo_quantity,FACTORY_CARGO_WAGON_CAPACITY};return true;
+}
+
+FactoryResult factory_simulation_cargo_wagon_insert(FactorySimulation*s,
+    FactoryEntityId id,FactoryItemType item,uint32_t quantity)
+{FactoryCargoWagon*w;if(s==NULL||item<=FACTORY_ITEM_NONE
+    ||item>FACTORY_ITEM_CONSTRUCTION_MATERIAL||quantity==0U)
+    return FACTORY_RESULT_INVALID_ARGUMENT;
+ w=factory_cargo_wagon_store_find_mutable(&s->cargo_wagons,id);
+ if(w==NULL)return factory_entity_is_valid(s->entities,id)
+    ?FACTORY_RESULT_UNSUPPORTED_ENTITY:FACTORY_RESULT_ENTITY_NOT_FOUND;
+ if((w->cargo_item!=FACTORY_ITEM_NONE&&w->cargo_item!=item)
+    ||quantity>FACTORY_CARGO_WAGON_CAPACITY-w->cargo_quantity)
+    return FACTORY_RESULT_INVALID_STATE;
+ w->cargo_item=item;w->cargo_quantity+=quantity;return FACTORY_RESULT_OK;}
+
+FactoryResult factory_simulation_cargo_wagon_remove(FactorySimulation*s,
+    FactoryEntityId id,FactoryItemType item,uint32_t quantity)
+{FactoryCargoWagon*w;if(s==NULL||item<=FACTORY_ITEM_NONE
+    ||item>FACTORY_ITEM_CONSTRUCTION_MATERIAL||quantity==0U)
+    return FACTORY_RESULT_INVALID_ARGUMENT;
+ w=factory_cargo_wagon_store_find_mutable(&s->cargo_wagons,id);
+ if(w==NULL)return factory_entity_is_valid(s->entities,id)
+    ?FACTORY_RESULT_UNSUPPORTED_ENTITY:FACTORY_RESULT_ENTITY_NOT_FOUND;
+ if(w->cargo_item!=item||quantity>w->cargo_quantity)return FACTORY_RESULT_INVALID_STATE;
+ w->cargo_quantity-=quantity;if(w->cargo_quantity==0U)w->cargo_item=FACTORY_ITEM_NONE;
+ return FACTORY_RESULT_OK;}
 
 static int plan_compare(const void*a,const void*b)
 {FactoryEntityId x=((const FactoryLocomotivePlan*)a)->id;
@@ -382,10 +449,19 @@ void factory_locomotives_update(FactorySimulation*s)
     }
     for(size_t i=0;i<store->count;++i)if(store->plans[i].move){FactoryLocomotive*l=
         factory_locomotive_store_find_mutable(store,store->plans[i].id);
-        FactoryEntityId previous=l->rail_entity_id;l->rail_entity_id=store->plans[i].to;
+        FactoryEntityId previous=l->rail_entity_id,carry_rail=l->rail_entity_id;
+        FactoryDirection carry_entry=l->entry_direction;
+        FactoryEntityId wagon_id=l->rear_vehicle_id;
+        l->rail_entity_id=store->plans[i].to;
         l->entry_direction=store->plans[i].next_entry;l->progress=0U;
         l->activity=FACTORY_LOCOMOTIVE_MOVING;
+        while(wagon_id!=0U){FactoryCargoWagon*w=
+            factory_cargo_wagon_store_find_mutable(&s->cargo_wagons,wagon_id);
+            FactoryEntityId next=w->next_vehicle_id,old_rail=w->rail_entity_id;
+            FactoryDirection old_entry=w->entry_direction;
+            w->rail_entity_id=carry_rail;w->entry_direction=carry_entry;
+            carry_rail=old_rail;carry_entry=old_entry;wagon_id=next;}
         factory_simulation_emit_event(s,(FactoryEvent){.type=FACTORY_EVENT_LOCOMOTIVE_MOVED,
             .entity_id=l->entity_id,.related_entity_id=previous,
-            .quantity=l->rail_entity_id});}
+            .quantity=l->rail_entity_id,.related_quantity=l->vehicle_count});}
 }

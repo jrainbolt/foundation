@@ -216,6 +216,8 @@ static FactoryResult populate_entity(
         factory_rail_switch_store_find(&simulation->rail_switches,id);
     const FactoryLocomotive *locomotive=
         factory_locomotive_store_find(&simulation->locomotives,id);
+    const FactoryCargoWagon *cargo_wagon=
+        factory_cargo_wagon_store_find(&simulation->cargo_wagons,id);
     FactoryPipeInspection pipe;
     FactoryPowerPoleInspection pole;
     FactoryPowerGeneratorInspection generator;
@@ -617,7 +619,20 @@ static FactoryResult populate_entity(
             inspection.rail_entity_id,inspection.entry_direction,
             inspection.travel_direction,inspection.movement_progress,
             inspection.movement_interval,inspection.next_rail_id,
-            inspection.network_id,inspection.activity};
+            inspection.network_id,inspection.activity,inspection.train_id,
+            inspection.vehicle_count};
+    } else if(cargo_wagon!=NULL){FactoryCargoWagonInspection inspection;
+        if(!factory_simulation_get_cargo_wagon(simulation,id,&inspection))
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        out->entity_type=FACTORY_ENTITY_TYPE_CARGO_WAGON;
+        out->x=inspection.x;out->y=inspection.y;
+        out->direction=inspection.entry_direction;
+        out->status=FACTORY_PRESENTATION_MACHINE_STATUS_IDLE;
+        out->data.cargo_wagon=(FactoryPresentationCargoWagon){
+            inspection.rail_entity_id,inspection.entry_direction,
+            inspection.network_id,inspection.train_id,inspection.consist_index,
+            inspection.coupled,inspection.cargo_item,inspection.cargo_quantity,
+            inspection.cargo_capacity};
     } else if(construction_depot!=NULL){
         out->entity_type=FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT;
         out->x=construction_depot->x;out->y=construction_depot->y;

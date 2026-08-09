@@ -1,6 +1,12 @@
 # Snapshot format version 22
 
-Version 22 adds Locomotive records containing the entity ID, occupied rail
+Version 23 adds authoritative train-consist membership and Cargo Wagon records.
+Locomotive records now include the first wagon link and vehicle count. Cargo
+Wagon records contain entity/rail IDs, entry direction, train and adjacent
+membership IDs, and bounded cargo item/quantity. Derived position, network,
+activity, and next-rail values remain excluded.
+
+Version 22 added Locomotive records containing the entity ID, occupied rail
 entity ID, entry direction, and movement progress. Derived position, network,
 next rail, activity, occupancy, and presentation remain excluded.
 

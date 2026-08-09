@@ -77,13 +77,17 @@ func show_entity(state: Dictionary) -> void:
 	if state.has("movement_progress"): field(lines,"Movement","%d / %d ticks" % [int(state.movement_progress),int(state.get("movement_interval",0))])
 	if state.has("next_rail_id"): field(lines,"Next rail","#%d" % int(state.next_rail_id))
 	if state.has("locomotive_activity"): field(lines,"Locomotive activity",str(int(state.locomotive_activity)))
+	if state.has("train_id"): field(lines,"Train ID","#%d" % int(state.train_id))
+	if state.has("vehicle_count"): field(lines,"Vehicle count",str(int(state.vehicle_count)))
+	if state.has("consist_index"): field(lines,"Consist index",str(int(state.consist_index)))
+	if state.has("coupled"): field(lines,"Coupled",Format.yes_no(bool(state.coupled)))
 	if state.has("recipe") or state.has("progress") or state.has("duration"):
 		section(lines, "Process")
 		if state.has("recipe"): field(lines, "Recipe ID", str(int(state.recipe)))
 		if state.has("progress"): field(lines, "Progress", "%d / %d ticks" % [int(state.progress), int(state.get("duration", 0))])
 	for key in ["processing", "generation_active", "conversion_active", "fuel_active"]:
 		if state.has(key): field(lines, key.capitalize(), Format.yes_no(bool(state[key])))
-	var inventory_keys := ["item", "quantity", "output_item", "output_quantity", "resource_remaining", "science_quantity", "science_capacity", "material_quantity", "supply_radius", "fluid_quantity", "fluid_capacity", "stored_water", "water_capacity", "stored_steam", "steam_capacity", "stored_exhaust", "exhaust_capacity", "stored_energy", "capacity", "stored_heat", "heat_capacity", "fuel_ticks", "energy_available"]
+	var inventory_keys := ["item", "quantity", "output_item", "output_quantity", "resource_remaining", "science_quantity", "science_capacity", "material_quantity", "supply_radius", "fluid_quantity", "fluid_capacity", "stored_water", "water_capacity", "stored_steam", "steam_capacity", "stored_exhaust", "exhaust_capacity", "stored_energy", "capacity", "stored_heat", "heat_capacity", "fuel_ticks", "energy_available", "cargo_item", "cargo_quantity", "cargo_capacity"]
 	var has_inventory := false
 	for key in inventory_keys:
 		if state.has(key): has_inventory = true

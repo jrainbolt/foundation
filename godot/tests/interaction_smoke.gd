@@ -63,6 +63,7 @@ func run_test() -> void:
 	if not require_value(toolbar.buttons.size() >= 11 and toolbar.buttons[5].disabled == false, "build toolbar catalog"): return
 	if not require_value(toolbar.buttons.has(26) and not toolbar.buttons[26].disabled, "rail switch toolbar entry"): return
 	if not require_value(toolbar.buttons.has(27) and not toolbar.buttons[27].disabled, "locomotive toolbar entry"): return
+	if not require_value(toolbar.buttons.has(28) and not toolbar.buttons[28].disabled, "cargo wagon toolbar entry"): return
 	if not require_value(controller.select_entity(59), "demo rail switch selection"): return
 	if not require_value(inspector.configuration_label.text == "Rail switch branch"
 		and inspector.configuration_selector.item_count == 2,
@@ -157,7 +158,7 @@ func run_test() -> void:
 	controller.select_entity(1)
 	main._reset_demo()
 	if not require_value(controller.selected_entity_id == 0 and inspector.entity_id == 0, "reset selection policy"): return
-	if not require_value(canvas.entity_nodes.size() == 63, "reset visual parity"): return
+	if not require_value(canvas.entity_nodes.size() == 65, "reset visual parity"): return
 	main.queue_free()
 	await process_frame
 	print("Foundation interaction smoke test passed")

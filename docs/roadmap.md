@@ -30,6 +30,7 @@
 - [x] Deterministic static rail geometry, topology, and station attachment
 - [x] Deterministic rail switches and branching junctions
 - [x] Deterministic locomotive ownership and basic rail movement
+- [x] Deterministic train consists and Cargo Wagons
 
 Finite deposits and seeded authoritative terrain are prerequisites for
 deterministic resource patches, remote mining outposts, rail infrastructure, and eventually

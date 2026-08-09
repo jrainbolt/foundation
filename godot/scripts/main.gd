@@ -196,6 +196,9 @@ func _on_placement_requested(entity_type: int,grid: Vector2i,direction: int) -> 
 	if entity_type == 27:
 		var rail_id: int = world_controller.pick_grid(grid)
 		queued = simulation.queue_place_locomotive(rail_id,direction)
+	elif entity_type == 28:
+		var rail_id: int = world_controller.pick_grid(grid)
+		queued = simulation.queue_place_cargo_wagon(rail_id,direction)
 	else:
 		queued = simulation.queue_place_entity(entity_type,grid.x,grid.y,direction)
 	if queued != 0:
