@@ -1122,7 +1122,7 @@ static FactoryResult validate_simulation(
     for (index = 0U; index < simulation->result_count; ++index) {
         const FactoryCommandResult *value = &simulation->results[index];
         if (!snapshot_command_valid(&value->command)
-            || value->result > FACTORY_RESULT_TERRAIN_BLOCKED
+            || value->result > FACTORY_RESULT_WORLD_GENERATION_FAILED
             || value->entity_type > FACTORY_ENTITY_TYPE_RESEARCH_LAB
             || value->previous_assembler_recipe
                 >= FACTORY_ASSEMBLER_RECIPE_COUNT

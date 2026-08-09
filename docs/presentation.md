@@ -1,5 +1,10 @@
 # Renderer-neutral presentation snapshots
 
+Generated worlds require no special presentation path: every authoritative
+terrain cell and finite deposit is copied in canonical row-major order. The
+derived center start coordinate remains available from the world dimensions;
+no noise values, patch IDs, or generator scratch enter presentation records.
+
 Steam Turbine records expose steam, fluid/power network IDs and connections,
 definition ID, maximum/available/actual output, consumed steam, completed
 cycles, and activity. Steam Condenser records expose the same shape mirrored

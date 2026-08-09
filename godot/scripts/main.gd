@@ -86,6 +86,9 @@ func _reset_demo() -> void:
 	var result: int = simulation.reset_demo()
 	_show_result(result)
 	_synchronize()
+	%Camera2D.center_on_grid(
+		Vector2i(simulation.get_start_x(),simulation.get_start_y()),76.0)
+	%Camera2D.set_zoom_level(0.55)
 
 func _advance(count: int) -> bool:
 	var result: int = simulation.step_many(count)

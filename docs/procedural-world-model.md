@@ -5,7 +5,8 @@ row-major terrain grid. `factory_world_create_with_seed` records a caller-owned
 seed; the original constructor remains a compatibility wrapper using
 `FACTORY_WORLD_DEFAULT_SEED`. This milestone adds no random generator or
 terrain-generation algorithm. A later generator can use the stable input tuple
-`(seed, width, height)` and initialize cells before simulation begins.
+`(seed, width, height)`. Generator version 1 now performs that initialization;
+see [world-generation.md](world-generation.md) for the fixed integer algorithm.
 
 ## Terrain ownership and setup
 
@@ -40,6 +41,7 @@ exports one read-only terrain record per cell in row-major order. Godot renders
 these beneath resources, networks, and entities and uses buildability only for
 advisory preview; the engine remains authoritative.
 
-The demo includes a small Water strip and Rock outcrop away from its factory.
+The demo uses generated coherent Water, Rock, and finite resource patches,
+while retaining its deterministic systems factory inside the protected core.
 Movement costs, biomes, chunks, hidden generation state, and renderer assets
 remain deliberately deferred.

@@ -303,7 +303,13 @@ func _initialize() -> void:
 		"fluid transfer was not reflected through Godot"
 	):
 		return
-	if not _require(resources.size() == 2, "missing resources"):
+	if not _require(resources.size() > 2, "generated resource patches missing"):
+		return
+	if not _require(simulation.get_terrain().size() == 48 * 32,
+		"generated terrain count"):
+		return
+	if not _require(simulation.get_start_x() == 24 and simulation.get_start_y() == 16,
+		"generated start coordinate"):
 		return
 	if not _require(not edges.is_empty(), "missing power edges"):
 		return

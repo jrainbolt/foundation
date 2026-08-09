@@ -10,8 +10,10 @@ extern "C" {
 namespace godot {
 namespace {
 
-constexpr uint32_t DEMO_WIDTH = 13U;
-constexpr uint32_t DEMO_HEIGHT = 8U;
+constexpr uint32_t DEMO_WIDTH = 48U;
+constexpr uint32_t DEMO_HEIGHT = 32U;
+constexpr int32_t DEMO_OFFSET_X = 18;
+constexpr int32_t DEMO_OFFSET_Y = 12;
 constexpr FactoryConstructionMaterial DEMO_CONSTRUCTION_UNITS = 1000U;
 constexpr int64_t MAX_STEP_MANY = 10000;
 
@@ -22,6 +24,8 @@ FactoryCommand place(
 )
 {
     FactoryCommand command = {};
+    x += DEMO_OFFSET_X;
+    y += DEMO_OFFSET_Y;
     command.type = type;
     switch (type) {
     case FACTORY_COMMAND_PLACE_EXTRACTOR:
@@ -167,6 +171,8 @@ const char *result_name_c(FactoryResult result)
         return "technology locked";
     case FACTORY_RESULT_TERRAIN_BLOCKED:
         return "terrain blocked";
+    case FACTORY_RESULT_WORLD_GENERATION_FAILED:
+        return "world generation failed";
     }
     return "unknown result";
 }
@@ -237,6 +243,8 @@ void FoundationSimulation::_bind_methods()
     ClassDB::bind_method(
         D_METHOD("get_terrain"), &FoundationSimulation::get_terrain
     );
+    ClassDB::bind_method(D_METHOD("get_start_x"),&FoundationSimulation::get_start_x);
+    ClassDB::bind_method(D_METHOD("get_start_y"),&FoundationSimulation::get_start_y);
     ClassDB::bind_method(
         D_METHOD("get_power_edges"), &FoundationSimulation::get_power_edges
     );
@@ -288,26 +296,22 @@ void FoundationSimulation::destroy_state()
 FactoryResult FoundationSimulation::build_demo()
 {
     FactoryResult result;
-    world_ = factory_world_create(DEMO_WIDTH, DEMO_HEIGHT);
+    world_ = factory_world_create_with_seed(DEMO_WIDTH,DEMO_HEIGHT,UINT64_C(42));
     if (world_ == nullptr)
         return FACTORY_RESULT_OUT_OF_MEMORY;
-    for (int32_t x=0;x<3;++x) {
-        result=factory_world_initialize_terrain(
-            world_,x,7,FACTORY_TERRAIN_WATER);
-        if(result!=FACTORY_RESULT_OK)return result;
-    }
-    for (int32_t x=6;x<9;++x) {
-        result=factory_world_initialize_terrain(
-            world_,x,7,FACTORY_TERRAIN_ROCK);
-        if(result!=FACTORY_RESULT_OK)return result;
-    }
+    FactoryWorldGenerationConfig generation;
+    factory_world_generation_default_config(&generation);
+    generation.starting_area_radius=8U;
+    generation.starter_distance=9U;
+    result=factory_world_generate(world_,&generation);
+    if(result!=FACTORY_RESULT_OK)return result;
     result = factory_world_add_resource(
-        world_, 0, 2, FACTORY_RESOURCE_IRON, 500U
+        world_, DEMO_OFFSET_X, DEMO_OFFSET_Y+2, FACTORY_RESOURCE_IRON, 500U
     );
     if (result != FACTORY_RESULT_OK)
         return result;
     result = factory_world_add_resource(
-        world_, 0, 4, FACTORY_RESOURCE_COPPER, 500U
+        world_, DEMO_OFFSET_X, DEMO_OFFSET_Y+4, FACTORY_RESOURCE_COPPER, 500U
     );
     if (result != FACTORY_RESULT_OK)
         return result;
@@ -1359,6 +1363,11 @@ Array FoundationSimulation::get_terrain() const
     }
     return values;
 }
+
+int64_t FoundationSimulation::get_start_x() const
+{return world_==nullptr?0:(int64_t)factory_world_get_start_x(world_);}
+int64_t FoundationSimulation::get_start_y() const
+{return world_==nullptr?0:(int64_t)factory_world_get_start_y(world_);}
 
 Array FoundationSimulation::get_power_edges() const
 {

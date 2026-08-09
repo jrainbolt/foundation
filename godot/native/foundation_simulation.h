@@ -68,6 +68,8 @@ public:
     Array get_entities() const;
     Array get_resources() const;
     Array get_terrain() const;
+    int64_t get_start_x() const;
+    int64_t get_start_y() const;
     Array get_power_edges() const;
     Array get_events() const;
     void clear_events();

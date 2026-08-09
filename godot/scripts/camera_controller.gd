@@ -27,6 +27,9 @@ func zoom_by(factor: float) -> void:
 func move_by(delta_position: Vector2) -> void:
 	position += delta_position
 
+func center_on_grid(grid: Vector2i, cell_size: float) -> void:
+	position = (Vector2(grid) + Vector2(0.5, 0.5)) * cell_size
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_MIDDLE:
 		dragging = event.pressed

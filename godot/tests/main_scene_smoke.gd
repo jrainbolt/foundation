@@ -157,7 +157,7 @@ func _run() -> void:
 			or steam_turbine_count != 1 or steam_condenser_count != 1:
 		_fail("main scene did not receive fluid machines")
 		return
-	if canvas.resources.size() != 2 or canvas.edges.is_empty():
+	if canvas.resources.size() <= 2 or canvas.terrain.size() != 48 * 32 or canvas.edges.is_empty():
 		_fail("resource or power-edge visuals are missing")
 		return
 	if not main.tick_label.text.contains("54"):
@@ -189,7 +189,7 @@ func _run() -> void:
 	if int(main.simulation.get_tick()) != initial_tick:
 		_fail("reset did not restore initial tick")
 		return
-	if canvas.entity_nodes.size() != 53 or canvas.resources.size() != 2:
+	if canvas.entity_nodes.size() != 53 or canvas.resources.size() <= 2:
 		_fail("reset did not restore deterministic visuals")
 		return
 

@@ -1,5 +1,9 @@
 # Deterministic Simulation
 
+World generation is completed and validated before simulation creation seals
+the world. Simulation ticks never consult the seed, rerun generation, or retain
+generator state; they consume only authoritative terrain and deposit cells.
+
 Before a tick clears events or mutates authoritative state, a shared preflight
 reserves the conservative post-command component and power/fluid/heat topology
 bounds. A failed reservation leaves commands, events, clock, world state, and

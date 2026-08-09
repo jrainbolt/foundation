@@ -1,5 +1,10 @@
 # Finite resource deposits
 
+Procedural generation creates multi-cell Iron and Copper patches directly from
+ordinary finite deposit cells. A patch has no runtime object or shared quantity;
+all depletion, occupancy, conservation, and snapshot rules below remain
+unchanged.
+
 Iron and copper deposits are authoritative world-tile state. Each deposit has
 an integer resource type, position, remaining `FactoryResourceQuantity`, and
 ordinary tile occupancy. Valid initial quantities are 1 through

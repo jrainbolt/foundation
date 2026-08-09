@@ -8,6 +8,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static int failures;
@@ -147,10 +148,42 @@ static void test_preflight_preserves_final_unit(void)
     factory_simulation_destroy(s);factory_world_destroy(w);
 }
 
+static void test_generated_deposit_depletes_normally(void)
+{
+    FactoryWorldGenerationConfig config;FactoryWorld*w;
+    FactorySimulation*s;int32_t rx=-1,ry=-1,px=-1,py=-1,gx=-1,gy=-1;
+    factory_world_generation_default_config(&config);
+    config.starter_quantity=1U;config.remote_patch_count=0U;
+    w=factory_world_create_with_seed(64U,48U,UINT64_C(42));
+    CHECK(factory_world_generate(w,&config)==FACTORY_RESULT_OK);
+    for(int32_t y=0;y<48&&rx<0;++y)for(int32_t x=0;x<64;++x)
+        if(factory_world_get_tile(w,x,y)->resource==FACTORY_RESOURCE_IRON){rx=x;ry=y;break;}
+    for(int32_t y=0;y<48&&gx<0;++y)for(int32_t x=0;x<64;++x){
+        const FactoryTile*t=factory_world_get_tile(w,x,y);
+        if(t->terrain!=FACTORY_TERRAIN_GROUND||t->resource!=FACTORY_RESOURCE_NONE)continue;
+        if(px<0&&abs(x-rx)<=2&&abs(y-ry)<=2){px=x;py=y;continue;}
+        if(px>=0&&abs(x-px)<=2&&abs(y-py)<=2){gx=x;gy=y;break;}
+    }
+    CHECK(rx>=0&&px>=0&&gx>=0);
+    s=factory_simulation_create_with_construction_units(w,1000U);
+    submit(s,(FactoryCommand){FACTORY_COMMAND_PLACE_EXTRACTOR,
+        {.place_extractor={rx,ry,FACTORY_DIRECTION_EAST}}});
+    CHECK(factory_test_submit_power_pair(s,px,py,gx,gy));
+    for(size_t i=0U;i<FACTORY_EXTRACTOR_PRODUCTION_TICKS;++i)
+        CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    CHECK(factory_world_get_tile(w,rx,ry)->resource_amount==0U);
+    {FactoryExtractor e;CHECK(factory_simulation_get_extractor(s,1U,&e));
+        CHECK(e.output_item==FACTORY_ITEM_IRON_ORE&&e.output_amount==1U);}
+    CHECK(factory_simulation_get_event_count(s)==2U);
+    CHECK(factory_simulation_get_event(s,1U)->type==FACTORY_EVENT_RESOURCE_DEPLETED);
+    factory_simulation_destroy(s);factory_world_destroy(w);
+}
+
 int main(void)
 {
     test_depletion_event_presentation_and_replacement();
     test_logistics_conservation_and_snapshot();
     test_preflight_preserves_final_unit();
+    test_generated_deposit_depletes_normally();
     return failures==0?0:1;
 }

@@ -82,6 +82,7 @@ add_library(factory_engine
     src/storage.c
     src/tick_preflight.c
     src/world.c
+    src/world_generation.c
 )
 target_include_directories(factory_engine
     PUBLIC

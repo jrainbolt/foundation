@@ -47,12 +47,12 @@ func run_test() -> void:
 	uninitialized = null
 	controller.enter_build_mode(5)
 	if not require_value(controller.mode == 1 and controller.build_entity_type == 5, "enter build mode"): return
-	controller.set_hovered_grid(Vector2i(12,0))
+	controller.set_hovered_grid(Vector2i(24,16))
 	if not require_value(controller.preview_is_advisably_valid(), "empty placement preview"): return
-	controller.set_hovered_grid(Vector2i(0,2))
+	controller.set_hovered_grid(Vector2i(18,14))
 	if not require_value(not controller.preview_is_advisably_valid(), "occupied placement preview"): return
 	if not require_value(controller.hovered_entity_id == 1 and canvas.entity_nodes[1].hovered, "entity hover outline state"): return
-	controller.set_hovered_grid(Vector2i(12,0))
+	controller.set_hovered_grid(Vector2i(24,16))
 	if not require_value(not canvas.entity_nodes[1].hovered, "entity hover clearing"): return
 	controller.rotate_build()
 	if not require_value(controller.build_direction == 1, "build rotation"): return
@@ -65,7 +65,7 @@ func run_test() -> void:
 	if not require_value(controller.mode == 1 and toolbar.buttons[5].button_pressed, "toolbar selected state"): return
 	controller.enter_select_mode()
 	var tick_before := int(simulation.get_tick())
-	if not require_value(camera.position == Vector2(494,304) and is_equal_approx(camera.zoom.x,0.72), "camera readability defaults"): return
+	if not require_value(camera.position == Vector2(1862,1254) and is_equal_approx(camera.zoom.x,0.55), "generated camera center"): return
 	var camera_before := camera.position
 	camera.move_by(Vector2(25, -10))
 	camera.set_zoom_level(100.0)

@@ -15,6 +15,21 @@ typedef enum {
 
 typedef uint64_t FactoryWorldSeed;
 #define FACTORY_WORLD_DEFAULT_SEED UINT64_C(0x464F554E44415449)
+#define FACTORY_WORLD_GENERATOR_VERSION 1U
+
+typedef struct {
+    uint32_t starting_area_radius;
+    uint32_t terrain_scale;
+    uint16_t water_threshold;
+    uint16_t rock_threshold;
+    uint32_t starter_patch_radius;
+    uint32_t starter_distance;
+    uint32_t starter_quantity;
+    uint32_t remote_patch_count;
+    uint32_t remote_patch_radius;
+    uint32_t remote_base_quantity;
+    uint32_t remote_distance_bonus;
+} FactoryWorldGenerationConfig;
 
 typedef enum {
     FACTORY_RESOURCE_NONE = 0,
@@ -84,7 +99,8 @@ typedef enum {
     FACTORY_RESULT_TECHNOLOGY_ALREADY_COMPLETED,
     FACTORY_RESULT_TECHNOLOGY_PREREQUISITES_MISSING,
     FACTORY_RESULT_TECHNOLOGY_LOCKED,
-    FACTORY_RESULT_TERRAIN_BLOCKED
+    FACTORY_RESULT_TERRAIN_BLOCKED,
+    FACTORY_RESULT_WORLD_GENERATION_FAILED
 } FactoryResult;
 
 /*
@@ -105,6 +121,12 @@ uint32_t factory_world_get_width(const FactoryWorld *world);
 uint32_t factory_world_get_height(const FactoryWorld *world);
 FactoryWorldSeed factory_world_get_seed(const FactoryWorld *world);
 bool factory_world_validate(const FactoryWorld *world);
+void factory_world_generation_default_config(FactoryWorldGenerationConfig *out);
+FactoryResult factory_world_generate(
+    FactoryWorld *world,const FactoryWorldGenerationConfig *config);
+int32_t factory_world_get_start_x(const FactoryWorld *world);
+int32_t factory_world_get_start_y(const FactoryWorld *world);
+uint64_t factory_world_generation_checksum(const FactoryWorld *world);
 
 /* Returns false for a NULL world or coordinates outside the world. */
 bool factory_world_is_in_bounds(const FactoryWorld *world, int32_t x, int32_t y);
