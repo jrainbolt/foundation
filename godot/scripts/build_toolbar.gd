@@ -4,7 +4,7 @@ extends HBoxContainer
 signal build_selected(entity_type: int)
 signal demolish_selected
 const Format := preload("res://scripts/presentation_format.gd")
-const CURATED_TYPES := [1,2,7,5,4,22,23,24,25,8,9,11,12,13,14,21]
+const CURATED_TYPES := [1,2,7,5,4,22,23,24,26,25,8,9,11,12,13,14,21]
 var buttons: Dictionary = {}
 
 func configure(simulation: Object) -> void:

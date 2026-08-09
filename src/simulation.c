@@ -133,6 +133,7 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     factory_construction_depot_store_destroy(&simulation->construction_depots);
     factory_rail_store_destroy(&simulation->rails);
     factory_rail_station_store_destroy(&simulation->rail_stations);
+    factory_rail_switch_store_destroy(&simulation->rail_switches);
     factory_rail_topology_destroy(&simulation->rail_topology);
     factory_research_lab_store_destroy(&simulation->research_labs);
     factory_refinery_store_destroy(&simulation->refineries);
@@ -850,12 +851,53 @@ static FactoryResult place_rail_station(FactorySimulation*s,
     if(result!=FACTORY_RESULT_OK)return result;
     for(size_t i=0U;i<s->rails.count;++i)if(s->rails.items[i].x==x+dx[o]
         &&s->rails.items[i].y==y+dy[o]){attached=true;break;}
+    for(size_t i=0U;!attached&&i<s->rail_switches.count;++i)
+        if(s->rail_switches.items[i].x==x+dx[o]
+            &&s->rail_switches.items[i].y==y+dy[o])attached=true;
     if(!attached)return FACTORY_RESULT_INVALID_STATE;
     if(!factory_rail_station_store_reserve_one(&s->rail_stations))
         return FACTORY_RESULT_OUT_OF_MEMORY;
     result=occupy_with_entity(s,x,y,out_id);if(result!=FACTORY_RESULT_OK)return result;
     factory_rail_station_store_add(&s->rail_stations,*out_id,x,y,o);
     s->rail_topology.dirty=true;return FACTORY_RESULT_OK;
+}
+
+static FactoryResult place_rail_switch(FactorySimulation*s,
+    const FactoryCommand*c,FactoryEntityId*out_id)
+{
+    int32_t x=c->data.place_rail_switch.x,y=c->data.place_rail_switch.y;
+    FactoryResult result=validate_empty_tile(s,x,y);
+    if(result!=FACTORY_RESULT_OK)return result;
+    if(!factory_rail_switch_store_reserve_one(&s->rail_switches))
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    result=occupy_with_entity(s,x,y,out_id);
+    if(result!=FACTORY_RESULT_OK)return result;
+    factory_rail_switch_store_add(&s->rail_switches,*out_id,x,y,
+        (FactoryRailSwitchGeometry)c->data.place_rail_switch.geometry);
+    s->rail_topology.dirty=true;return FACTORY_RESULT_OK;
+}
+
+static FactoryResult set_rail_switch_branch(FactorySimulation*s,
+    const FactoryCommand*c,FactoryEntityId*out_id)
+{
+    FactoryEntityId id=c->data.set_rail_switch_branch.entity_id;
+    FactoryRailSwitch *rail_switch;
+    FactoryRailSwitchBranch branch=(FactoryRailSwitchBranch)
+        c->data.set_rail_switch_branch.branch;
+    if(!factory_rail_switch_branch_is_valid(branch))
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    if(!factory_entity_is_valid(s->entities,id))
+        return FACTORY_RESULT_ENTITY_NOT_FOUND;
+    rail_switch=factory_rail_switch_store_find_mutable(&s->rail_switches,id);
+    if(rail_switch==NULL)return FACTORY_RESULT_UNSUPPORTED_ENTITY;
+    *out_id=id;
+    if(rail_switch->selected_branch==branch)return FACTORY_RESULT_OK;
+    FactoryRailSwitchBranch previous=rail_switch->selected_branch;
+    rail_switch->selected_branch=branch;
+    factory_simulation_emit_event(s,(FactoryEvent){
+        .type=FACTORY_EVENT_RAIL_SWITCH_CHANGED,.entity_id=id,
+        .quantity=(uint32_t)previous,.related_quantity=(uint32_t)branch});
+    return FACTORY_RESULT_OK;
 }
 
 static FactoryResult place_splitter(
@@ -976,6 +1018,8 @@ static FactoryResult validate_demolition(
     const FactoryRail *rail=factory_rail_store_find(&simulation->rails,id);
     const FactoryRailStation *rail_station=
         factory_rail_station_store_find(&simulation->rail_stations,id);
+    const FactoryRailSwitch *rail_switch=
+        factory_rail_switch_store_find(&simulation->rail_switches,id);
     const FactoryTile *tile;
 
     if (id == 0U) {
@@ -1061,6 +1105,9 @@ static FactoryResult validate_demolition(
     } else if(rail_station!=NULL){
         *out_type=FACTORY_ENTITY_TYPE_RAIL_STATION;
         *out_x=rail_station->x;*out_y=rail_station->y;
+    } else if(rail_switch!=NULL){
+        *out_type=FACTORY_ENTITY_TYPE_RAIL_SWITCH;
+        *out_x=rail_switch->x;*out_y=rail_switch->y;
     } else if(construction_depot!=NULL){
         if(construction_depot->material_quantity!=0U)
             return FACTORY_RESULT_CONSTRUCTION_DEPOT_NOT_EMPTY;
@@ -1345,6 +1392,9 @@ static bool remove_subsystem_record(
         case FACTORY_ENTITY_TYPE_RAIL_STATION:
             simulation->rail_topology.dirty=true;
             return factory_rail_station_store_remove(&simulation->rail_stations,id);
+        case FACTORY_ENTITY_TYPE_RAIL_SWITCH:
+            simulation->rail_topology.dirty=true;
+            return factory_rail_switch_store_remove(&simulation->rail_switches,id);
         case FACTORY_ENTITY_TYPE_NONE:
         default:
             return false;
@@ -1471,6 +1521,8 @@ static bool placement_type(
             *out_type=FACTORY_ENTITY_TYPE_RAIL;return true;
         case FACTORY_COMMAND_PLACE_RAIL_STATION:
             *out_type=FACTORY_ENTITY_TYPE_RAIL_STATION;return true;
+        case FACTORY_COMMAND_PLACE_RAIL_SWITCH:
+            *out_type=FACTORY_ENTITY_TYPE_RAIL_SWITCH;return true;
         default:
             return false;
     }
@@ -1918,6 +1970,12 @@ static void apply_commands(FactorySimulation *simulation)
             case FACTORY_COMMAND_PLACE_RAIL_STATION:
                 result->result=place_rail_station(simulation,&result->command,
                     &result->entity_id);break;
+            case FACTORY_COMMAND_PLACE_RAIL_SWITCH:
+                result->result=place_rail_switch(simulation,&result->command,
+                    &result->entity_id);break;
+            case FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH:
+                result->result=set_rail_switch_branch(simulation,
+                    &result->command,&result->entity_id);break;
             case FACTORY_COMMAND_SELECT_RESEARCH:
                 result->result=factory_research_select(simulation,
                     result->command.data.select_research.technology_id);

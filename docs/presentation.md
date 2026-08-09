@@ -140,3 +140,8 @@ Rail presentation exposes geometry, derived port/connection masks, network ID,
 and neighbors in North/East/South/West order. Rail Station presentation exposes
 orientation, attached rail, network ID, and connected state. Frontends do not
 calculate authoritative attachment or connectivity; no train fields exist.
+
+Rail Switch presentation adds immutable geometry, authoritative selected
+branch, derived stem/Branch A/Branch B directions, all three physical ports,
+connection mask, cardinal neighbors, and physical network ID. Presentation
+does not perform traversal or mutate selection.

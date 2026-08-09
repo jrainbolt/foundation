@@ -67,6 +67,7 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
     FactoryTickPreflight next={0};
     size_t q,additions=0U,poles,generators,accumulators,consumers,connections;
     size_t pipes,ports,conductors,heat_ports;
+    size_t rail_count,switch_count,station_count,rail_nodes;
     if (s==NULL) return FACTORY_RESULT_INVALID_ARGUMENT;
     q=s->command_count;
     for (size_t i=0U;i<q;++i) switch (s->commands[i].type) {
@@ -80,6 +81,7 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
         case FACTORY_COMMAND_FLUID_TRANSFER:
         case FACTORY_COMMAND_INSERT_REACTOR_FUEL:
         case FACTORY_COMMAND_SELECT_RESEARCH:
+        case FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH:
             break;
         default:
             ++additions;
@@ -130,6 +132,7 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
     RESERVE_STORE(s->construction_depots,1U);
     RESERVE_STORE(s->rails,1U);
     RESERVE_STORE(s->rail_stations,1U);
+    RESERVE_STORE(s->rail_switches,1U);
 #undef RESERVE_STORE
     ADD_BOUND(poles,s->power_poles.count,1U);
     ADD_BOUND(generators,s->power_generators.count,1U);
@@ -151,6 +154,11 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
     ADD_BOUND(ports,s->fluid_ports.count,2U);
     ADD_BOUND(conductors,s->heat_conductors.count,1U);
     ADD_BOUND(heat_ports,s->heat_ports.count,1U);
+    ADD_BOUND(rail_count,s->rails.count,1U);
+    ADD_BOUND(switch_count,s->rail_switches.count,1U);
+    ADD_BOUND(station_count,s->rail_stations.count,1U);
+    rail_nodes=rail_count;
+    if (!add_size(&rail_nodes,switch_count)) goto overflow;
     if (!add_block(&next,FACTORY_TOPOLOGY_POWER,poles,
             sizeof(FactoryPowerPoleInspection))
         || !add_block(&next,FACTORY_TOPOLOGY_POWER,generators,
@@ -182,11 +190,13 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
             sizeof(FactoryHeatPortInspection))
         || !add_block(&next,FACTORY_TOPOLOGY_HEAT,conductors,
             sizeof(FactoryHeatNetworkInspection))
-        || !add_block(&next,FACTORY_TOPOLOGY_RAIL,s->rails.count+q,
+        || !add_block(&next,FACTORY_TOPOLOGY_RAIL,rail_count,
             sizeof(FactoryRailInspection))
-        || !add_block(&next,FACTORY_TOPOLOGY_RAIL,s->rail_stations.count+q,
+        || !add_block(&next,FACTORY_TOPOLOGY_RAIL,switch_count,
+            sizeof(FactoryRailSwitchInspection))
+        || !add_block(&next,FACTORY_TOPOLOGY_RAIL,station_count,
             sizeof(FactoryRailStationInspection))
-        || !add_block(&next,FACTORY_TOPOLOGY_RAIL,s->rails.count+q,
+        || !add_block(&next,FACTORY_TOPOLOGY_RAIL,rail_nodes,
             sizeof(FactoryRailNetworkInspection))) {
         factory_tick_preflight_destroy(&next);
         return FACTORY_RESULT_OUT_OF_MEMORY;

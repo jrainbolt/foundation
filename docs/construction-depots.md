@@ -41,3 +41,7 @@ Static rails and Rail Stations use this physical supply path. Each tile is an
 independent transaction: a rail costs 2 units and a station costs 30, selected
 from the lowest-ID eligible depot. There is no free or bulk-build discount and
 failed validation consumes nothing.
+
+Rail Switches cost 5 units and use the same lowest-ID covering-depot rule.
+Invalid terrain, occupancy, geometry, branch configuration, insufficient
+supply, and out-of-coverage attempts never partially deduct material.

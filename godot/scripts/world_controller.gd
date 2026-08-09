@@ -172,6 +172,12 @@ func _draw() -> void:
 			for index in range(4):
 				if mask & (1 << index):
 					draw_line(center,center+vectors[index]*36.0,Color.WHITE,5.0)
+		elif build_entity_type == 26:
+			var switch_masks := [11,14,7,13]
+			var mask: int = switch_masks[build_direction]
+			for index in range(4):
+				if mask & (1 << index):
+					draw_line(center,center+vectors[index]*36.0,Color.WHITE,5.0)
 		else:
 			draw_line(center,center+vectors[build_direction]*20.0,Color.WHITE,3.0)
 	elif mode == InteractionMode.DEMOLISH:

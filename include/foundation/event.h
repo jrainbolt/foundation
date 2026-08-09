@@ -53,7 +53,8 @@ typedef enum {
     FACTORY_EVENT_TECHNOLOGY_COMPLETED,
     FACTORY_EVENT_ASSEMBLER_RECIPE_CHANGED,
     FACTORY_EVENT_STORAGE_OUTPUT_CHANGED,
-    FACTORY_EVENT_RESOURCE_DEPLETED
+    FACTORY_EVENT_RESOURCE_DEPLETED,
+    FACTORY_EVENT_RAIL_SWITCH_CHANGED
 } FactoryEventType;
 
 /*
@@ -108,6 +109,8 @@ typedef enum {
  * resource depleted: x/y identify the deposit, entity_id identifies the
  * occupying extractor, and resource_type identifies the resource. It follows
  * the final production-completed event and is emitted exactly once.
+ * rail switch changed: entity_id identifies the switch, quantity is the
+ * previous branch, and related_quantity is the newly selected branch.
  *
  * tick is the simulation tick at the start of the step that emitted the
  * event. Item-transfer quantity is currently one. Successful requests for an

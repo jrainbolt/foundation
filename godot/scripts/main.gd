@@ -40,6 +40,7 @@ func _ready() -> void:
 	world_controller.interaction_mode_changed.connect(_on_interaction_mode_changed)
 	inspector.assembler_recipe_requested.connect(_on_assembler_recipe_requested)
 	inspector.storage_output_requested.connect(_on_storage_output_requested)
+	inspector.rail_switch_branch_requested.connect(_on_rail_switch_branch_requested)
 	_reset_demo()
 	build_toolbar.configure(simulation)
 	inspector.configure_catalogs(
@@ -217,6 +218,13 @@ func _on_storage_output_requested(entity_id: int,item_type: int) -> void:
 		status_label.text = "Status: %s" % simulation.result_name(queued)
 		return
 	_execute_queued_command("Storage output updated")
+
+func _on_rail_switch_branch_requested(entity_id: int,branch: int) -> void:
+	var queued: int = simulation.queue_set_rail_switch_branch(entity_id,branch)
+	if queued != 0:
+		status_label.text = "Status: %s" % simulation.result_name(queued)
+		return
+	_execute_queued_command("Rail switch branch updated")
 
 func _execute_queued_command(success_message: String) -> void:
 	if not _advance(1): return

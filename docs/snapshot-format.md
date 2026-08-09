@@ -183,3 +183,11 @@ contain entity ID, signed grid coordinates, and orientation. Derived ports,
 neighbors, network IDs, station attachment, and topology events are excluded.
 Load validates geometry, orientation, terrain, occupancy, and component
 correspondence, then rebuilds topology without emitting events.
+
+## Version 21 rail-switch section
+
+Version 21 adds 20-byte Rail Switch records containing entity ID, signed grid
+position, stable three-port geometry, and authoritative selected branch.
+Physical neighbors, masks, component ID, and traversal results are excluded
+and reconstructed. Load rejects invalid geometry/branch values, non-Ground
+placement, occupancy conflicts, and entity/component mismatch.

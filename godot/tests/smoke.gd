@@ -51,15 +51,16 @@ func _initialize() -> void:
 		and simulation.has_method("queue_demolish_entity")
 		and simulation.has_method("queue_set_assembler_recipe")
 		and simulation.has_method("queue_set_storage_output")
+		and simulation.has_method("queue_set_rail_switch_branch")
 		and simulation.has_method("get_command_results")
-		and simulation.get_build_catalog().size() == 25
+		and simulation.get_build_catalog().size() == 26
 		and simulation.get_assembler_recipe_catalog().size() == 4
 		and simulation.get_item_catalog().size() == 11
 		and simulation.get_construction_units() >= 0,
 		"construction command bridge"
 	):
 		return
-	if not _require(simulation.get_tick() == 54, "unexpected reset tick"):
+	if not _require(simulation.get_tick() == 55, "unexpected reset tick"):
 		return
 	var research: Dictionary = simulation.get_research()
 	if not _require(
@@ -74,7 +75,7 @@ func _initialize() -> void:
 	if not _require(not simulation.has_error(), simulation.get_last_error()):
 		return
 	if not _require(
-		entities.size() == 53,
+		entities.size() == 62,
 		"missing presentation entities: got %d" % entities.size()
 	):
 		return
@@ -89,7 +90,8 @@ func _initialize() -> void:
 		6, 2, 2, 5, 5, 7, 5, 8, 8, 8, 8, 9, 5, 7, 22, 8, 9, 10, 11,
 		12, 11, 13, 11, 14, 15, 8, 16, 7, 17,
 		18, 18, 18, 19, 11, 10, 11, 20,
-		11, 21
+		11, 21,
+		24, 24, 24, 24, 24, 26, 24, 24, 25
 	]
 	var seen_ids := {}
 	for index in entities.size():
@@ -103,7 +105,16 @@ func _initialize() -> void:
 		):
 			return
 		seen_ids[entity_id] = true
-	if not _require(seen_ids.size() == 53, "duplicate or missing stable IDs"):
+	if not _require(seen_ids.size() == 62, "duplicate or missing stable IDs"):
+		return
+	var rail_switch: Dictionary = entities[58]
+	if not _require(
+		int(rail_switch.type) == 26
+		and int(rail_switch.selected_branch) == 0
+		and int(rail_switch.connection_mask) == 13
+		and int(rail_switch.rail_network_id) == 54,
+		"rail switch presentation: %s" % rail_switch
+	):
 		return
 	var tank: Dictionary = {}
 	for entity: Dictionary in entities:
@@ -140,7 +151,7 @@ func _initialize() -> void:
 		int(water_extractor.type) == 12
 		and int(water_extractor.stored_water) == 0
 		and int(water_extractor.output_capacity) == 1000
-		and int(water_extractor.progress) == 1,
+		and int(water_extractor.progress) == 2,
 		"water extractor presentation fields"
 	):
 		return
@@ -182,16 +193,16 @@ func _initialize() -> void:
 		return
 	if not _require(
 		int(reactor.type) == 17
-		and int(reactor.stored_heat) == 0
+		and int(reactor.stored_heat) == 100
 		and int(reactor.heat_capacity) == 10000
 		and int(reactor.active_fuel_id) == 1
-		and int(reactor.remaining_burn_ticks) == 99
-		and int(reactor.remaining_heat_yield) == 9900
+		and int(reactor.remaining_burn_ticks) == 98
+		and int(reactor.remaining_heat_yield) == 9800
 		and int(reactor.generated_last_tick) == 100
 		and int(reactor.reactor_activity) == 1
 		and int(reactor.heat_network_id) == 44
 		and bool(reactor.heat_connected),
-		"reactor presentation fields"
+		"reactor presentation fields: %s" % reactor
 	):
 		return
 	if not _require(
@@ -207,13 +218,13 @@ func _initialize() -> void:
 		and int(heat_exchanger.heat_network_id) == 44
 		and int(heat_exchanger.water_network_id) == 48
 		and int(heat_exchanger.steam_network_id) == 50
-		and int(heat_exchanger.stored_water) == 0
-		and int(heat_exchanger.stored_steam) == 100
-		and int(heat_exchanger.consumed_heat_last_tick) == 100
-		and int(heat_exchanger.consumed_water_last_tick) == 100
-		and int(heat_exchanger.produced_steam_last_tick) == 100
-		and int(heat_exchanger.heat_exchanger_activity) == 1,
-		"heat exchanger presentation fields"
+		and int(heat_exchanger.stored_water) == 50
+		and int(heat_exchanger.stored_steam) == 50
+		and int(heat_exchanger.consumed_heat_last_tick) == 0
+		and int(heat_exchanger.consumed_water_last_tick) == 0
+		and int(heat_exchanger.produced_steam_last_tick) == 0
+		and int(heat_exchanger.heat_exchanger_activity) == 4,
+		"heat exchanger presentation fields: %s" % heat_exchanger
 	):
 		return
 	if not _require(
@@ -353,13 +364,22 @@ func _initialize() -> void:
 		return
 	if not _require(not simulation.get_entities().is_empty(), "rebuild data"):
 		return
+	if not _require(simulation.queue_set_rail_switch_branch(int(rail_switch.id),1) == 0
+		and simulation.step() == 0,
+		"rail switch configuration bridge"):
+		return
+	entities = simulation.get_entities()
+	if not _require(int(entities[58].selected_branch) == 1,
+		"rail switch branch presentation refresh"):
+		return
+	tick_before = int(simulation.get_tick())
 
 	var second: Object = ClassDB.instantiate("FoundationSimulation")
 	if not _require(second != null, "second adapter construction failed"):
 		return
 	if not _require(second.reset_demo() == 0, "second reset failed"):
 		return
-	if not _require(second.get_tick() == 54, "second adapter tick"):
+	if not _require(second.get_tick() == 55, "second adapter tick"):
 		return
 	if not _require(simulation.get_tick() == tick_before, "adapter interference"):
 		return

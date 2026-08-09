@@ -65,3 +65,7 @@ Rail and Rail Station definitions own their provisional construction costs (2
 and 30 construction material), one-cell footprints, and role metadata.
 Geometry and station orientation are authoritative per-entity state; derived
 rail ports and topology are not immutable content records.
+
+The Rail Switch definition adds a 5-unit construction cost. Its geometry and
+selected branch are authoritative component state; stable stem/branch port
+semantics are defined by the public rail geometry API.

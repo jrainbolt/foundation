@@ -11,7 +11,7 @@ typedef enum {
     FACTORY_TOPOLOGY_DOMAIN_COUNT
 } FactoryTopologyDomain;
 
-#define FACTORY_TOPOLOGY_BLOCK_COUNT 20U
+#define FACTORY_TOPOLOGY_BLOCK_COUNT 21U
 
 typedef struct {
     void *pointer;

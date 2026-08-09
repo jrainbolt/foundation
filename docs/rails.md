@@ -41,3 +41,32 @@ rail's stable geometry, compatible cardinal neighbors, and component without
 reconstructing topology from renderer coordinates. Switches, rolling stock,
 movement, occupancy, routing, reservations, signals, freight endpoints, and
 schedules remain deferred.
+
+## Rail Switches
+
+Rail Switches are authoritative one-cell, three-port graph nodes. Four stable
+geometries use North, South, East, or West as the stem; Branch A and Branch B
+are the remaining two ports in the explicit immutable geometry definition.
+Branch A is the deterministic construction default. Switches cost 5
+construction material and otherwise use ordinary terrain, occupancy, depot,
+demolition, and construction-event rules.
+
+Physical topology and traversal state are intentionally separate. All three
+compatible physical neighbors always participate in adjacency and connected
+components, and switch IDs participate in the lowest-node-ID network rule.
+Changing branch selection never adds/removes edges or rebuilds network
+membership. Traversal permits stem ↔ selected branch only; the unselected
+branch is blocked and branch-to-branch traversal is never allowed. Both entry
+and exit neighbors must physically exist. Ordinary two-port rails traverse
+from one physically connected port to the other.
+
+`factory_simulation_get_rail_traversal` is a read-only, train-neutral query.
+`FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH` changes authoritative selection in
+FIFO order. Same-state requests are successful no-ops; actual transitions emit
+one `FACTORY_EVENT_RAIL_SWITCH_CHANGED` carrying previous and new branch IDs.
+
+Snapshot version 21 serializes switch ID, position, geometry, and selected
+branch. Connection masks, neighbors, networks, and traversal results remain
+derived. Switches add branching topology only: rolling stock, automatic
+switching, occupancy, routing, reservations, signals, and schedules remain
+deferred.

@@ -212,6 +212,8 @@ static FactoryResult populate_entity(
     const FactoryRail *rail=factory_rail_store_find(&simulation->rails,id);
     const FactoryRailStation *rail_station=
         factory_rail_station_store_find(&simulation->rail_stations,id);
+    const FactoryRailSwitch *rail_switch=
+        factory_rail_switch_store_find(&simulation->rail_switches,id);
     FactoryPipeInspection pipe;
     FactoryPowerPoleInspection pole;
     FactoryPowerGeneratorInspection generator;
@@ -587,6 +589,19 @@ static FactoryResult populate_entity(
         out->data.rail_station=(FactoryPresentationRailStation){
             inspection.attached_rail_id,inspection.network_id,
             inspection.connected};
+    } else if(rail_switch!=NULL){
+        FactoryRailSwitchInspection inspection;
+        if(!factory_simulation_get_rail_switch(simulation,id,&inspection))
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        out->entity_type=FACTORY_ENTITY_TYPE_RAIL_SWITCH;
+        out->x=rail_switch->x;out->y=rail_switch->y;
+        out->data.rail_switch=(FactoryPresentationRailSwitch){
+            inspection.geometry,inspection.selected_branch,
+            inspection.stem_direction,inspection.branch_a_direction,
+            inspection.branch_b_direction,inspection.port_mask,
+            inspection.connection_mask,inspection.network_id,
+            {inspection.neighbors[0],inspection.neighbors[1],
+             inspection.neighbors[2],inspection.neighbors[3]}};
     } else if(construction_depot!=NULL){
         out->entity_type=FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT;
         out->x=construction_depot->x;out->y=construction_depot->y;

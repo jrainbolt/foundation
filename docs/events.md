@@ -113,3 +113,8 @@ Successful rail and Rail Station placement/demolition emits the ordinary
 construction/demolition event at the FIFO commit point. This milestone adds no
 bespoke topology events, so rebuilds and snapshot loads produce no rail event
 noise.
+
+`FACTORY_EVENT_RAIL_SWITCH_CHANGED` is emitted only for an actual committed
+branch transition. `entity_id` is the switch, `quantity` is the previous
+branch, and `related_quantity` is the new branch. Its tick is the authoritative
+start-of-step tick. Invalid and same-state commands emit nothing.

@@ -3,6 +3,7 @@ extends PanelContainer
 
 signal assembler_recipe_requested(entity_id: int,recipe_id: int)
 signal storage_output_requested(entity_id: int,item_type: int)
+signal rail_switch_branch_requested(entity_id: int,branch: int)
 
 const Format := preload("res://scripts/presentation_format.gd")
 @onready var title_label: Label = %InspectorTitle
@@ -64,6 +65,8 @@ func show_entity(state: Dictionary) -> void:
 		if state.has(key): field(lines, key.capitalize(), str(int(state[key])))
 	if state.has("rail_network_id"): field(lines,"Rail network",str(int(state.rail_network_id)))
 	if state.has("rail_geometry"): field(lines,"Geometry",str(int(state.rail_geometry)))
+	if state.has("switch_geometry"): field(lines,"Switch geometry",str(int(state.switch_geometry)))
+	if state.has("selected_branch"): field(lines,"Selected branch","A" if int(state.selected_branch) == 0 else "B")
 	if state.has("connection_mask"): field(lines,"Connection mask",str(int(state.connection_mask)))
 	if state.has("rail_neighbors"): field(lines,"Neighbors",str(state.rail_neighbors))
 	if state.has("rail_connected"): field(lines,"Rail connected",Format.yes_no(bool(state.rail_connected)))
@@ -143,6 +146,13 @@ func _show_configuration(type_id: int,state: Dictionary) -> void:
 			configuration_selector.set_item_metadata(index,int(definition.get("item_type",0)))
 			if int(definition.get("item_type",0)) == int(state.get("configured_output",0)):
 				configuration_selector.select(index)
+	elif type_id == 26:
+		configuration_label.text = "Rail switch branch"
+		for branch in range(2):
+			configuration_selector.add_item("Branch %s" % ("A" if branch == 0 else "B"))
+			configuration_selector.set_item_metadata(branch,branch)
+			if branch == int(state.get("selected_branch",0)):
+				configuration_selector.select(branch)
 	else:
 		_hide_configuration()
 		configuring = false
@@ -156,5 +166,7 @@ func _on_configuration_selected(index: int) -> void:
 	var value := int(configuration_selector.get_item_metadata(index))
 	if configuration_label.text == "Assembler recipe":
 		assembler_recipe_requested.emit(entity_id,value)
+	elif configuration_label.text == "Rail switch branch":
+		rail_switch_branch_requested.emit(entity_id,value)
 	else:
 		storage_output_requested.emit(entity_id,value)

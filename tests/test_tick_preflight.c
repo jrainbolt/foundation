@@ -73,6 +73,39 @@ static void test_each_topology_failure(void)
     verify_failure_and_retry((FactoryCommand){FACTORY_COMMAND_PLACE_RAIL,
         {.place_rail={2,2,FACTORY_RAIL_HORIZONTAL}}},16U,
         FACTORY_ENTITY_TYPE_RAIL);
+    verify_failure_and_retry((FactoryCommand){FACTORY_COMMAND_PLACE_RAIL_SWITCH,
+        {.place_rail_switch={2,2,FACTORY_RAIL_SWITCH_STEM_NORTH}}},17U,
+        FACTORY_ENTITY_TYPE_RAIL_SWITCH);
+}
+
+static void test_switch_configuration_failure_and_retry(void)
+{
+    FactoryWorld *world;FactorySimulation *s=make(&world);
+    FactorySnapshotBuffer before={0},after={0};
+    queue(s,(FactoryCommand){FACTORY_COMMAND_PLACE_RAIL_SWITCH,
+        {.place_rail_switch={2,2,FACTORY_RAIL_SWITCH_STEM_NORTH}}});
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    FactoryEntityId id=factory_simulation_get_command_result(s,0U)->entity_id;
+    queue(s,(FactoryCommand){FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH,
+        {.set_rail_switch_branch={id,FACTORY_RAIL_SWITCH_BRANCH_B}}});
+    CHECK(factory_simulation_create_snapshot(s,&before)==FACTORY_RESULT_OK);
+    factory_tick_preflight_test_fail_allocations_after(0U);
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OUT_OF_MEMORY);
+    factory_tick_preflight_test_fail_allocations_after(SIZE_MAX);
+    FactoryRailSwitchInspection inspection;
+    CHECK(factory_simulation_get_rail_switch(s,id,&inspection)
+        &&inspection.selected_branch==FACTORY_RAIL_SWITCH_BRANCH_A);
+    CHECK(factory_simulation_get_pending_command_count(s)==1U);
+    CHECK(factory_simulation_create_snapshot(s,&after)==FACTORY_RESULT_OK);
+    CHECK(before.size==after.size&&memcmp(before.data,after.data,before.size)==0);
+    CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_rail_switch(s,id,&inspection)
+        &&inspection.selected_branch==FACTORY_RAIL_SWITCH_BRANCH_B);
+    CHECK(factory_simulation_get_event_count(s)==1U
+        &&factory_simulation_get_event(s,0U)->type
+            ==FACTORY_EVENT_RAIL_SWITCH_CHANGED);
+    factory_snapshot_buffer_destroy(&before);factory_snapshot_buffer_destroy(&after);
+    factory_simulation_destroy(s);factory_world_destroy(world);
 }
 
 static void test_combined_batch_is_all_or_nothing(void)
@@ -143,5 +176,6 @@ int main(void)
     test_each_topology_failure();
     test_combined_batch_is_all_or_nothing();
     test_configuration_batch_failure_and_retry();
+    test_switch_configuration_failure_and_retry();
     return failures==0?0:1;
 }

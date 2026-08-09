@@ -77,6 +77,15 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
         case FACTORY_COMMAND_PLACE_RAIL_STATION:
             direction=command->data.place_rail_station.orientation;
             break;
+        case FACTORY_COMMAND_PLACE_RAIL_SWITCH:
+            return factory_rail_switch_geometry_is_valid(
+                (FactoryRailSwitchGeometry)
+                    command->data.place_rail_switch.geometry);
+        case FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH:
+            return command->data.set_rail_switch_branch.entity_id!=0U
+                &&factory_rail_switch_branch_is_valid(
+                    (FactoryRailSwitchBranch)
+                        command->data.set_rail_switch_branch.branch);
         case FACTORY_COMMAND_INSERT_REACTOR_FUEL:
             return command->data.insert_reactor_fuel.reactor_entity_id != 0U
                 && factory_nuclear_fuel_definition_get(

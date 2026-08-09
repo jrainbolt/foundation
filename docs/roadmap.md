@@ -28,6 +28,7 @@
 - [x] Deterministic production and logistics telemetry
 - [x] Physical Construction Depot supply for remote outposts
 - [x] Deterministic static rail geometry, topology, and station attachment
+- [x] Deterministic rail switches and branching junctions
 
 Finite deposits and seeded authoritative terrain are prerequisites for
 deterministic resource patches, remote mining outposts, rail infrastructure, and eventually
@@ -38,7 +39,6 @@ deterministic trains, routing, reservations, and stations.
 Godot bindings, incremental synchronization, and other frontend integrations
 remain separate future milestones.
 
-Rail progression remains deliberately staged: static rail geometry →
-switches/junctions → locomotives and wagons → deterministic train movement →
-track occupancy → route planning → block reservations/signals → stations as
-freight endpoints → schedules → train telemetry.
+Rail progression remains deliberately staged: static rail topology →
+switches/junctions → first locomotive → deterministic movement/occupancy →
+routing/reservations/signals → freight stations/schedules → train telemetry.

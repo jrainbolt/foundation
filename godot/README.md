@@ -281,3 +281,11 @@ connected/disconnected state. Their inspectors use only renderer-neutral
 presentation fields: geometry, masks, cardinal neighbors, attached rail, and
 lowest-ID rail network. Foundation remains authoritative for terrain,
 occupancy, physical construction supply, and attachment.
+
+Rail Switch is also available in the catalog. `R` cycles its four explicit
+stem orientations. The visual shows all three physical branches in gray and
+the selected stem-to-branch route in bright gold. Selecting a switch exposes a
+Branch A/Branch B control; changes always travel through the native FIFO
+command and return through presentation. The deterministic demo includes a
+small visible curve, straight corridor, connected three-port switch, both
+branches, and Rail Station above the main factory.

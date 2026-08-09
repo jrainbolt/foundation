@@ -13,7 +13,7 @@ const COLORS := {
 	19: Color("#873d8c"), 20: Color("#857322"), 21: Color("#286d80"),
 	22: Color("#475d91"),
 	23: Color("#596b46"),
-	24: Color("#9ea7af"), 25: Color("#506a78"),
+	24: Color("#9ea7af"), 25: Color("#506a78"), 26: Color("#a88946"),
 }
 const TITLES := {
 	1: "EXTRACTOR", 2: "BELT", 3: "REFINERY", 4: "ASSEMBLER",
@@ -24,7 +24,7 @@ const TITLES := {
 	20: "TURBINE", 21: "CONDENSER",
 	22: "RESEARCH LAB",
 	23: "CONSTRUCTION DEPOT",
-	24: "RAIL", 25: "RAIL STATION",
+	24: "RAIL", 25: "RAIL STATION", 26: "RAIL SWITCH",
 }
 const ABBREVIATIONS := {
 	1: "EX", 2: "BELT", 3: "REF", 4: "ASM", 5: "BOX", 6: "SPLIT",
@@ -33,7 +33,7 @@ const ABBREVIATIONS := {
 	17: "CORE", 18: "HEAT", 19: "HEX", 20: "TURB", 21: "COND",
 	22: "LAB",
 	23: "DEPOT",
-	24: "", 25: "STN",
+	24: "", 25: "STN", 26: "SW",
 }
 
 var state: Dictionary = {}
@@ -67,6 +67,10 @@ func _draw() -> void:
 		return
 	if entity_type == 25:
 		_draw_station(color)
+		_draw_selection()
+		return
+	if entity_type == 26:
+		_draw_switch()
 		_draw_selection()
 		return
 	if not bool(state.get("powered", true)) and entity_type in [1, 3, 4, 7, 21, 22]:
@@ -111,6 +115,21 @@ func _draw_station(color: Color) -> void:
 	draw_line(Vector2(12,55),Vector2(64,55),Color("#c8d1d6"),5.0)
 	_draw_centered("STN",43.0,18,Color.WHITE)
 	_draw_centered("CONNECTED" if bool(state.get("rail_connected",false)) else "NO RAIL",57.0,9,Color("#cfe7d4") if bool(state.get("rail_connected",false)) else Color("#ff9f91"))
+
+func _draw_switch() -> void:
+	var center := Vector2(38, 38)
+	var vectors := [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT]
+	var mask := int(state.get("port_mask", 0))
+	var stem := int(state.get("stem_direction", 0))
+	var selected := int(state.get("branch_a_direction", 1)) if int(state.get("selected_branch", 0)) == 0 else int(state.get("branch_b_direction", 3))
+	for index in range(4):
+		if mask & (1 << index):
+			draw_line(center, center + vectors[index] * 38.0, Color("#343b40"), 13.0)
+			draw_line(center, center + vectors[index] * 38.0, Color("#69747b"), 5.0)
+	for index in [stem, selected]:
+		draw_line(center, center + vectors[index] * 38.0, Color("#f4d06f"), 8.0)
+	draw_circle(center, 7.0, Color("#fff0b0"))
+	draw_string(ThemeDB.fallback_font,Vector2(5,14),"SW %s" % ("A" if int(state.get("selected_branch",0)) == 0 else "B"),HORIZONTAL_ALIGNMENT_LEFT,-1,9,Color.WHITE)
 
 func _draw_centered(text: String, baseline: float, size: int, color: Color) -> void:
 	draw_string(ThemeDB.fallback_font, Vector2(7, baseline), text, HORIZONTAL_ALIGNMENT_CENTER, 62, size, color)

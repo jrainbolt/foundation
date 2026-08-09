@@ -101,6 +101,8 @@ FactoryCommand place(
         command.data.place_rail={x,y,(uint32_t)first};break;
     case FACTORY_COMMAND_PLACE_RAIL_STATION:
         command.data.place_rail_station={x,y,first};break;
+    case FACTORY_COMMAND_PLACE_RAIL_SWITCH:
+        command.data.place_rail_switch={x,y,(uint32_t)first};break;
     default:
         break;
     }
@@ -211,6 +213,9 @@ void FoundationSimulation::_bind_methods()
     ClassDB::bind_method(
         D_METHOD("queue_set_storage_output","entity_id","item_type"),
         &FoundationSimulation::queue_set_storage_output);
+    ClassDB::bind_method(
+        D_METHOD("queue_set_rail_switch_branch","entity_id","branch"),
+        &FoundationSimulation::queue_set_rail_switch_branch);
     ClassDB::bind_method(D_METHOD("get_command_results"),
         &FoundationSimulation::get_command_results);
     ClassDB::bind_method(D_METHOD("get_build_catalog"),
@@ -573,6 +578,38 @@ FactoryResult FoundationSimulation::build_demo()
         simulation_, tank_result->entity_id, &tank_storage);
     if (result != FACTORY_RESULT_OK)
         return result;
+    const FactoryCommand rail_demo[] = {
+        place(FACTORY_COMMAND_PLACE_RAIL,0,-2,
+            (FactoryDirection)FACTORY_RAIL_CURVE_SE),
+        place(FACTORY_COMMAND_PLACE_RAIL,0,-1,
+            (FactoryDirection)FACTORY_RAIL_VERTICAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,1,-2,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,2,-2,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,3,-2,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL_SWITCH,4,-2,
+            (FactoryDirection)FACTORY_RAIL_SWITCH_STEM_WEST),
+        place(FACTORY_COMMAND_PLACE_RAIL,4,-3,
+            (FactoryDirection)FACTORY_RAIL_VERTICAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,4,-1,
+            (FactoryDirection)FACTORY_RAIL_VERTICAL),
+        place(FACTORY_COMMAND_PLACE_RAIL_STATION,3,-3,
+            FACTORY_DIRECTION_SOUTH)
+    };
+    for(const FactoryCommand &command:rail_demo){
+        result=submit(command);if(result!=FACTORY_RESULT_OK)return result;
+    }
+    result=factory_simulation_tick(simulation_);
+    if(result!=FACTORY_RESULT_OK)return result;
+    for(size_t i=0U;i<sizeof(rail_demo)/sizeof(rail_demo[0]);++i){
+        const FactoryCommandResult *rail_result=
+            factory_simulation_get_command_result(simulation_,i);
+        if(rail_result==nullptr||rail_result->result!=FACTORY_RESULT_OK)
+            return rail_result==nullptr?FACTORY_RESULT_INTERNAL_STATE_MISMATCH
+                :rail_result->result;
+    }
     return factory_presentation_snapshot_rebuild(presentation_, simulation_);
 }
 
@@ -618,12 +655,14 @@ int64_t FoundationSimulation::queue_place_entity(
     int64_t entity_type,int64_t x,int64_t y,int64_t direction)
 {
     if (simulation_==nullptr || entity_type<=FACTORY_ENTITY_TYPE_NONE
-        || entity_type>FACTORY_ENTITY_TYPE_RAIL_STATION
+        || entity_type>FACTORY_ENTITY_TYPE_RAIL_SWITCH
         || x<INT32_MIN || x>INT32_MAX || y<INT32_MIN || y>INT32_MAX
         || direction<0
         || (entity_type==FACTORY_ENTITY_TYPE_RAIL
             ?direction>=FACTORY_RAIL_GEOMETRY_COUNT
-            :direction>FACTORY_DIRECTION_WEST))
+            :entity_type==FACTORY_ENTITY_TYPE_RAIL_SWITCH
+                ?direction>=FACTORY_RAIL_SWITCH_GEOMETRY_COUNT
+                :direction>FACTORY_DIRECTION_WEST))
         return FACTORY_RESULT_INVALID_ARGUMENT;
     FactoryCommandType command_type;
     switch ((FactoryEntityType)entity_type) {
@@ -652,6 +691,7 @@ int64_t FoundationSimulation::queue_place_entity(
     case FACTORY_ENTITY_TYPE_CONSTRUCTION_DEPOT: command_type=FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT;break;
     case FACTORY_ENTITY_TYPE_RAIL: command_type=FACTORY_COMMAND_PLACE_RAIL;break;
     case FACTORY_ENTITY_TYPE_RAIL_STATION: command_type=FACTORY_COMMAND_PLACE_RAIL_STATION;break;
+    case FACTORY_ENTITY_TYPE_RAIL_SWITCH: command_type=FACTORY_COMMAND_PLACE_RAIL_SWITCH;break;
     default:return FACTORY_RESULT_INVALID_ARGUMENT;
     }
     FactoryCommand command=place(command_type,(int32_t)x,(int32_t)y,
@@ -696,6 +736,20 @@ int64_t FoundationSimulation::queue_set_storage_output(
     command.type=FACTORY_COMMAND_SET_STORAGE_OUTPUT;
     command.data.set_storage_output.storage_entity=(FactoryEntityId)entity_id;
     command.data.set_storage_output.item=(FactoryItemType)item_type;
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
+int64_t FoundationSimulation::queue_set_rail_switch_branch(
+    int64_t entity_id,int64_t branch)
+{
+    if(simulation_==nullptr||entity_id<=0||entity_id>UINT32_MAX
+        ||branch<FACTORY_RAIL_SWITCH_BRANCH_A
+        ||branch>=FACTORY_RAIL_SWITCH_BRANCH_COUNT)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};
+    command.type=FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH;
+    command.data.set_rail_switch_branch={
+        (FactoryEntityId)entity_id,(uint32_t)branch};
     return factory_simulation_submit_command(simulation_,&command);
 }
 
@@ -1346,6 +1400,19 @@ bool FoundationSimulation::entity_to_dictionary(
             entity.data.rail_station.attached_rail_id;
         value["rail_network_id"]=(int64_t)entity.data.rail_station.network_id;
         value["rail_connected"]=entity.data.rail_station.connected;break;
+    case FACTORY_ENTITY_TYPE_RAIL_SWITCH: {
+        value["switch_geometry"]=(int64_t)entity.data.rail_switch.geometry;
+        value["selected_branch"]=(int64_t)entity.data.rail_switch.selected_branch;
+        value["stem_direction"]=(int64_t)entity.data.rail_switch.stem_direction;
+        value["branch_a_direction"]=(int64_t)entity.data.rail_switch.branch_a_direction;
+        value["branch_b_direction"]=(int64_t)entity.data.rail_switch.branch_b_direction;
+        value["port_mask"]=(int64_t)entity.data.rail_switch.port_mask;
+        value["connection_mask"]=(int64_t)entity.data.rail_switch.connection_mask;
+        value["rail_network_id"]=(int64_t)entity.data.rail_switch.network_id;
+        Array neighbors;for(size_t i=0U;i<FACTORY_RAIL_NEIGHBOR_COUNT;++i)
+            neighbors.append((int64_t)entity.data.rail_switch.neighbors[i]);
+        value["rail_neighbors"]=neighbors;break;
+    }
     default:
         break;
     }

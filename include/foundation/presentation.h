@@ -276,6 +276,18 @@ typedef struct {
 } FactoryPresentationRail;
 
 typedef struct {
+    FactoryRailSwitchGeometry geometry;
+    FactoryRailSwitchBranch selected_branch;
+    FactoryDirection stem_direction;
+    FactoryDirection branch_a_direction;
+    FactoryDirection branch_b_direction;
+    uint32_t port_mask;
+    uint32_t connection_mask;
+    FactoryRailNetworkId network_id;
+    FactoryEntityId neighbors[FACTORY_RAIL_NEIGHBOR_COUNT];
+} FactoryPresentationRailSwitch;
+
+typedef struct {
     FactoryEntityId attached_rail_id;
     FactoryRailNetworkId network_id;
     bool connected;
@@ -315,6 +327,7 @@ typedef struct {
         FactoryPresentationConstructionDepot construction_depot;
         FactoryPresentationRail rail;
         FactoryPresentationRailStation rail_station;
+        FactoryPresentationRailSwitch rail_switch;
     } data;
 } FactoryPresentationEntity;
 

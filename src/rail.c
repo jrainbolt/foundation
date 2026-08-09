@@ -4,7 +4,10 @@
 
 #include <stdlib.h>
 
-uint32_t factory_rail_geometry_port_mask(FactoryRailGeometry g)
+static const int32_t direction_x[4]={0,1,0,-1};
+static const int32_t direction_y[4]={-1,0,1,0};
+
+uint32_t factory_rail_geometry_port_mask(FactoryRailGeometry geometry)
 {
     static const uint32_t masks[FACTORY_RAIL_GEOMETRY_COUNT]={
         FACTORY_RAIL_PORT_EAST|FACTORY_RAIL_PORT_WEST,
@@ -13,59 +16,275 @@ uint32_t factory_rail_geometry_port_mask(FactoryRailGeometry g)
         FACTORY_RAIL_PORT_NORTH|FACTORY_RAIL_PORT_WEST,
         FACTORY_RAIL_PORT_SOUTH|FACTORY_RAIL_PORT_EAST,
         FACTORY_RAIL_PORT_SOUTH|FACTORY_RAIL_PORT_WEST};
-    return g>=0&&g<FACTORY_RAIL_GEOMETRY_COUNT?masks[g]:0U;
+    return factory_rail_geometry_is_valid(geometry)?masks[geometry]:0U;
 }
-bool factory_rail_geometry_is_valid(FactoryRailGeometry g)
-{return g>=0&&g<FACTORY_RAIL_GEOMETRY_COUNT;}
+
+bool factory_rail_geometry_is_valid(FactoryRailGeometry geometry)
+{
+    return geometry>=FACTORY_RAIL_HORIZONTAL
+        &&geometry<FACTORY_RAIL_GEOMETRY_COUNT;
+}
+
+bool factory_rail_switch_geometry_is_valid(FactoryRailSwitchGeometry geometry)
+{
+    return geometry>=FACTORY_RAIL_SWITCH_STEM_NORTH
+        &&geometry<FACTORY_RAIL_SWITCH_GEOMETRY_COUNT;
+}
+
+bool factory_rail_switch_branch_is_valid(FactoryRailSwitchBranch branch)
+{
+    return branch>=FACTORY_RAIL_SWITCH_BRANCH_A
+        &&branch<FACTORY_RAIL_SWITCH_BRANCH_COUNT;
+}
+
+bool factory_rail_switch_geometry_directions(FactoryRailSwitchGeometry geometry,
+    FactoryDirection *out_stem,FactoryDirection *out_branch_a,
+    FactoryDirection *out_branch_b)
+{
+    static const FactoryDirection directions[FACTORY_RAIL_SWITCH_GEOMETRY_COUNT][3]={
+        {FACTORY_DIRECTION_NORTH,FACTORY_DIRECTION_EAST,FACTORY_DIRECTION_WEST},
+        {FACTORY_DIRECTION_SOUTH,FACTORY_DIRECTION_EAST,FACTORY_DIRECTION_WEST},
+        {FACTORY_DIRECTION_EAST,FACTORY_DIRECTION_NORTH,FACTORY_DIRECTION_SOUTH},
+        {FACTORY_DIRECTION_WEST,FACTORY_DIRECTION_NORTH,FACTORY_DIRECTION_SOUTH}};
+    if(!factory_rail_switch_geometry_is_valid(geometry)||out_stem==NULL
+        ||out_branch_a==NULL||out_branch_b==NULL)return false;
+    *out_stem=directions[geometry][0];
+    *out_branch_a=directions[geometry][1];
+    *out_branch_b=directions[geometry][2];
+    return true;
+}
+
+uint32_t factory_rail_switch_geometry_port_mask(
+    FactoryRailSwitchGeometry geometry)
+{
+    FactoryDirection stem,branch_a,branch_b;
+    if(!factory_rail_switch_geometry_directions(geometry,&stem,&branch_a,
+            &branch_b))return 0U;
+    return (UINT32_C(1)<<(uint32_t)stem)
+        |(UINT32_C(1)<<(uint32_t)branch_a)
+        |(UINT32_C(1)<<(uint32_t)branch_b);
+}
 
 #define STORE_FUNCTIONS(prefix,Store,Item) \
 void prefix##_destroy(Store*s){if(s!=NULL){free(s->items);*s=(Store){0};}} \
-bool prefix##_reserve_one(Store*s){Item*p;size_t c;if(s==NULL)return false;if(s->count<s->capacity)return true;c=s->capacity==0U?4U:s->capacity*2U;if(c<s->capacity||c>SIZE_MAX/sizeof(*p))return false;p=realloc(s->items,c*sizeof(*p));if(p==NULL)return false;s->items=p;s->capacity=c;return true;} \
+bool prefix##_reserve_one(Store*s){Item*p;size_t capacity;if(s==NULL)return false;if(s->count<s->capacity)return true;capacity=s->capacity==0U?4U:s->capacity*2U;if(capacity<s->capacity||capacity>SIZE_MAX/sizeof(*p))return false;p=realloc(s->items,capacity*sizeof(*p));if(p==NULL)return false;s->items=p;s->capacity=capacity;return true;} \
 bool prefix##_remove(Store*s,FactoryEntityId id){if(s==NULL)return false;for(size_t i=0U;i<s->count;++i)if(s->items[i].entity_id==id){--s->count;s->items[i]=s->items[s->count];return true;}return false;}
 STORE_FUNCTIONS(factory_rail_store,FactoryRailStore,FactoryRail)
 STORE_FUNCTIONS(factory_rail_station_store,FactoryRailStationStore,FactoryRailStation)
+STORE_FUNCTIONS(factory_rail_switch_store,FactoryRailSwitchStore,FactoryRailSwitch)
 #undef STORE_FUNCTIONS
 
 void factory_rail_store_add(FactoryRailStore*s,FactoryEntityId id,int32_t x,
-    int32_t y,FactoryRailGeometry g){s->items[s->count++]=(FactoryRail){id,x,y,g};}
+    int32_t y,FactoryRailGeometry geometry)
+{s->items[s->count++]=(FactoryRail){id,x,y,geometry};}
+
 const FactoryRail *factory_rail_store_find(const FactoryRailStore*s,
-    FactoryEntityId id){if(s!=NULL)for(size_t i=0U;i<s->count;++i)if(s->items[i].entity_id==id)return &s->items[i];return NULL;}
+    FactoryEntityId id)
+{if(s!=NULL)for(size_t i=0U;i<s->count;++i)if(s->items[i].entity_id==id)return &s->items[i];return NULL;}
+
 void factory_rail_station_store_add(FactoryRailStationStore*s,
-    FactoryEntityId id,int32_t x,int32_t y,FactoryDirection o)
-{s->items[s->count++]=(FactoryRailStation){id,x,y,o};}
+    FactoryEntityId id,int32_t x,int32_t y,FactoryDirection orientation)
+{s->items[s->count++]=(FactoryRailStation){id,x,y,orientation};}
+
 const FactoryRailStation *factory_rail_station_store_find(
     const FactoryRailStationStore*s,FactoryEntityId id)
 {if(s!=NULL)for(size_t i=0U;i<s->count;++i)if(s->items[i].entity_id==id)return &s->items[i];return NULL;}
-void factory_rail_topology_destroy(FactoryRailTopology*t)
-{if(t!=NULL){free(t->rails);free(t->stations);free(t->networks);*t=(FactoryRailTopology){0};}}
 
-static int rail_compare(const void*a,const void*b){FactoryEntityId x=((const FactoryRailInspection*)a)->entity_id,y=((const FactoryRailInspection*)b)->entity_id;return x<y?-1:x>y;}
-static uint32_t opposite(uint32_t p){return p==FACTORY_RAIL_PORT_NORTH?FACTORY_RAIL_PORT_SOUTH:p==FACTORY_RAIL_PORT_EAST?FACTORY_RAIL_PORT_WEST:p==FACTORY_RAIL_PORT_SOUTH?FACTORY_RAIL_PORT_NORTH:p==FACTORY_RAIL_PORT_WEST?FACTORY_RAIL_PORT_EAST:0U;}
-static FactoryRailInspection *rail_at(FactoryRailTopology*t,int32_t x,int32_t y)
-{for(size_t i=0U;i<t->rail_count;++i)if(t->rails[i].x==x&&t->rails[i].y==y)return &t->rails[i];return NULL;}
-static FactoryRailNetworkInspection *network_at(FactoryRailTopology*t,FactoryRailNetworkId id)
+void factory_rail_switch_store_add(FactoryRailSwitchStore*s,
+    FactoryEntityId id,int32_t x,int32_t y,FactoryRailSwitchGeometry geometry)
+{s->items[s->count++]=(FactoryRailSwitch){id,x,y,geometry,
+    FACTORY_RAIL_SWITCH_BRANCH_A};}
+
+const FactoryRailSwitch *factory_rail_switch_store_find(
+    const FactoryRailSwitchStore*s,FactoryEntityId id)
+{if(s!=NULL)for(size_t i=0U;i<s->count;++i)if(s->items[i].entity_id==id)return &s->items[i];return NULL;}
+
+FactoryRailSwitch *factory_rail_switch_store_find_mutable(
+    FactoryRailSwitchStore*s,FactoryEntityId id)
+{if(s!=NULL)for(size_t i=0U;i<s->count;++i)if(s->items[i].entity_id==id)return &s->items[i];return NULL;}
+
+void factory_rail_topology_destroy(FactoryRailTopology*topology)
+{
+    if(topology==NULL)return;
+    free(topology->rails);free(topology->switches);free(topology->stations);
+    free(topology->networks);*topology=(FactoryRailTopology){0};
+}
+
+static int rail_compare(const void*a,const void*b)
+{FactoryEntityId x=((const FactoryRailInspection*)a)->entity_id,y=((const FactoryRailInspection*)b)->entity_id;return x<y?-1:x>y;}
+static int switch_compare(const void*a,const void*b)
+{FactoryEntityId x=((const FactoryRailSwitchInspection*)a)->entity_id,y=((const FactoryRailSwitchInspection*)b)->entity_id;return x<y?-1:x>y;}
+static uint32_t opposite(uint32_t port)
+{return ((port<<2U)|(port>>2U))&UINT32_C(0x0f);}
+
+typedef struct {
+    FactoryEntityId *entity_id;
+    int32_t x,y;
+    uint32_t port_mask;
+    uint32_t *connection_mask;
+    FactoryEntityId *neighbors;
+    FactoryRailNetworkId *network_id;
+    uint32_t *connection_count;
+    bool is_switch;
+} Node;
+
+static size_t node_count(const FactoryRailTopology*t)
+{return t->rail_count+t->switch_count;}
+
+static Node node_at_index(FactoryRailTopology*t,size_t index)
+{
+    if(index<t->rail_count){FactoryRailInspection*r=&t->rails[index];return (Node){
+        &r->entity_id,r->x,r->y,r->port_mask,&r->connection_mask,r->neighbors,
+        &r->network_id,&r->connection_count,false};}
+    FactoryRailSwitchInspection*s=&t->switches[index-t->rail_count];return (Node){
+        &s->entity_id,s->x,s->y,s->port_mask,&s->connection_mask,s->neighbors,
+        &s->network_id,&s->connection_count,true};
+}
+
+static bool find_node_at(FactoryRailTopology*t,int32_t x,int32_t y,Node*out)
+{
+    for(size_t i=0U;i<node_count(t);++i){Node node=node_at_index(t,i);
+        if(node.x==x&&node.y==y){*out=node;return true;}}
+    return false;
+}
+
+static bool find_node_by_id(FactoryRailTopology*t,FactoryEntityId id,Node*out)
+{
+    for(size_t i=0U;i<node_count(t);++i){Node node=node_at_index(t,i);
+        if(*node.entity_id==id){*out=node;return true;}}
+    return false;
+}
+
+static FactoryRailNetworkInspection *network_at(FactoryRailTopology*t,
+    FactoryRailNetworkId id)
 {for(size_t i=0U;i<t->network_count;++i)if(t->networks[i].network_id==id)return &t->networks[i];return NULL;}
 
-FactoryResult factory_rail_topology_rebuild(FactorySimulation*s)
+FactoryResult factory_rail_topology_rebuild(FactorySimulation*simulation)
 {
-    FactoryRailTopology next={0};next.rail_count=s->rails.count;next.station_count=s->rail_stations.count;
-    if((next.rail_count!=0U&&(next.rails=factory_topology_calloc(s,FACTORY_TOPOLOGY_RAIL,next.rail_count,sizeof(*next.rails)))==NULL)
-        ||(next.station_count!=0U&&(next.stations=factory_topology_calloc(s,FACTORY_TOPOLOGY_RAIL,next.station_count,sizeof(*next.stations)))==NULL)
-        ||(next.rail_count!=0U&&(next.networks=factory_topology_calloc(s,FACTORY_TOPOLOGY_RAIL,next.rail_count,sizeof(*next.networks)))==NULL)){factory_rail_topology_destroy(&next);return FACTORY_RESULT_OUT_OF_MEMORY;}
-    for(size_t i=0U;i<next.rail_count;++i){const FactoryRail*r=&s->rails.items[i];next.rails[i]=(FactoryRailInspection){.entity_id=r->entity_id,.x=r->x,.y=r->y,.geometry=r->geometry,.port_mask=factory_rail_geometry_port_mask(r->geometry),.network_id=r->entity_id};}
+    FactoryRailTopology next={0};
+    next.rail_count=simulation->rails.count;
+    next.switch_count=simulation->rail_switches.count;
+    next.station_count=simulation->rail_stations.count;
+    if(next.rail_count>SIZE_MAX-next.switch_count)
+        return FACTORY_RESULT_OUT_OF_MEMORY;
+    size_t nodes=node_count(&next);
+    if((next.rail_count!=0U&&(next.rails=factory_topology_calloc(simulation,
+            FACTORY_TOPOLOGY_RAIL,next.rail_count,sizeof(*next.rails)))==NULL)
+        ||(next.switch_count!=0U&&(next.switches=factory_topology_calloc(simulation,
+            FACTORY_TOPOLOGY_RAIL,next.switch_count,sizeof(*next.switches)))==NULL)
+        ||(next.station_count!=0U&&(next.stations=factory_topology_calloc(simulation,
+            FACTORY_TOPOLOGY_RAIL,next.station_count,sizeof(*next.stations)))==NULL)
+        ||(nodes!=0U&&(next.networks=factory_topology_calloc(simulation,
+            FACTORY_TOPOLOGY_RAIL,nodes,sizeof(*next.networks)))==NULL)){
+        factory_rail_topology_destroy(&next);return FACTORY_RESULT_OUT_OF_MEMORY;
+    }
+    for(size_t i=0U;i<next.rail_count;++i){const FactoryRail*r=&simulation->rails.items[i];
+        next.rails[i]=(FactoryRailInspection){.entity_id=r->entity_id,.x=r->x,
+            .y=r->y,.geometry=r->geometry,
+            .port_mask=factory_rail_geometry_port_mask(r->geometry),
+            .network_id=r->entity_id};}
+    for(size_t i=0U;i<next.switch_count;++i){const FactoryRailSwitch*s=&simulation->rail_switches.items[i];
+        FactoryDirection stem,branch_a,branch_b;
+        (void)factory_rail_switch_geometry_directions(s->geometry,&stem,&branch_a,&branch_b);
+        next.switches[i]=(FactoryRailSwitchInspection){.entity_id=s->entity_id,
+            .x=s->x,.y=s->y,.geometry=s->geometry,
+            .selected_branch=s->selected_branch,.stem_direction=stem,
+            .branch_a_direction=branch_a,.branch_b_direction=branch_b,
+            .port_mask=factory_rail_switch_geometry_port_mask(s->geometry),
+            .network_id=s->entity_id};}
     if(next.rail_count>1U)qsort(next.rails,next.rail_count,sizeof(*next.rails),rail_compare);
-    for(size_t i=0U;i<next.rail_count;++i)for(size_t d=0U;d<4U;++d){static const int32_t dx[4]={0,1,0,-1},dy[4]={-1,0,1,0};uint32_t port=UINT32_C(1)<<d;FactoryRailInspection*n=rail_at(&next,next.rails[i].x+dx[d],next.rails[i].y+dy[d]);if(n!=NULL&&(next.rails[i].port_mask&port)!=0U&&(n->port_mask&opposite(port))!=0U){next.rails[i].neighbors[d]=n->entity_id;next.rails[i].connection_mask|=port;++next.rails[i].connection_count;}}
-    {bool changed;do{changed=false;for(size_t i=0U;i<next.rail_count;++i)for(size_t d=0U;d<4U;++d)if(next.rails[i].neighbors[d]!=0U){for(size_t j=0U;j<next.rail_count;++j)if(next.rails[j].entity_id==next.rails[i].neighbors[d]){FactoryRailNetworkId m=next.rails[i].network_id<next.rails[j].network_id?next.rails[i].network_id:next.rails[j].network_id;if(next.rails[i].network_id!=m||next.rails[j].network_id!=m){next.rails[i].network_id=m;next.rails[j].network_id=m;changed=true;}break;}}}while(changed);}
-    for(size_t i=0U;i<next.rail_count;++i){FactoryRailNetworkInspection*n=network_at(&next,next.rails[i].network_id);if(n==NULL){n=&next.networks[next.network_count++];n->network_id=next.rails[i].network_id;}++n->rail_count;}
-    for(size_t i=0U;i<next.station_count;++i){const FactoryRailStation*st=&s->rail_stations.items[i];static const int32_t dx[4]={0,1,0,-1},dy[4]={-1,0,1,0};FactoryRailInspection*r=rail_at(&next,st->x+dx[st->orientation],st->y+dy[st->orientation]);next.stations[i]=(FactoryRailStationInspection){.entity_id=st->entity_id,.x=st->x,.y=st->y,.orientation=st->orientation,.attached_rail_id=r!=NULL?r->entity_id:0U,.network_id=r!=NULL?r->network_id:0U,.connected=r!=NULL};if(r!=NULL)++network_at(&next,r->network_id)->station_count;}
-    factory_rail_topology_destroy(&s->rail_topology);s->rail_topology=next;return FACTORY_RESULT_OK;
+    if(next.switch_count>1U)qsort(next.switches,next.switch_count,sizeof(*next.switches),switch_compare);
+    for(size_t i=0U;i<nodes;++i){Node node=node_at_index(&next,i);
+        for(size_t direction=0U;direction<4U;++direction){uint32_t port=UINT32_C(1)<<direction;Node neighbor;
+            if((node.port_mask&port)!=0U&&find_node_at(&next,
+                    node.x+direction_x[direction],node.y+direction_y[direction],
+                    &neighbor)&&(neighbor.port_mask&opposite(port))!=0U){
+                node.neighbors[direction]=*neighbor.entity_id;
+                *node.connection_mask|=port;++*node.connection_count;
+            }
+        }
+    }
+    {bool changed;do{changed=false;for(size_t i=0U;i<nodes;++i){Node node=node_at_index(&next,i);
+        for(size_t direction=0U;direction<4U;++direction)if(node.neighbors[direction]!=0U){Node neighbor;
+            if(find_node_by_id(&next,node.neighbors[direction],&neighbor)){
+                FactoryRailNetworkId minimum=*node.network_id<*neighbor.network_id
+                    ?*node.network_id:*neighbor.network_id;
+                if(*node.network_id!=minimum||*neighbor.network_id!=minimum){
+                    *node.network_id=minimum;*neighbor.network_id=minimum;changed=true;
+                }
+            }
+        }
+    }}while(changed);}
+    while(next.network_count<nodes){FactoryRailNetworkId minimum=UINT32_MAX;
+        for(size_t i=0U;i<nodes;++i){Node node=node_at_index(&next,i);
+            if(network_at(&next,*node.network_id)==NULL&&*node.network_id<minimum)
+                minimum=*node.network_id;}
+        if(minimum==UINT32_MAX)break;
+        FactoryRailNetworkInspection*network=&next.networks[next.network_count++];
+        network->network_id=minimum;
+        for(size_t i=0U;i<nodes;++i){Node node=node_at_index(&next,i);
+            if(*node.network_id==minimum){if(node.is_switch)++network->switch_count;
+                else ++network->rail_count;}}
+    }
+    for(size_t i=0U;i<next.station_count;++i){const FactoryRailStation*station=&simulation->rail_stations.items[i];Node attached;
+        bool connected=find_node_at(&next,
+            station->x+direction_x[station->orientation],
+            station->y+direction_y[station->orientation],&attached);
+        next.stations[i]=(FactoryRailStationInspection){.entity_id=station->entity_id,
+            .x=station->x,.y=station->y,.orientation=station->orientation,
+            .attached_rail_id=connected?*attached.entity_id:0U,
+            .network_id=connected?*attached.network_id:0U,.connected=connected};
+        if(connected)++network_at(&next,*attached.network_id)->station_count;
+    }
+    factory_rail_topology_destroy(&simulation->rail_topology);
+    simulation->rail_topology=next;return FACTORY_RESULT_OK;
 }
 
 bool factory_simulation_get_rail(const FactorySimulation*s,FactoryEntityId id,
-    FactoryRailInspection*out){if(s==NULL||out==NULL)return false;for(size_t i=0U;i<s->rail_topology.rail_count;++i)if(s->rail_topology.rails[i].entity_id==id){*out=s->rail_topology.rails[i];return true;}return false;}
+    FactoryRailInspection*out)
+{if(s==NULL||out==NULL)return false;for(size_t i=0U;i<s->rail_topology.rail_count;++i)if(s->rail_topology.rails[i].entity_id==id){*out=s->rail_topology.rails[i];return true;}return false;}
+
+bool factory_simulation_get_rail_switch(const FactorySimulation*s,
+    FactoryEntityId id,FactoryRailSwitchInspection*out)
+{if(s==NULL||out==NULL)return false;for(size_t i=0U;i<s->rail_topology.switch_count;++i)if(s->rail_topology.switches[i].entity_id==id){*out=s->rail_topology.switches[i];return true;}return false;}
+
 bool factory_simulation_get_rail_station(const FactorySimulation*s,
-    FactoryEntityId id,FactoryRailStationInspection*out){if(s==NULL||out==NULL)return false;for(size_t i=0U;i<s->rail_topology.station_count;++i)if(s->rail_topology.stations[i].entity_id==id){*out=s->rail_topology.stations[i];return true;}return false;}
+    FactoryEntityId id,FactoryRailStationInspection*out)
+{if(s==NULL||out==NULL)return false;for(size_t i=0U;i<s->rail_topology.station_count;++i)if(s->rail_topology.stations[i].entity_id==id){*out=s->rail_topology.stations[i];return true;}return false;}
+
+bool factory_simulation_get_rail_traversal(const FactorySimulation*s,
+    FactoryEntityId id,FactoryDirection entry,FactoryRailTraversal*out)
+{
+    if(out!=NULL)*out=(FactoryRailTraversal){0};
+    if(s==NULL||out==NULL||entry<FACTORY_DIRECTION_NORTH
+        ||entry>FACTORY_DIRECTION_WEST)return false;
+    FactoryRailInspection rail;
+    if(factory_simulation_get_rail(s,id,&rail)){
+        uint32_t entry_port=UINT32_C(1)<<(uint32_t)entry;
+        if((rail.port_mask&entry_port)==0U||rail.neighbors[entry]==0U)return true;
+        for(size_t direction=0U;direction<4U;++direction)
+            if(direction!=(size_t)entry&&rail.neighbors[direction]!=0U
+                &&(rail.port_mask&(UINT32_C(1)<<direction))!=0U){
+                *out=(FactoryRailTraversal){true,(FactoryDirection)direction,
+                    rail.neighbors[direction]};return true;}
+        return true;
+    }
+    FactoryRailSwitchInspection rail_switch;
+    if(!factory_simulation_get_rail_switch(s,id,&rail_switch))return false;
+    FactoryDirection selected=rail_switch.selected_branch==FACTORY_RAIL_SWITCH_BRANCH_A
+        ?rail_switch.branch_a_direction:rail_switch.branch_b_direction;
+    FactoryDirection exit;
+    if(entry==rail_switch.stem_direction)exit=selected;
+    else if(entry==selected)exit=rail_switch.stem_direction;
+    else return true;
+    if(rail_switch.neighbors[entry]!=0U&&rail_switch.neighbors[exit]!=0U)
+        *out=(FactoryRailTraversal){true,exit,rail_switch.neighbors[exit]};
+    return true;
+}
+
 size_t factory_simulation_get_rail_network_count(const FactorySimulation*s)
 {return s==NULL?0U:s->rail_topology.network_count;}
+
 const FactoryRailNetworkInspection *factory_simulation_get_rail_network(
-    const FactorySimulation*s,size_t i){return s!=NULL&&i<s->rail_topology.network_count?&s->rail_topology.networks[i]:NULL;}
+    const FactorySimulation*s,size_t index)
+{return s!=NULL&&index<s->rail_topology.network_count?s->rail_topology.networks+index:NULL;}

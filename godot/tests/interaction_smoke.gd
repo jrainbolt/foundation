@@ -61,6 +61,14 @@ func run_test() -> void:
 	controller.enter_select_mode()
 	if not require_value(controller.mode == 0, "exit interaction mode"): return
 	if not require_value(toolbar.buttons.size() >= 11 and toolbar.buttons[5].disabled == false, "build toolbar catalog"): return
+	if not require_value(toolbar.buttons.has(26) and not toolbar.buttons[26].disabled, "rail switch toolbar entry"): return
+	if not require_value(controller.select_entity(59), "demo rail switch selection"): return
+	if not require_value(inspector.configuration_label.text == "Rail switch branch"
+		and inspector.configuration_selector.item_count == 2,
+		"rail switch inspector controls"): return
+	inspector._on_configuration_selected(1)
+	if not require_value(int(canvas.entity_nodes[59].state.get("selected_branch",-1)) == 1,
+		"command-driven rail switch refresh"): return
 	toolbar.buttons[5].pressed.emit()
 	if not require_value(controller.mode == 1 and toolbar.buttons[5].button_pressed, "toolbar selected state"): return
 	controller.enter_select_mode()
@@ -127,13 +135,14 @@ func run_test() -> void:
 	if not require_value(simulation.step() == 0, "placement execution tick"): return
 	var command_results: Array = simulation.get_command_results()
 	if not require_value(command_results.size() == 1 and int(command_results[0].result) == 0, "successful placement result"): return
+	var placed_id := int(command_results[0].entity_id)
 	if not require_value(main._synchronize() and simulation.get_entities().size() == entity_count + 1, "placement presentation synchronization"): return
 	if not require_value(controller.selected_entity_id == 1, "selection did not survive placement"): return
 	if not require_value(simulation.queue_place_entity(2,12,0,1) == 0 and simulation.step() == 0, "occupied placement execution"): return
 	command_results = simulation.get_command_results()
 	if not require_value(int(command_results[0].result) != 0 and simulation.get_entities().size() == entity_count + 1, "occupied placement rejection"): return
-	if not require_value(main._synchronize() and controller.select_entity(54), "select constructed entity"): return
-	if not require_value(simulation.queue_demolish_entity(54) == 0, "demolition queue submission"): return
+	if not require_value(main._synchronize() and controller.select_entity(placed_id), "select constructed entity"): return
+	if not require_value(simulation.queue_demolish_entity(placed_id) == 0, "demolition queue submission"): return
 	if not require_value(simulation.get_entities().size() == entity_count + 1, "demolition mutated before tick"): return
 	if not require_value(simulation.step() == 0 and main._synchronize(), "demolition execution and synchronization"): return
 	command_results = simulation.get_command_results()
@@ -147,7 +156,7 @@ func run_test() -> void:
 	controller.select_entity(1)
 	main._reset_demo()
 	if not require_value(controller.selected_entity_id == 0 and inspector.entity_id == 0, "reset selection policy"): return
-	if not require_value(canvas.entity_nodes.size() == 53, "reset visual parity"): return
+	if not require_value(canvas.entity_nodes.size() == 62, "reset visual parity"): return
 	main.queue_free()
 	await process_frame
 	print("Foundation interaction smoke test passed")
