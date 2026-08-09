@@ -315,9 +315,16 @@ bool factory_locomotive_store_remove(FactoryLocomotiveStore*s,FactoryEntityId id
 void factory_cargo_wagon_store_destroy(FactoryCargoWagonStore*s)
 {if(s!=NULL){free(s->items);*s=(FactoryCargoWagonStore){0};}}
 bool factory_cargo_wagon_store_reserve(FactoryCargoWagonStore*s,size_t required)
-{if(s==NULL||required>SIZE_MAX/sizeof(*s->items))return false;
- if(required>s->capacity){FactoryCargoWagon*p=realloc(s->items,required*sizeof(*p));
-  if(p==NULL)return false;s->items=p;s->capacity=required;}return true;}
+{
+    if(s==NULL||required>SIZE_MAX/sizeof(*s->items))return false;
+    if(required>s->capacity){
+        FactoryCargoWagon*p=realloc(s->items,required*sizeof(*p));
+        if(p==NULL)return false;
+        s->items=p;
+        s->capacity=required;
+    }
+    return true;
+}
 const FactoryCargoWagon *factory_cargo_wagon_store_find(
     const FactoryCargoWagonStore*s,FactoryEntityId id)
 {if(s!=NULL)for(size_t i=0;i<s->count;++i)if(s->items[i].entity_id==id)return s->items+i;return NULL;}
@@ -351,8 +358,10 @@ static bool rail_node_position(const FactorySimulation*s,FactoryEntityId id,
 bool factory_simulation_get_locomotive(const FactorySimulation*s,
     FactoryEntityId id,FactoryLocomotiveInspection*out)
 {
-    if(s==NULL||out==NULL)return false;const FactoryLocomotive*l=
-        factory_locomotive_store_find(&s->locomotives,id);if(l==NULL)return false;
+    if(s==NULL||out==NULL)return false;
+    const FactoryLocomotive*l=
+        factory_locomotive_store_find(&s->locomotives,id);
+    if(l==NULL)return false;
     int32_t x=0,y=0;FactoryRailNetworkId network=0;FactoryRailTraversal t={0};
     bool exists=rail_node_position(s,l->rail_entity_id,&x,&y,&network);
     bool traversed=exists&&factory_simulation_get_rail_traversal(s,
@@ -376,15 +385,21 @@ bool factory_simulation_get_locomotive(const FactorySimulation*s,
 bool factory_simulation_get_cargo_wagon(const FactorySimulation*s,
     FactoryEntityId id,FactoryCargoWagonInspection*out)
 {
-    if(s==NULL||out==NULL)return false;const FactoryCargoWagon*w=
-        factory_cargo_wagon_store_find(&s->cargo_wagons,id);if(w==NULL)return false;
+    if(s==NULL||out==NULL)return false;
+    const FactoryCargoWagon*w=
+        factory_cargo_wagon_store_find(&s->cargo_wagons,id);
+    if(w==NULL)return false;
     int32_t x=0,y=0;FactoryRailNetworkId network=0;uint32_t index=0U;
     (void)rail_node_position(s,w->rail_entity_id,&x,&y,&network);
     if(w->train_id!=0U){const FactoryLocomotive*l=factory_locomotive_store_find(
         &s->locomotives,w->train_id);FactoryEntityId next=l!=NULL?l->rear_vehicle_id:0U;
         index=1U;while(next!=0U&&next!=id){const FactoryCargoWagon*cursor=
             factory_cargo_wagon_store_find(&s->cargo_wagons,next);
-            if(cursor==NULL)break;next=cursor->next_vehicle_id;++index;}}
+            if(cursor==NULL)break;
+            next=cursor->next_vehicle_id;
+            ++index;
+        }
+    }
     *out=(FactoryCargoWagonInspection){w->entity_id,w->rail_entity_id,x,y,
         w->entry_direction,network,w->train_id,index,w->train_id!=0U,
         w->cargo_item,w->cargo_quantity,FACTORY_CARGO_WAGON_CAPACITY};return true;

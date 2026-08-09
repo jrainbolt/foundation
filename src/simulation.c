@@ -999,7 +999,10 @@ static FactoryResult decouple_rear_wagon(FactorySimulation*s,
  for(FactoryEntityId cursor=l->rear_vehicle_id;cursor!=0U;){w=
     factory_cargo_wagon_store_find_mutable(&s->cargo_wagons,cursor);
     if(w==NULL)return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
-    if(w->next_vehicle_id==0U)break;previous=w;cursor=w->next_vehicle_id;}
+    if(w->next_vehicle_id==0U)break;
+    previous=w;
+    cursor=w->next_vehicle_id;
+ }
  if(previous!=NULL)previous->next_vehicle_id=0U;else l->rear_vehicle_id=0U;
  w->train_id=0U;w->previous_vehicle_id=0U;--l->vehicle_count;*out_id=w->entity_id;
  factory_simulation_emit_event(s,(FactoryEvent){
