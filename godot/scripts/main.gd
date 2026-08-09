@@ -105,6 +105,8 @@ func _advance(count: int) -> bool:
 func _synchronize() -> bool:
 	simulation.clear_error()
 	var entities: Array = simulation.get_entities()
+	for entity: Dictionary in entities:
+		entity["telemetry"] = simulation.get_entity_telemetry(int(entity.id))
 	var resources: Array = simulation.get_resources()
 	var terrain: Array = simulation.get_terrain()
 	var power_edges: Array = simulation.get_power_edges()

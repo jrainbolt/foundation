@@ -1,5 +1,9 @@
 # Renderer-neutral presentation snapshots
 
+Rolling telemetry remains separate from presentation. Telemetry reuses current
+entity status for activity classification, while clients such as Godot combine
+the two read-only projections only when rendering an inspector.
+
 Generated worlds require no special presentation path: every authoritative
 terrain cell and finite deposit is copied in canonical row-major order. The
 derived center start coordinate remains available from the world dimensions;

@@ -61,6 +61,10 @@ event lines.
 The deterministic demo seed produces coherent terrain plus starter and remote
 Iron/Copper patches. Reset recreates the same generated world and centers the
 camera on its protected starting area. Move the camera with WASD or the arrow keys, drag with the middle mouse button,
+
+The adapter owns a transient telemetry collector. Successful steps are observed
+before presentation rebuild, and selected production/logistics entities show
+compact last-60-tick flow and activity counters. Reset clears telemetry.
 and zoom with the mouse wheel. Camera motion and zoom are frontend state and
 continue to work while simulation stepping is paused. The procedural grid and
 cursor tile share the renderer's 64-pixel Foundation-grid conversion.

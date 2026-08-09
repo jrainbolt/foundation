@@ -98,6 +98,12 @@ func show_entity(state: Dictionary) -> void:
 			field(lines, str(key).capitalize(), Format.number(int(state[key])))
 			activity_count += 1
 	if activity_count == 0: lines.pop_back()
+	var telemetry: Dictionary = state.get("telemetry", {})
+	if not telemetry.is_empty():
+		section(lines, "Telemetry — last %d ticks" % int(telemetry.get("window_ticks", 0)))
+		for key in ["received", "sent", "net_flow", "cycles", "working", "blocked_input", "blocked_output", "blocked", "unpowered", "idle", "depleted", "occupied", "holding", "pickups", "drops"]:
+			var amount := int(telemetry.get(key, 0))
+			if amount != 0: field(lines, key.capitalize(), Format.number(amount))
 	details.text = "\n".join(lines)
 
 func section(lines: Array[String], name: String) -> void:

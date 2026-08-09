@@ -81,6 +81,7 @@ add_library(factory_engine
     src/splitter.c
     src/storage.c
     src/tick_preflight.c
+    src/telemetry.c
     src/world.c
     src/world_generation.c
 )
@@ -387,4 +388,9 @@ if(BUILD_TESTING)
     add_executable(factory_procedural_world_tests tests/test_procedural_world.c)
     target_link_libraries(factory_procedural_world_tests PRIVATE factory_engine)
     add_test(NAME factory_procedural_world_tests COMMAND factory_procedural_world_tests)
+    add_executable(factory_telemetry_tests tests/test_telemetry.c)
+    target_include_directories(factory_telemetry_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    target_link_libraries(factory_telemetry_tests PRIVATE factory_engine)
+    add_test(NAME factory_telemetry_tests COMMAND factory_telemetry_tests)
 endif()

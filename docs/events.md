@@ -1,5 +1,9 @@
 # Deterministic simulation events
 
+Production and item-transfer events are also the authoritative committed-flow
+input for the external telemetry collector. Telemetry reads but never clears or
+changes the event batch.
+
 Each `factory_simulation_tick` produces one transient, simulation-owned event
 batch. Before any authoritative mutation, the simulation reserves enough
 storage for the maximum events that step can produce. If reservation fails,

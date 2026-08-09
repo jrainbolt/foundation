@@ -25,6 +25,7 @@
 - [x] Finite resource deposits, depletion, and conservation
 - [x] Seeded deterministic procedural world model and authoritative terrain
 - [x] Deterministic terrain generation and finite resource patches
+- [x] Deterministic production and logistics telemetry
 
 Finite deposits and seeded authoritative terrain are prerequisites for
 deterministic resource patches, remote mining outposts, rail infrastructure, and eventually

@@ -13,6 +13,7 @@ extern "C" {
 #include "foundation/research.h"
 #include "foundation/research_lab.h"
 #include "foundation/content.h"
+#include "foundation/telemetry.h"
 
 #ifdef __cplusplus
 }

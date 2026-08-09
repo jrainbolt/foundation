@@ -1,5 +1,8 @@
 # Deterministic Simulation
 
+Telemetry observes a completed step externally. It is never consulted by tick
+logic and is excluded from canonical snapshot version 18.
+
 World generation is completed and validated before simulation creation seals
 the world. Simulation ticks never consult the seed, rerun generation, or retain
 generator state; they consume only authoritative terrain and deposit cells.

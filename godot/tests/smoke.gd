@@ -313,6 +313,11 @@ func _initialize() -> void:
 		return
 	if not _require(not edges.is_empty(), "missing power edges"):
 		return
+	var telemetry: Dictionary = simulation.get_entity_telemetry(1)
+	if not _require(not telemetry.is_empty()
+		and int(telemetry.window_ticks) > 0,
+		"selected-entity telemetry missing"):
+		return
 	var first_id := int(entities[0].id)
 	if not _require(first_id > 0, "invalid first entity ID"):
 		return

@@ -19,6 +19,7 @@ private:
     FactoryWorld *world_ = nullptr;
     FactorySimulation *simulation_ = nullptr;
     FactoryPresentationSnapshot *presentation_ = nullptr;
+    FactoryTelemetry *telemetry_ = nullptr;
     mutable String last_error_;
 
     void destroy_state();
@@ -68,6 +69,7 @@ public:
     Array get_entities() const;
     Array get_resources() const;
     Array get_terrain() const;
+    Dictionary get_entity_telemetry(int64_t entity_id) const;
     int64_t get_start_x() const;
     int64_t get_start_y() const;
     Array get_power_edges() const;

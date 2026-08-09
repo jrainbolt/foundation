@@ -243,6 +243,8 @@ void FoundationSimulation::_bind_methods()
     ClassDB::bind_method(
         D_METHOD("get_terrain"), &FoundationSimulation::get_terrain
     );
+    ClassDB::bind_method(D_METHOD("get_entity_telemetry","entity_id"),
+        &FoundationSimulation::get_entity_telemetry);
     ClassDB::bind_method(D_METHOD("get_start_x"),&FoundationSimulation::get_start_x);
     ClassDB::bind_method(D_METHOD("get_start_y"),&FoundationSimulation::get_start_y);
     ClassDB::bind_method(
@@ -275,11 +277,15 @@ void FoundationSimulation::_bind_methods()
 FoundationSimulation::FoundationSimulation()
 {
     presentation_ = factory_presentation_snapshot_create();
+    FactoryTelemetryConfig config;
+    factory_telemetry_default_config(&config);
+    telemetry_=factory_telemetry_create(&config);
 }
 
 FoundationSimulation::~FoundationSimulation()
 {
     destroy_state();
+    factory_telemetry_destroy(telemetry_);
     factory_presentation_snapshot_destroy(presentation_);
 }
 
@@ -289,6 +295,7 @@ void FoundationSimulation::destroy_state()
     factory_world_destroy(world_);
     simulation_ = nullptr;
     world_ = nullptr;
+    factory_telemetry_clear(telemetry_);
     if (presentation_ != nullptr)
         factory_presentation_snapshot_clear(presentation_);
 }
@@ -569,6 +576,12 @@ int64_t FoundationSimulation::step()
     if (simulation_ == nullptr)
         return FACTORY_RESULT_INVALID_STATE;
     FactoryResult result = factory_simulation_tick(simulation_);
+    if (result == FACTORY_RESULT_OK && telemetry_ != nullptr) {
+        FactoryTelemetryResult telemetry_result=
+            factory_telemetry_observe_step(telemetry_,simulation_);
+        if(telemetry_result!=FACTORY_TELEMETRY_RESULT_OK)
+            last_error_="telemetry observation unavailable";
+    }
     if (result == FACTORY_RESULT_OK)
         result = factory_presentation_snapshot_rebuild(
             presentation_, simulation_
@@ -1362,6 +1375,36 @@ Array FoundationSimulation::get_terrain() const
         values.append(value);
     }
     return values;
+}
+
+Dictionary FoundationSimulation::get_entity_telemetry(int64_t entity_id) const
+{
+    Dictionary value;FactoryTelemetryEntityMetrics metrics;
+    if(telemetry_==nullptr||entity_id<=0||entity_id>UINT32_MAX
+        ||!factory_telemetry_get_entity_metrics(telemetry_,
+            (FactoryEntityId)entity_id,FACTORY_TELEMETRY_WINDOW_SHORT,&metrics))
+        return value;
+    value["window_ticks"]=(int64_t)metrics.observed_ticks;
+    if(!set_unsigned(&value,"received",metrics.received_quantity,
+            "telemetry.received")
+        ||!set_unsigned(&value,"sent",metrics.sent_quantity,"telemetry.sent")
+        ||!set_unsigned(&value,"cycles",metrics.completed_cycles,
+            "telemetry.cycles")
+        ||!set_unsigned(&value,"pickups",metrics.pickups,"telemetry.pickups")
+        ||!set_unsigned(&value,"drops",metrics.drops,"telemetry.drops"))
+        return Dictionary();
+    value["working"]=(int64_t)metrics.working_ticks;
+    value["net_flow"]=metrics.net_flow;
+    value["blocked_input"]=(int64_t)metrics.blocked_input_ticks;
+    value["blocked_output"]=(int64_t)metrics.blocked_output_ticks;
+    value["unpowered"]=(int64_t)metrics.unpowered_ticks;
+    value["idle"]=(int64_t)metrics.idle_ticks;
+    value["depleted"]=(int64_t)metrics.depleted_ticks;
+    value["occupied"]=(int64_t)metrics.occupied_ticks;
+    value["blocked"]=(int64_t)metrics.blocked_ticks;
+    value["holding"]=(int64_t)metrics.holding_ticks;
+    value["saturated"]=metrics.saturated;
+    return value;
 }
 
 int64_t FoundationSimulation::get_start_x() const
