@@ -111,8 +111,9 @@ void factory_rail_signal_store_add(FactoryRailSignalStore*s,
 
 const FactoryRailSignal *factory_rail_signal_store_find(
     const FactoryRailSignalStore*s,FactoryEntityId id)
-{if(s!=NULL)for(size_t i=0U;i<s->count;++i)
- if(s->items[i].entity_id==id)return &s->items[i];return NULL;}
+{if(s!=NULL){for(size_t i=0U;i<s->count;++i){
+    if(s->items[i].entity_id==id)return &s->items[i];}}
+ return NULL;}
 
 void factory_rail_topology_destroy(FactoryRailTopology*topology)
 {
