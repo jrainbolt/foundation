@@ -66,7 +66,8 @@ static void invalid_attachment(void)
 static void reservation_aspect_and_owner_crossing(void)
 {FactoryWorld*w=factory_world_create(12,6);FactorySimulation*s=
  factory_simulation_create_with_construction_units(w,1000U);FactoryEntityId r[8];
- for(int x=1;x<=8;++x)r[x-1]=rail(s,x);FactoryEntityId sig=signal(s,5,
+ for(int x=1;x<=8;++x)r[x-1]=rail(s,x);
+ FactoryEntityId sig=signal(s,5,
     FACTORY_DIRECTION_EAST);
  FactoryCommand station_command={FACTORY_COMMAND_PLACE_RAIL_STATION,
     {.place_rail_station={8,1,FACTORY_DIRECTION_SOUTH}}};

@@ -21,7 +21,8 @@ static FactoryEntityId station(FactorySimulation*s,int x)
 static void block_derivation(void)
 {FactoryWorld*w=factory_world_create(12,6);FactorySimulation*s=
  factory_simulation_create_with_construction_units(w,1000U);FactoryEntityId r[5];
- for(int x=1;x<=5;++x)r[x-1]=rail(s,x);station(s,5);
+ for(int x=1;x<=5;++x)r[x-1]=rail(s,x);
+ station(s,5);
  CHECK(factory_simulation_get_rail_block_count(s)==3U);
  CHECK(factory_simulation_get_rail_block_for_rail(s,r[0])==r[0]);
  CHECK(factory_simulation_get_rail_block_for_rail(s,r[1])==r[1]);
@@ -37,7 +38,8 @@ static void block_derivation(void)
 static void two_train_reservation_and_snapshot(void)
 {FactoryWorld*w=factory_world_create(14,6);FactorySimulation*s=
  factory_simulation_create_with_construction_units(w,2000U);FactoryEntityId r[7];
- for(int x=1;x<=7;++x)r[x-1]=rail(s,x);FactoryEntityId st=station(s,4);
+ for(int x=1;x<=7;++x)r[x-1]=rail(s,x);
+ FactoryEntityId st=station(s,4);
  FactoryCommand vehicles[2]={
   {FACTORY_COMMAND_PLACE_LOCOMOTIVE,{.place_locomotive={r[1],FACTORY_DIRECTION_EAST}}},
   {FACTORY_COMMAND_PLACE_LOCOMOTIVE,{.place_locomotive={r[5],FACTORY_DIRECTION_WEST}}}};
