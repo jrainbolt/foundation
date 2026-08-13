@@ -12,8 +12,9 @@ Coupling is explicit and command-driven. Only an uncoupled wagon on the rail
 immediately behind the current rear vehicle may be appended. Its traversal must
 lead to that rear vehicle, which validates curved as well as straight chains.
 Rear-only decoupling leaves the detached wagon on its rail. Middle insertion,
-middle removal, multiple locomotives, routing, schedules, signals, reservations,
-and station freight are intentionally deferred.
+middle removal, multiple locomotives, schedules, chain signals, interlocking,
+and station freight are intentionally deferred. Routing, one-block-ahead
+reservations, and ordinary directional block signals are documented separately.
 
 ## Movement and conflicts
 

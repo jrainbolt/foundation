@@ -6,6 +6,10 @@ not two is a one-node boundary block. Remaining two-connection rails form
 maximal connected blocks. A block ID is its lowest member rail entity ID and
 members are inspected in ascending rail-ID order. Blocks are never serialized.
 
+Ordinary directional Rail Signals additionally cut their protected physical
+transition, allowing players to subdivide corridors. Topology mutation releases
+and deterministically replans future reservations; see `rail-signals.md`.
+
 Routing, reservation, and occupancy are distinct. Each routed train may own
 one authoritative future `reserved_block_id`. Before movement, trains are
 processed in ascending locomotive/train ID. A still-needed reservation is

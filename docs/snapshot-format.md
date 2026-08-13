@@ -1,4 +1,8 @@
-# Snapshot format version 25
+# Snapshot format version 26
+
+Version 26 adds Rail Signal records containing entity ID, trackside position,
+and controlled direction. Attachment, downstream block, aspect, occupancy,
+and reservation display are derived after load and are not serialized.
 
 Version 25 adds one authoritative `reserved_block_id` to each locomotive
 record. Rail-block membership, occupancy protection, waiting status, and the

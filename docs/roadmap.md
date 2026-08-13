@@ -33,6 +33,7 @@
 - [x] Deterministic train consists and Cargo Wagons
 - [x] Deterministic train destinations and directional routing
 - [x] Derived rail blocks and one-block-ahead reservations
+- [x] Ordinary directional Rail Signals and explicit block boundaries
 
 Finite deposits and seeded authoritative terrain are prerequisites for
 deterministic resource patches, remote mining outposts, rail infrastructure, and eventually
@@ -45,5 +46,5 @@ remain separate future milestones.
 
 Rail progression remains deliberately staged: static rail topology → switches
 → locomotive movement → consists/wagons → destinations/routing → rail
-blocks/reservations → player-facing signals/interlocking → freight stations
+blocks/reservations → ordinary rail signals → chain signals/interlocking → freight stations
 → schedules/automated logistics.

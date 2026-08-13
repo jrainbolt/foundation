@@ -65,6 +65,7 @@ from one physically connected port to the other.
 Derived rail blocks group ordinary two-connection corridors while switches,
 station attachment rails, endpoints, and other non-two-connection nodes form
 boundary blocks. See `train-reservations.md` for identity and ownership rules.
+Player-placed directional boundaries are described in `rail-signals.md`.
 `FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH` changes authoritative selection in
 FIFO order. Same-state requests are successful no-ops; actual transitions emit
 one `FACTORY_EVENT_RAIL_SWITCH_CHANGED` carrying previous and new branch IDs.

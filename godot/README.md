@@ -294,3 +294,8 @@ Selecting a locomotive highlights its current block in green, a held future
 block in cyan, or a block owned/occupied by another train in orange-red. The
 inspector reports route, block, reservation, and blocker fields. Godot neither
 calculates nor mutates reservation ownership.
+
+Rail Signal is a toolbar construction type. `R` rotates its controlled travel
+direction. Signals render as compact trackside masts with green, red, or cyan
+reserved lamps using Foundation presentation fields; their inspector shows
+attachment, upstream/downstream blocks, aspect, reservation, and occupancy.

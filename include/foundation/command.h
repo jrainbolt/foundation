@@ -65,7 +65,8 @@ typedef enum {
     FACTORY_COMMAND_DECOUPLE_REAR_WAGON,
     FACTORY_COMMAND_SET_TRAIN_DESTINATION,
     FACTORY_COMMAND_CLEAR_TRAIN_DESTINATION,
-    FACTORY_COMMAND_REPLAN_TRAIN_ROUTE
+    FACTORY_COMMAND_REPLAN_TRAIN_ROUTE,
+    FACTORY_COMMAND_PLACE_RAIL_SIGNAL
 } FactoryCommandType;
 
 typedef struct {
@@ -190,6 +191,8 @@ typedef struct {
             set_train_destination;
         struct { FactoryEntityId train_id; } clear_train_destination;
         struct { FactoryEntityId train_id; } replan_train_route;
+        struct { int32_t x; int32_t y; FactoryDirection orientation; }
+            place_rail_signal;
     } data;
 } FactoryCommand;
 

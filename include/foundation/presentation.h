@@ -300,6 +300,18 @@ typedef struct {
 } FactoryPresentationRailStation;
 
 typedef struct {
+    FactoryDirection orientation;
+    FactoryEntityId attached_rail_id;
+    FactoryEntityId upstream_rail_id;
+    FactoryRailBlockId upstream_block_id;
+    FactoryRailBlockId downstream_block_id;
+    FactoryRailSignalAspect aspect;
+    FactoryTrainId reserved_train_id;
+    uint32_t occupied_train_count;
+    bool connected;
+} FactoryPresentationRailSignal;
+
+typedef struct {
     FactoryEntityId rail_entity_id;
     FactoryDirection entry_direction;
     FactoryDirection travel_direction;
@@ -369,6 +381,7 @@ typedef struct {
         FactoryPresentationRail rail;
         FactoryPresentationRailStation rail_station;
         FactoryPresentationRailSwitch rail_switch;
+        FactoryPresentationRailSignal rail_signal;
         FactoryPresentationLocomotive locomotive;
         FactoryPresentationCargoWagon cargo_wagon;
     } data;

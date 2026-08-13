@@ -61,7 +61,7 @@ func _initialize() -> void:
 		and simulation.has_method("queue_replan_train_route")
 		and simulation.has_method("get_train_route")
 		and simulation.has_method("get_command_results")
-		and simulation.get_build_catalog().size() == 28
+		and simulation.get_build_catalog().size() == 29
 		and simulation.get_assembler_recipe_catalog().size() == 4
 		and simulation.get_item_catalog().size() == 11
 		and simulation.get_construction_units() >= 0,
@@ -83,7 +83,7 @@ func _initialize() -> void:
 	if not _require(not simulation.has_error(), simulation.get_last_error()):
 		return
 	if not _require(
-		entities.size() == 65,
+		entities.size() == 67,
 		"missing presentation entities: got %d" % entities.size()
 	):
 		return
@@ -99,7 +99,7 @@ func _initialize() -> void:
 		12, 11, 13, 11, 14, 15, 8, 16, 7, 17,
 		18, 18, 18, 19, 11, 10, 11, 20,
 		11, 21,
-		24, 24, 24, 24, 24, 26, 24, 24, 25, 27, 28, 28
+		24, 24, 24, 24, 24, 26, 24, 24, 25, 29, 29, 27, 28, 28
 	]
 	var seen_ids := {}
 	for index in entities.size():
@@ -113,7 +113,21 @@ func _initialize() -> void:
 		):
 			return
 		seen_ids[entity_id] = true
-	if not _require(seen_ids.size() == 65, "duplicate or missing stable IDs"):
+	if not _require(seen_ids.size() == 67, "duplicate or missing stable IDs"):
+		return
+	var first_signal: Dictionary = entities[62]
+	var second_signal: Dictionary = entities[63]
+	if not _require(
+		int(first_signal.type) == 29
+		and int(first_signal.attached_rail_id) == 57
+		and int(first_signal.signal_orientation) == 1
+		and int(first_signal.downstream_block_id) != 0
+		and int(second_signal.type) == 29
+		and int(second_signal.attached_rail_id) == 58
+		and int(second_signal.signal_orientation) == 1
+		and int(second_signal.downstream_block_id) != 0,
+		"rail signal presentation: %s / %s" % [first_signal,second_signal]
+	):
 		return
 	var rail_switch: Dictionary = entities[58]
 	if not _require(
@@ -124,7 +138,7 @@ func _initialize() -> void:
 		"rail switch presentation: %s" % rail_switch
 	):
 		return
-	var locomotive: Dictionary = entities[62]
+	var locomotive: Dictionary = entities[64]
 	if not _require(
 		int(locomotive.type) == 27
 		and int(locomotive.rail_entity_id) == 57
@@ -132,19 +146,19 @@ func _initialize() -> void:
 		and int(locomotive.movement_progress) == 1
 		and int(locomotive.movement_interval) == 4
 		and int(locomotive.rail_network_id) == 54
-		and int(locomotive.train_id) == 63
+		and int(locomotive.train_id) == 65
 		and int(locomotive.vehicle_count) == 3
 		and int(locomotive.destination_station_id) == 0
 		and int(locomotive.route_status) == 0
 		and int(locomotive.current_block_id) != 0
 		and int(locomotive.reserved_block_id) == 0
 		and int(locomotive.reservation_status) == 0
-		and simulation.get_train_route(63).is_empty(),
+		and simulation.get_train_route(65).is_empty(),
 		"locomotive presentation: %s" % locomotive
 	):
 		return
-	var wagon: Dictionary = entities[63]
-	if not _require(int(wagon.type) == 28 and int(wagon.train_id) == 63
+	var wagon: Dictionary = entities[65]
+	if not _require(int(wagon.type) == 28 and int(wagon.train_id) == 65
 		and int(wagon.consist_index) == 1 and bool(wagon.coupled),
 		"cargo wagon presentation: %s" % wagon):
 		return

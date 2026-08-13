@@ -14,6 +14,7 @@ const COLORS := {
 	22: Color("#475d91"),
 	23: Color("#596b46"),
 	24: Color("#9ea7af"), 25: Color("#506a78"), 26: Color("#a88946"), 27: Color("#b64b3b"), 28: Color("#3f7294"),
+	29: Color("#4a5963"),
 }
 const TITLES := {
 	1: "EXTRACTOR", 2: "BELT", 3: "REFINERY", 4: "ASSEMBLER",
@@ -25,6 +26,7 @@ const TITLES := {
 	22: "RESEARCH LAB",
 	23: "CONSTRUCTION DEPOT",
 	24: "RAIL", 25: "RAIL STATION", 26: "RAIL SWITCH", 27: "LOCOMOTIVE", 28: "CARGO WAGON",
+	29: "RAIL SIGNAL",
 }
 const ABBREVIATIONS := {
 	1: "EX", 2: "BELT", 3: "REF", 4: "ASM", 5: "BOX", 6: "SPLIT",
@@ -81,6 +83,10 @@ func _draw() -> void:
 		_draw_cargo_wagon(color)
 		_draw_selection()
 		return
+	if entity_type == 29:
+		_draw_signal()
+		_draw_selection()
+		return
 	if not bool(state.get("powered", true)) and entity_type in [1, 3, 4, 7, 21, 22]:
 		color = color.darkened(0.42)
 	draw_rect(TILE_RECT, Color("#111820"), true)
@@ -96,6 +102,17 @@ func _draw() -> void:
 	_draw_resource_badge()
 	_draw_process_bar()
 	_draw_selection()
+
+func _draw_signal() -> void:
+	var aspect := int(state.get("signal_aspect",1))
+	var lamp := Color("#4ee579") if aspect == 0 else (Color("#55d7ff") if aspect == 2 else Color("#f05b55"))
+	draw_line(Vector2(38,62),Vector2(38,24),Color("#b6c1ca"),5.0)
+	draw_rect(Rect2(27,12,22,22),Color("#172029"),true)
+	draw_circle(Vector2(38,23),7.0,lamp)
+	var direction := int(state.get("signal_orientation",state.get("direction",0)))
+	var vectors := [Vector2(0,-1),Vector2(1,0),Vector2(0,1),Vector2(-1,0)]
+	var arrow: Vector2 = vectors[direction]
+	draw_line(Vector2(38,49),Vector2(38,49)+arrow*13.0,lamp,3.0)
 
 func _draw_selection() -> void:
 	if hovered:

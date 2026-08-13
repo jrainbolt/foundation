@@ -36,7 +36,8 @@ static const FactoryEntityDefinition entities[] = {
     {FACTORY_ENTITY_TYPE_RAIL_STATION,FACTORY_CONSTRUCTION_COST_RAIL_STATION,1U,1U,0,0U,FACTORY_CONTENT_RECIPE_FAMILY_NONE,0U,0U,0U},
     {FACTORY_ENTITY_TYPE_RAIL_SWITCH,FACTORY_CONSTRUCTION_COST_RAIL_SWITCH,1U,1U,0,0U,FACTORY_CONTENT_RECIPE_FAMILY_NONE,0U,0U,0U},
     {FACTORY_ENTITY_TYPE_LOCOMOTIVE,FACTORY_CONSTRUCTION_COST_LOCOMOTIVE,1U,1U,0,0U,FACTORY_CONTENT_RECIPE_FAMILY_NONE,0U,0U,0U},
-    {FACTORY_ENTITY_TYPE_CARGO_WAGON,FACTORY_CONSTRUCTION_COST_CARGO_WAGON,1U,1U,0,0U,FACTORY_CONTENT_RECIPE_FAMILY_NONE,0U,0U,0U}
+    {FACTORY_ENTITY_TYPE_CARGO_WAGON,FACTORY_CONSTRUCTION_COST_CARGO_WAGON,1U,1U,0,0U,FACTORY_CONTENT_RECIPE_FAMILY_NONE,0U,0U,0U},
+    {FACTORY_ENTITY_TYPE_RAIL_SIGNAL,FACTORY_CONSTRUCTION_COST_RAIL_SIGNAL,1U,1U,0,0U,FACTORY_CONTENT_RECIPE_FAMILY_NONE,0U,0U,0U}
 };
 
 static const FactoryRefineryRecipeDefinition refinery_recipes[] = {
@@ -157,7 +158,7 @@ bool factory_content_validate_view(const FactoryContentView *v)
 {
     uint64_t unlocks=0U;
     if(v==NULL||v->entities==NULL||v->entity_count==0U
-        ||v->entity_count!=(size_t)FACTORY_ENTITY_TYPE_CARGO_WAGON
+        ||v->entity_count!=(size_t)FACTORY_ENTITY_TYPE_RAIL_SIGNAL
         ||v->refinery_recipes==NULL||v->refinery_recipe_count==0U
         ||v->assembler_recipe_count==0U||v->technology_count==0U
         ||v->fuel_count==0U||v->fluid_count==0U||v->nuclear_fuel_count==0U
@@ -177,7 +178,7 @@ bool factory_content_validate_view(const FactoryContentView *v)
             if(d->terrain_type==v->terrains[j].terrain_type)return false;}
     for(size_t i=0U;i<v->entity_count;++i){const FactoryEntityDefinition*d=&v->entities[i];
         if(d->entity_type<=FACTORY_ENTITY_TYPE_NONE
-            ||d->entity_type>FACTORY_ENTITY_TYPE_CARGO_WAGON
+            ||d->entity_type>FACTORY_ENTITY_TYPE_RAIL_SIGNAL
             ||d->construction_cost==0U||d->footprint_width==0U
             ||d->footprint_height==0U||(d->required_unlock&~FACTORY_UNLOCK_ALL)!=0U
             ||d->default_orientation<FACTORY_CONTENT_ORIENTATION_NONE

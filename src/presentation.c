@@ -214,6 +214,8 @@ static FactoryResult populate_entity(
         factory_rail_station_store_find(&simulation->rail_stations,id);
     const FactoryRailSwitch *rail_switch=
         factory_rail_switch_store_find(&simulation->rail_switches,id);
+    const FactoryRailSignal *rail_signal=
+        factory_rail_signal_store_find(&simulation->rail_signals,id);
     const FactoryLocomotive *locomotive=
         factory_locomotive_store_find(&simulation->locomotives,id);
     const FactoryCargoWagon *cargo_wagon=
@@ -622,6 +624,21 @@ static FactoryResult populate_entity(
             {inspection.neighbors[0],inspection.neighbors[1],
              inspection.neighbors[2],inspection.neighbors[3]},block_id,reserved,
              occupied};
+    } else if(rail_signal!=NULL){FactoryRailSignalInspection inspection;
+        if(!factory_simulation_get_rail_signal(simulation,id,&inspection))
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        out->entity_type=FACTORY_ENTITY_TYPE_RAIL_SIGNAL;
+        out->x=inspection.x;out->y=inspection.y;
+        out->direction=inspection.orientation;
+        out->status=inspection.aspect==FACTORY_RAIL_SIGNAL_GREEN
+            ?FACTORY_PRESENTATION_MACHINE_STATUS_IDLE
+            :FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_OUTPUT;
+        out->data.rail_signal=(FactoryPresentationRailSignal){
+            inspection.orientation,inspection.attached_rail_id,
+            inspection.upstream_rail_id,inspection.upstream_block_id,
+            inspection.downstream_block_id,inspection.aspect,
+            inspection.reserved_train_id,inspection.occupied_train_count,
+            inspection.connected};
     } else if(locomotive!=NULL){FactoryLocomotiveInspection inspection;
         if(!factory_simulation_get_locomotive(simulation,id,&inspection))
             return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;

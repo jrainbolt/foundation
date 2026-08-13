@@ -138,6 +138,7 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
     RESERVE_STORE(s->rails,1U);
     RESERVE_STORE(s->rail_stations,1U);
     RESERVE_STORE(s->rail_switches,1U);
+    RESERVE_STORE(s->rail_signals,1U);
     {
         size_t required;
         if(s->locomotives.count>SIZE_MAX-q)goto overflow;

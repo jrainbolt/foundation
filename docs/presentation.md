@@ -153,3 +153,7 @@ and activity. It does not own movement or occupancy.
 Rail and switch records additionally expose block ID, reservation owner, and
 occupied-train count. Locomotives expose current/next/reserved block IDs,
 reservation status, and blocking train ID. These are read-only renderer data.
+
+Rail Signal records expose orientation, attached/upstream rails,
+upstream/downstream blocks, derived aspect, downstream reservation owner,
+occupied-train count, and connectivity. Frontends do not calculate aspects.

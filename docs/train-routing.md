@@ -52,3 +52,6 @@ when independently planned routes overlap.
 
 Block permission is a separate one-block-ahead layer documented in
 `train-reservations.md`; a route remains intended direction rather than ownership.
+Ordinary signals do not alter route search or switch selection. They split the
+derived exclusive block map, so route execution obtains permission through that
+same reservation layer before crossing a signal-defined boundary.

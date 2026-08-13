@@ -65,6 +65,12 @@ typedef enum {
     FACTORY_TRAIN_RESERVATION_INVALID
 } FactoryTrainReservationStatus;
 
+typedef enum {
+    FACTORY_RAIL_SIGNAL_GREEN = 0,
+    FACTORY_RAIL_SIGNAL_RED,
+    FACTORY_RAIL_SIGNAL_RESERVED
+} FactoryRailSignalAspect;
+
 typedef struct {
     FactoryEntityId rail_entity_id;
     FactoryDirection entry_direction;
@@ -115,6 +121,26 @@ typedef struct {
     bool station_boundary;
     bool endpoint_boundary;
 } FactoryRailBlockInspection;
+
+/*
+ * Orientation is the controlled travel direction. The attached rail is one
+ * cell to the signal's left when viewed along that direction, leaving the
+ * signal beside the track. Its upstream rail is the attached rail's neighbor
+ * opposite the controlled direction.
+ */
+typedef struct {
+    FactoryEntityId entity_id;
+    int32_t x,y;
+    FactoryDirection orientation;
+    FactoryEntityId attached_rail_id;
+    FactoryEntityId upstream_rail_id;
+    FactoryRailBlockId upstream_block_id;
+    FactoryRailBlockId downstream_block_id;
+    FactoryRailSignalAspect aspect;
+    FactoryTrainId reserved_train_id;
+    uint32_t occupied_train_count;
+    bool connected;
+} FactoryRailSignalInspection;
 
 typedef struct {
     FactoryEntityId entity_id;
@@ -222,5 +248,7 @@ FactoryRailBlockId factory_simulation_get_rail_block_for_rail(
     const FactorySimulation *simulation,FactoryEntityId rail_entity_id);
 bool factory_simulation_get_rail_block_member(const FactorySimulation *simulation,
     FactoryRailBlockId block_id,size_t index,FactoryEntityId *out_rail_id);
+bool factory_simulation_get_rail_signal(const FactorySimulation *simulation,
+    FactoryEntityId id,FactoryRailSignalInspection *out_signal);
 
 #endif
