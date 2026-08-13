@@ -273,6 +273,9 @@ typedef struct {
     uint32_t connection_mask;
     FactoryRailNetworkId network_id;
     FactoryEntityId neighbors[FACTORY_RAIL_NEIGHBOR_COUNT];
+    FactoryRailBlockId block_id;
+    FactoryTrainId reserved_train_id;
+    uint32_t occupied_train_count;
 } FactoryPresentationRail;
 
 typedef struct {
@@ -285,6 +288,9 @@ typedef struct {
     uint32_t connection_mask;
     FactoryRailNetworkId network_id;
     FactoryEntityId neighbors[FACTORY_RAIL_NEIGHBOR_COUNT];
+    FactoryRailBlockId block_id;
+    FactoryTrainId reserved_train_id;
+    uint32_t occupied_train_count;
 } FactoryPresentationRailSwitch;
 
 typedef struct {
@@ -309,6 +315,11 @@ typedef struct {
     uint32_t route_length;
     uint32_t route_index;
     FactoryEntityId next_planned_rail_id;
+    FactoryRailBlockId current_block_id;
+    FactoryRailBlockId next_route_block_id;
+    FactoryRailBlockId reserved_block_id;
+    FactoryTrainReservationStatus reservation_status;
+    FactoryTrainId blocking_train_id;
 } FactoryPresentationLocomotive;
 
 typedef struct {

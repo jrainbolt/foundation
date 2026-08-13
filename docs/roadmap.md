@@ -31,6 +31,8 @@
 - [x] Deterministic rail switches and branching junctions
 - [x] Deterministic locomotive ownership and basic rail movement
 - [x] Deterministic train consists and Cargo Wagons
+- [x] Deterministic train destinations and directional routing
+- [x] Derived rail blocks and one-block-ahead reservations
 
 Finite deposits and seeded authoritative terrain are prerequisites for
 deterministic resource patches, remote mining outposts, rail infrastructure, and eventually
@@ -42,6 +44,6 @@ Godot bindings, incremental synchronization, and other frontend integrations
 remain separate future milestones.
 
 Rail progression remains deliberately staged: static rail topology → switches
-→ deterministic locomotive movement → train consists/wagons → routing and
-destinations → blocks/reservations/signals → freight stations → schedules and
-automated rail logistics.
+→ locomotive movement → consists/wagons → destinations/routing → rail
+blocks/reservations → player-facing signals/interlocking → freight stations
+→ schedules/automated logistics.

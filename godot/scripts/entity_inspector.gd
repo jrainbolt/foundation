@@ -88,6 +88,11 @@ func show_entity(state: Dictionary) -> void:
 	if state.has("route_status"): field(lines,"Route status",["NONE","ACTIVE","ARRIVED","INVALID"][clampi(int(state.route_status),0,3)])
 	if state.has("route_length"): field(lines,"Route progress","%d / %d" % [int(state.get("route_index",0)),maxi(0,int(state.route_length)-1)])
 	if state.has("next_planned_rail_id"): field(lines,"Next planned rail","#%d" % int(state.next_planned_rail_id))
+	if state.has("current_block_id"): field(lines,"Current block","#%d" % int(state.current_block_id))
+	if state.has("next_route_block_id"): field(lines,"Next route block","None" if int(state.next_route_block_id) == 0 else "#%d" % int(state.next_route_block_id))
+	if state.has("reserved_block_id"): field(lines,"Reserved block","None" if int(state.reserved_block_id) == 0 else "#%d" % int(state.reserved_block_id))
+	if state.has("reservation_status"): field(lines,"Reservation status",["NONE","HELD","WAITING","INVALID"][clampi(int(state.reservation_status),0,3)])
+	if state.has("blocking_train_id"): field(lines,"Blocking train","None" if int(state.blocking_train_id) == 0 else "#%d" % int(state.blocking_train_id))
 	if state.has("consist_index"): field(lines,"Consist index",str(int(state.consist_index)))
 	if state.has("coupled"): field(lines,"Coupled",Format.yes_no(bool(state.coupled)))
 	if state.has("recipe") or state.has("progress") or state.has("duration"):

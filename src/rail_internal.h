@@ -16,7 +16,9 @@ typedef struct {FactoryEntityId entity_id,rail_entity_id;FactoryDirection entry_
     uint32_t progress;FactoryLocomotiveActivity activity;
     FactoryEntityId rear_vehicle_id;uint32_t vehicle_count;
     FactoryEntityId destination_station_id;FactoryTrainRouteStatus route_status;
-    FactoryTrainRouteStep *route;size_t route_length,route_index;} FactoryLocomotive;
+    FactoryTrainRouteStep *route;size_t route_length,route_index;
+    FactoryRailBlockId reserved_block_id;FactoryTrainReservationStatus reservation_status;
+    FactoryTrainId blocking_train_id;} FactoryLocomotive;
 typedef struct {FactoryEntityId entity_id,rail_entity_id;FactoryDirection entry_direction;
     FactoryTrainId train_id;FactoryEntityId previous_vehicle_id,next_vehicle_id;
     FactoryItemType cargo_item;uint32_t cargo_quantity;} FactoryCargoWagon;
@@ -26,10 +28,18 @@ typedef struct {FactoryEntityId id,from,to;FactoryDirection next_entry;
 typedef struct {FactoryLocomotive *items;size_t count,capacity;
     FactoryLocomotivePlan *plans;size_t plan_capacity;} FactoryLocomotiveStore;
 typedef struct {
+    FactoryRailBlockId block_id;size_t member_offset,member_count;
+    bool switch_boundary,station_boundary,endpoint_boundary;
+} FactoryRailBlock;
+typedef struct {FactoryEntityId rail_id;FactoryRailBlockId block_id;}
+    FactoryRailBlockMember;
+typedef struct {
     FactoryRailInspection *rails;size_t rail_count;
     FactoryRailSwitchInspection *switches;size_t switch_count;
     FactoryRailStationInspection *stations;size_t station_count;
     FactoryRailNetworkInspection *networks;size_t network_count;
+    FactoryRailBlock *blocks;size_t block_count;
+    FactoryRailBlockMember *block_members;size_t block_member_count;
     bool dirty;
 } FactoryRailTopology;
 
@@ -80,5 +90,7 @@ const FactoryCargoWagon *factory_cargo_wagon_store_find(
     const FactoryCargoWagonStore *s,FactoryEntityId id);
 bool factory_cargo_wagon_store_remove(FactoryCargoWagonStore *s,FactoryEntityId id);
 void factory_locomotives_update(FactorySimulation *simulation);
+void factory_train_reservations_update(FactorySimulation *simulation);
+bool factory_train_reservations_validate(const FactorySimulation *simulation);
 
 #endif

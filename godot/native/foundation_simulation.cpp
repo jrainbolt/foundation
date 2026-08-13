@@ -1511,6 +1511,9 @@ bool FoundationSimulation::entity_to_dictionary(
         value["port_mask"]=(int64_t)entity.data.rail.port_mask;
         value["connection_mask"]=(int64_t)entity.data.rail.connection_mask;
         value["rail_network_id"]=(int64_t)entity.data.rail.network_id;
+        value["block_id"]=(int64_t)entity.data.rail.block_id;
+        value["reserved_train_id"]=(int64_t)entity.data.rail.reserved_train_id;
+        value["occupied_train_count"]=(int64_t)entity.data.rail.occupied_train_count;
         Array neighbors;for(size_t i=0U;i<FACTORY_RAIL_NEIGHBOR_COUNT;++i)
             neighbors.append((int64_t)entity.data.rail.neighbors[i]);
         value["rail_neighbors"]=neighbors;break;
@@ -1529,6 +1532,9 @@ bool FoundationSimulation::entity_to_dictionary(
         value["port_mask"]=(int64_t)entity.data.rail_switch.port_mask;
         value["connection_mask"]=(int64_t)entity.data.rail_switch.connection_mask;
         value["rail_network_id"]=(int64_t)entity.data.rail_switch.network_id;
+        value["block_id"]=(int64_t)entity.data.rail_switch.block_id;
+        value["reserved_train_id"]=(int64_t)entity.data.rail_switch.reserved_train_id;
+        value["occupied_train_count"]=(int64_t)entity.data.rail_switch.occupied_train_count;
         Array neighbors;for(size_t i=0U;i<FACTORY_RAIL_NEIGHBOR_COUNT;++i)
             neighbors.append((int64_t)entity.data.rail_switch.neighbors[i]);
         value["rail_neighbors"]=neighbors;break;
@@ -1549,6 +1555,11 @@ bool FoundationSimulation::entity_to_dictionary(
         value["route_length"]=(int64_t)entity.data.locomotive.route_length;
         value["route_index"]=(int64_t)entity.data.locomotive.route_index;
         value["next_planned_rail_id"]=(int64_t)entity.data.locomotive.next_planned_rail_id;
+        value["current_block_id"]=(int64_t)entity.data.locomotive.current_block_id;
+        value["next_route_block_id"]=(int64_t)entity.data.locomotive.next_route_block_id;
+        value["reserved_block_id"]=(int64_t)entity.data.locomotive.reserved_block_id;
+        value["reservation_status"]=(int64_t)entity.data.locomotive.reservation_status;
+        value["blocking_train_id"]=(int64_t)entity.data.locomotive.blocking_train_id;
         break;
     case FACTORY_ENTITY_TYPE_CARGO_WAGON:
         value["rail_entity_id"]=(int64_t)entity.data.cargo_wagon.rail_entity_id;

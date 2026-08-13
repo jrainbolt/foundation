@@ -136,6 +136,9 @@ func _initialize() -> void:
 		and int(locomotive.vehicle_count) == 3
 		and int(locomotive.destination_station_id) == 0
 		and int(locomotive.route_status) == 0
+		and int(locomotive.current_block_id) != 0
+		and int(locomotive.reserved_block_id) == 0
+		and int(locomotive.reservation_status) == 0
 		and simulation.get_train_route(63).is_empty(),
 		"locomotive presentation: %s" % locomotive
 	):

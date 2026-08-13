@@ -3194,6 +3194,7 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     (void)factory_fluid_network_rebuild(simulation, true);
     (void)factory_heat_network_rebuild(simulation, true);
     (void)factory_rail_topology_rebuild(simulation);
+    factory_train_reservations_update(simulation);
     factory_locomotives_update(simulation);
     factory_fluid_network_transfer(simulation);
     factory_burner_store_begin_tick(&simulation->burners, simulation);

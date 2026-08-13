@@ -60,7 +60,9 @@ typedef enum {
     FACTORY_EVENT_RAIL_VEHICLES_DECOUPLED,
     FACTORY_EVENT_TRAIN_DESTINATION_CHANGED,
     FACTORY_EVENT_TRAIN_ROUTE_INVALIDATED,
-    FACTORY_EVENT_TRAIN_ARRIVED
+    FACTORY_EVENT_TRAIN_ARRIVED,
+    FACTORY_EVENT_TRAIN_BLOCK_RESERVED,
+    FACTORY_EVENT_TRAIN_BLOCK_RELEASED
 } FactoryEventType;
 
 /*
@@ -125,6 +127,8 @@ typedef enum {
  * retained destination, and quantity is the failing next rail when available.
  * train arrived: entity_id is the train, related_entity_id is the station, and
  * quantity is the station attachment rail occupied by the locomotive.
+ * train block reserved/released: entity_id is the train and quantity is the
+ * stable derived block ID. Waiting emits no event.
  *
  * tick is the simulation tick at the start of the step that emitted the
  * event. Item-transfer quantity is currently one. Successful requests for an

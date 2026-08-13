@@ -42,3 +42,7 @@ direction, membership, and cargo fields. Positions, networks, activity, and
 forward destinations remain derived. Loading emits no movement or coupling
 events. Presentation exports consist identity and cargo values; Godot only
 renders and submits typed commands.
+
+Long consists protect every derived rail block occupied by any vehicle. An old
+block becomes available only after the rear wagon leaves it; see
+`train-reservations.md`.

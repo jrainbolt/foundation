@@ -49,3 +49,6 @@ Current limitations are deliberate: routing does not reserve track, avoid other
 trains during search, detect deadlocks, control switches, transfer freight, or
 implement schedules. Existing occupancy conflict resolution remains authoritative
 when independently planned routes overlap.
+
+Block permission is a separate one-block-ahead layer documented in
+`train-reservations.md`; a route remains intended direction rather than ownership.

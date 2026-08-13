@@ -149,3 +149,7 @@ does not perform traversal or mutate selection.
 Locomotive presentation exposes occupied rail ID, derived grid position,
 entry/travel directions, integer progress and interval, next rail, network ID,
 and activity. It does not own movement or occupancy.
+
+Rail and switch records additionally expose block ID, reservation owner, and
+occupied-train count. Locomotives expose current/next/reserved block IDs,
+reservation status, and blocking train ID. These are read-only renderer data.

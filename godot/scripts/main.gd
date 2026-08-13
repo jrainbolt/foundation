@@ -126,6 +126,16 @@ func _synchronize() -> bool:
 	var selected_id := int(world_controller.selected_entity_id)
 	canvas.set_selected_route(simulation.get_train_route(selected_id)
 		if selected_id != 0 else [])
+	var selected_state: Dictionary = {}
+	for entity: Dictionary in entities:
+		if int(entity.id) == selected_id:
+			selected_state = entity
+			break
+	var waiting := int(selected_state.get("reservation_status",0)) == 2
+	canvas.set_selected_train_blocks(
+		int(selected_state.get("current_block_id",0)),
+		int(selected_state.get("reserved_block_id",0)),
+		int(selected_state.get("next_route_block_id",0)) if waiting else 0)
 	world_controller.refresh_selection()
 	world_controller.set_hovered_grid(world_controller.hovered_grid)
 	build_toolbar.refresh(simulation)

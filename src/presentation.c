@@ -577,10 +577,18 @@ static FactoryResult populate_entity(
         if(!factory_simulation_get_rail(simulation,id,&inspection))
             return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
         out->entity_type=FACTORY_ENTITY_TYPE_RAIL;out->x=rail->x;out->y=rail->y;
+        FactoryRailBlockId block_id=factory_simulation_get_rail_block_for_rail(
+            simulation,id);FactoryTrainId reserved=0U;uint32_t occupied=0U;
+        for(size_t block=0U;block<factory_simulation_get_rail_block_count(
+                simulation);++block){FactoryRailBlockInspection b;
+            if(factory_simulation_get_rail_block_at(simulation,block,&b)
+                &&b.block_id==block_id){reserved=b.reserved_train_id;
+                occupied=b.occupied_train_count;break;}}
         out->data.rail=(FactoryPresentationRail){inspection.geometry,
             inspection.port_mask,inspection.connection_mask,
             inspection.network_id,{inspection.neighbors[0],inspection.neighbors[1],
-            inspection.neighbors[2],inspection.neighbors[3]}};
+            inspection.neighbors[2],inspection.neighbors[3]},block_id,reserved,
+            occupied};
     } else if(rail_station!=NULL){
         FactoryRailStationInspection inspection;
         if(!factory_simulation_get_rail_station(simulation,id,&inspection))
@@ -599,13 +607,21 @@ static FactoryResult populate_entity(
             return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
         out->entity_type=FACTORY_ENTITY_TYPE_RAIL_SWITCH;
         out->x=rail_switch->x;out->y=rail_switch->y;
+        FactoryRailBlockId block_id=factory_simulation_get_rail_block_for_rail(
+            simulation,id);FactoryTrainId reserved=0U;uint32_t occupied=0U;
+        for(size_t block=0U;block<factory_simulation_get_rail_block_count(
+                simulation);++block){FactoryRailBlockInspection b;
+            if(factory_simulation_get_rail_block_at(simulation,block,&b)
+                &&b.block_id==block_id){reserved=b.reserved_train_id;
+                occupied=b.occupied_train_count;break;}}
         out->data.rail_switch=(FactoryPresentationRailSwitch){
             inspection.geometry,inspection.selected_branch,
             inspection.stem_direction,inspection.branch_a_direction,
             inspection.branch_b_direction,inspection.port_mask,
             inspection.connection_mask,inspection.network_id,
             {inspection.neighbors[0],inspection.neighbors[1],
-             inspection.neighbors[2],inspection.neighbors[3]}};
+             inspection.neighbors[2],inspection.neighbors[3]},block_id,reserved,
+             occupied};
     } else if(locomotive!=NULL){FactoryLocomotiveInspection inspection;
         if(!factory_simulation_get_locomotive(simulation,id,&inspection))
             return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
@@ -622,7 +638,10 @@ static FactoryResult populate_entity(
             inspection.network_id,inspection.activity,inspection.train_id,
             inspection.vehicle_count,inspection.destination_station_id,
             inspection.route_status,inspection.route_length,
-            inspection.route_index,inspection.next_planned_rail_id};
+            inspection.route_index,inspection.next_planned_rail_id,
+            inspection.current_block_id,inspection.next_route_block_id,
+            inspection.reserved_block_id,inspection.reservation_status,
+            inspection.blocking_train_id};
     } else if(cargo_wagon!=NULL){FactoryCargoWagonInspection inspection;
         if(!factory_simulation_get_cargo_wagon(simulation,id,&inspection))
             return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;

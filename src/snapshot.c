@@ -304,7 +304,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_records(&size,simulation->rails.count,16U)
         || !checked_records(&size,simulation->rail_stations.count,16U)
         || !checked_records(&size,simulation->rail_switches.count,20U)
-        || !checked_records(&size,simulation->locomotives.count,40U)
+        || !checked_records(&size,simulation->locomotives.count,44U)
         || !checked_records(&size,route_steps,8U)
         || !checked_records(&size,simulation->cargo_wagons.count,36U)
         || !checked_records(&size, simulation->command_count, 24U)
@@ -369,7 +369,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !section_size_valid(simulation->rails.count,16U,0U)
         || !section_size_valid(simulation->rail_stations.count,16U,0U)
         || !section_size_valid(simulation->rail_switches.count,20U,0U)
-        || !section_size_valid(simulation->locomotives.count,40U,0U)
+        || !section_size_valid(simulation->locomotives.count,44U,0U)
         || !section_size_valid(route_steps,8U,0U)
         || !section_size_valid(simulation->cargo_wagons.count,36U,0U)
         || size > UINT64_MAX) {
@@ -2222,7 +2222,7 @@ static void write_snapshot(
         write_u32(writer,v->selected_branch);
     }
     write_section_header(writer,SNAPSHOT_SECTION_LOCOMOTIVES,
-        simulation->locomotives.count,simulation->locomotives.count*40U);
+        simulation->locomotives.count,simulation->locomotives.count*44U);
     for(index=0U;index<simulation->locomotives.count;++index){
         const FactoryLocomotive*v=&simulation->locomotives.items[index];
         write_u32(writer,v->entity_id);write_u32(writer,v->rail_entity_id);
@@ -2231,6 +2231,7 @@ static void write_snapshot(
         write_u32(writer,v->destination_station_id);write_u32(writer,v->route_status);
         write_u32(writer,(uint32_t)v->route_length);
         write_u32(writer,(uint32_t)v->route_index);
+        write_u32(writer,v->reserved_block_id);
     }
     size_t route_step_count=0U;
     for(index=0U;index<simulation->locomotives.count;++index)
@@ -2984,7 +2985,7 @@ static bool load_sections(
         v->geometry=(FactoryRailSwitchGeometry)value;
         v->selected_branch=(FactoryRailSwitchBranch)branch;
     }
-    if(!read_section_header(reader,SNAPSHOT_SECTION_LOCOMOTIVES,40U,0U,&count)
+    if(!read_section_header(reader,SNAPSHOT_SECTION_LOCOMOTIVES,44U,0U,&count)
         ||!factory_locomotive_store_reserve(&simulation->locomotives,count))
         return false;
     simulation->locomotives.count=count;
@@ -2999,6 +3000,7 @@ static bool load_sections(
             ||!read_u32(reader,&v->rear_vehicle_id)||!read_u32(reader,&v->vehicle_count)
             ||!read_u32(reader,&v->destination_station_id)||!read_u32(reader,&status)
             ||!read_u32(reader,&route_length)||!read_u32(reader,&route_index)
+            ||!read_u32(reader,&v->reserved_block_id)
             ||!direction_valid(direction)||progress>FACTORY_LOCOMOTIVE_MOVE_TICKS
             ||status>FACTORY_TRAIN_ROUTE_INVALID
             ||route_length>FACTORY_TRAIN_ROUTE_MAX_STEPS
@@ -3243,6 +3245,10 @@ FactoryResult factory_simulation_load_snapshot(
     if(!factory_train_routes_validate(simulation)){
         factory_simulation_destroy(simulation);return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
+    if(!factory_train_reservations_validate(simulation)){
+        factory_simulation_destroy(simulation);return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
+    factory_train_reservations_update(simulation);
     *out_simulation = simulation;
     return FACTORY_RESULT_OK;
 }

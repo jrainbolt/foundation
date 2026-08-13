@@ -1,4 +1,10 @@
-# Snapshot format version 22
+# Snapshot format version 25
+
+Version 25 adds one authoritative `reserved_block_id` to each locomotive
+record. Rail-block membership, occupancy protection, waiting status, and the
+blocking train are derived after load. Load rebuilds topology and rejects
+missing, duplicate, arrived, or route-incompatible future reservations without
+emitting events.
 
 Version 23 adds authoritative train-consist membership and Cargo Wagon records.
 Locomotive records now include the first wagon link and vehicle count. Cargo

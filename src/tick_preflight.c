@@ -216,7 +216,11 @@ FactoryResult factory_simulation_preflight_tick(FactorySimulation *s)
         || !add_block(&next,FACTORY_TOPOLOGY_RAIL,station_count,
             sizeof(FactoryRailStationInspection))
         || !add_block(&next,FACTORY_TOPOLOGY_RAIL,rail_nodes,
-            sizeof(FactoryRailNetworkInspection))) {
+            sizeof(FactoryRailNetworkInspection))
+        || !add_block(&next,FACTORY_TOPOLOGY_RAIL,rail_nodes,
+            sizeof(FactoryRailBlock))
+        || !add_block(&next,FACTORY_TOPOLOGY_RAIL,rail_nodes,
+            sizeof(FactoryRailBlockMember))) {
         factory_tick_preflight_destroy(&next);
         return FACTORY_RESULT_OUT_OF_MEMORY;
     }

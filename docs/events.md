@@ -123,3 +123,8 @@ start-of-step tick. Invalid and same-state commands emit nothing.
 transition of the whole consist. It carries locomotive/train ID, previous rail
 ID, new rail ID, resulting vehicle count, and tick;
 blocked attempts emit no event.
+
+`FACTORY_EVENT_TRAIN_BLOCK_RESERVED` and
+`FACTORY_EVENT_TRAIN_BLOCK_RELEASED` occur once per ownership transition.
+`entity_id` identifies the train and `quantity` is the stable block ID.
+Reservation waiting produces no per-tick event.

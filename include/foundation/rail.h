@@ -42,8 +42,10 @@ enum {
 
 typedef FactoryEntityId FactoryRailNetworkId;
 typedef FactoryEntityId FactoryTrainId;
+typedef FactoryEntityId FactoryRailBlockId;
 #define FACTORY_RAIL_NETWORK_NONE 0U
 #define FACTORY_TRAIN_NONE 0U
+#define FACTORY_RAIL_BLOCK_NONE 0U
 #define FACTORY_RAIL_NEIGHBOR_COUNT 4U
 #define FACTORY_LOCOMOTIVE_MOVE_TICKS 4U
 #define FACTORY_CARGO_WAGON_CAPACITY 100U
@@ -55,6 +57,13 @@ typedef enum {
     FACTORY_TRAIN_ROUTE_ARRIVED,
     FACTORY_TRAIN_ROUTE_INVALID
 } FactoryTrainRouteStatus;
+
+typedef enum {
+    FACTORY_TRAIN_RESERVATION_NONE = 0,
+    FACTORY_TRAIN_RESERVATION_HELD,
+    FACTORY_TRAIN_RESERVATION_WAITING,
+    FACTORY_TRAIN_RESERVATION_INVALID
+} FactoryTrainReservationStatus;
 
 typedef struct {
     FactoryEntityId rail_entity_id;
@@ -68,7 +77,8 @@ typedef enum {
     FACTORY_LOCOMOTIVE_BLOCKED_OCCUPIED,
     FACTORY_LOCOMOTIVE_DISCONNECTED,
     FACTORY_LOCOMOTIVE_ARRIVED,
-    FACTORY_LOCOMOTIVE_ROUTE_INVALID
+    FACTORY_LOCOMOTIVE_ROUTE_INVALID,
+    FACTORY_LOCOMOTIVE_BLOCKED_RESERVATION
 } FactoryLocomotiveActivity;
 
 typedef struct {
@@ -89,7 +99,22 @@ typedef struct {
     uint32_t route_length;
     uint32_t route_index;
     FactoryEntityId next_planned_rail_id;
+    FactoryRailBlockId current_block_id;
+    FactoryRailBlockId next_route_block_id;
+    FactoryRailBlockId reserved_block_id;
+    FactoryTrainReservationStatus reservation_status;
+    FactoryTrainId blocking_train_id;
 } FactoryLocomotiveInspection;
+
+typedef struct {
+    FactoryRailBlockId block_id;
+    uint32_t member_count;
+    FactoryTrainId reserved_train_id;
+    uint32_t occupied_train_count;
+    bool switch_boundary;
+    bool station_boundary;
+    bool endpoint_boundary;
+} FactoryRailBlockInspection;
 
 typedef struct {
     FactoryEntityId entity_id;
@@ -190,5 +215,12 @@ FactoryEntityId factory_simulation_get_rail_vehicle_occupant(
     const FactorySimulation *simulation,FactoryEntityId rail_entity_id);
 bool factory_simulation_get_train_route_step(const FactorySimulation *simulation,
     FactoryTrainId train_id,size_t index,FactoryTrainRouteStep *out_step);
+size_t factory_simulation_get_rail_block_count(const FactorySimulation *simulation);
+bool factory_simulation_get_rail_block_at(const FactorySimulation *simulation,
+    size_t index,FactoryRailBlockInspection *out_block);
+FactoryRailBlockId factory_simulation_get_rail_block_for_rail(
+    const FactorySimulation *simulation,FactoryEntityId rail_entity_id);
+bool factory_simulation_get_rail_block_member(const FactorySimulation *simulation,
+    FactoryRailBlockId block_id,size_t index,FactoryEntityId *out_rail_id);
 
 #endif

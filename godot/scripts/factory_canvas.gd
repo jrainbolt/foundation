@@ -9,9 +9,18 @@ var resources: Array = []
 var edges: Array = []
 var terrain: Array = []
 var selected_route: Array = []
+var selected_current_block := 0
+var selected_reserved_block := 0
+var selected_blocked_block := 0
 
 func set_selected_route(route: Array) -> void:
 	selected_route = route.duplicate(true)
+	queue_redraw()
+
+func set_selected_train_blocks(current_block: int,reserved_block: int,blocked_block: int) -> void:
+	selected_current_block = current_block
+	selected_reserved_block = reserved_block
+	selected_blocked_block = blocked_block
 	queue_redraw()
 
 func terrain_is_buildable(grid: Vector2i) -> bool:
@@ -87,6 +96,18 @@ func _draw() -> void:
 				b.position + Vector2(38, 38),
 				Color("#f2d95c", 0.9), 4.0
 				)
+	for entity_id: int in entity_nodes.keys():
+		var visual: FoundationEntityVisual = entity_nodes[entity_id]
+		var block_id := int(visual.state.get("block_id",0))
+		var highlight := Color.TRANSPARENT
+		if block_id != 0 and block_id == selected_blocked_block:
+			highlight = Color("#ff785c",0.78)
+		elif block_id != 0 and block_id == selected_reserved_block:
+			highlight = Color("#55d7ff",0.72)
+		elif block_id != 0 and block_id == selected_current_block:
+			highlight = Color("#62d58b",0.62)
+		if highlight.a > 0.0:
+			draw_rect(Rect2(visual.position + Vector2(4,4),Vector2(68,68)),highlight,false,5.0)
 	if selected_route.size() > 1:
 		for index in range(selected_route.size() - 1):
 			var a_id := int(selected_route[index].rail_entity_id)

@@ -289,3 +289,8 @@ Branch A/Branch B control; changes always travel through the native FIFO
 command and return through presentation. The deterministic demo includes a
 small visible curve, straight corridor, connected three-port switch, both
 branches, and Rail Station above the main factory.
+
+Selecting a locomotive highlights its current block in green, a held future
+block in cyan, or a block owned/occupied by another train in orange-red. The
+inspector reports route, block, reservation, and blocker fields. Godot neither
+calculates nor mutates reservation ownership.

@@ -18,6 +18,15 @@ static FactoryEntityId loco(FactorySimulation*s,FactoryEntityId r,FactoryDirecti
 {FactoryCommand c={FACTORY_COMMAND_PLACE_LOCOMOTIVE,{.place_locomotive={r,d}}};
  CHECK(factory_simulation_submit_command(s,&c)==FACTORY_RESULT_OK);
  CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);return result_id(s);}
+static FactoryEntityId station(FactorySimulation*s,int x,int y,FactoryDirection d)
+{FactoryCommand c={FACTORY_COMMAND_PLACE_RAIL_STATION,
+ {.place_rail_station={x,y,d}}};CHECK(factory_simulation_submit_command(s,&c)==0);
+ CHECK(factory_simulation_tick(s)==0);return result_id(s);}
+static void destination(FactorySimulation*s,FactoryEntityId train,FactoryEntityId st)
+{FactoryCommand c={FACTORY_COMMAND_SET_TRAIN_DESTINATION,
+ {.set_train_destination={train,st}}};CHECK(factory_simulation_submit_command(s,&c)==0);
+ CHECK(factory_simulation_tick(s)==0);
+ CHECK(factory_simulation_get_command_result(s,0)->result==FACTORY_RESULT_OK);}
 
 static void movement_and_snapshot(void)
 {FactoryWorld*w=factory_world_create(8,8);FactorySimulation*s=
@@ -25,26 +34,27 @@ static void movement_and_snapshot(void)
  FactoryEntityId a=rail(s,1,2,FACTORY_RAIL_HORIZONTAL);
  FactoryEntityId b=rail(s,2,2,FACTORY_RAIL_HORIZONTAL);
  FactoryEntityId c=rail(s,3,2,FACTORY_RAIL_HORIZONTAL);
- FactoryEntityId id=loco(s,b,FACTORY_DIRECTION_EAST);FactoryLocomotiveInspection v;
+ FactoryEntityId st=station(s,3,1,FACTORY_DIRECTION_SOUTH);
+ FactoryEntityId id=loco(s,b,FACTORY_DIRECTION_EAST);destination(s,id,st);
+ FactoryLocomotiveInspection v;
  CHECK(factory_simulation_get_locomotive(s,id,&v));
- CHECK(v.rail_entity_id==b&&v.movement_progress==1U&&v.next_rail_id==c);
+ CHECK(v.rail_entity_id==b&&v.movement_progress==2U&&v.next_rail_id==c);
  CHECK(factory_simulation_get_rail_vehicle_occupant(s,b)==id);
  CHECK(factory_simulation_get_rail_vehicle_occupant(s,a)==0U);
- CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
  CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
  CHECK(factory_simulation_get_locomotive(s,id,&v)&&v.rail_entity_id==b
     &&v.movement_progress==3U);
  CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
  CHECK(factory_simulation_get_locomotive(s,id,&v)&&v.rail_entity_id==c
     &&v.movement_progress==0U&&v.entry_direction==FACTORY_DIRECTION_WEST);
- CHECK(factory_simulation_get_event_count(s)==1U);
- const FactoryEvent*e=factory_simulation_get_event(s,0);
- CHECK(e&&e->type==FACTORY_EVENT_LOCOMOTIVE_MOVED&&e->entity_id==id
-    &&e->related_entity_id==b&&e->quantity==c);
+ bool moved=false;for(size_t i=0U;i<factory_simulation_get_event_count(s);++i){
+ const FactoryEvent*e=factory_simulation_get_event(s,i);
+ if(e&&e->type==FACTORY_EVENT_LOCOMOTIVE_MOVED&&e->entity_id==id
+    &&e->related_entity_id==b&&e->quantity==c)moved=true;}CHECK(moved);
  for(int i=0;i<4;++i)CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
  CHECK(factory_simulation_get_locomotive(s,id,&v)&&v.rail_entity_id==c
     &&v.movement_progress==FACTORY_LOCOMOTIVE_MOVE_TICKS
-    &&v.activity==FACTORY_LOCOMOTIVE_BLOCKED_TRACK);
+    &&v.activity==FACTORY_LOCOMOTIVE_ARRIVED);
  FactorySnapshotBuffer bytes={0};FactorySimulation*loaded=NULL;
  CHECK(factory_simulation_create_snapshot(s,&bytes)==FACTORY_RESULT_OK);
  CHECK(factory_simulation_load_snapshot(bytes.data,bytes.size,&loaded)==FACTORY_RESULT_OK);
@@ -110,9 +120,9 @@ static void switch_command_before_movement(void)
  CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);FactoryEntityId sw=result_id(s);
  FactoryEntityId north=rail(s,3,2,FACTORY_RAIL_VERTICAL);
  FactoryEntityId south=rail(s,3,4,FACTORY_RAIL_VERTICAL);(void)north;
+ FactoryEntityId st=station(s,4,4,FACTORY_DIRECTION_WEST);
  FactoryEntityId id=loco(s,approach,FACTORY_DIRECTION_EAST);
- CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
- CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+ destination(s,id,st);CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
  FactoryCommand change={FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH,
   {.set_rail_switch_branch={sw,FACTORY_RAIL_SWITCH_BRANCH_B}}};
  CHECK(factory_simulation_submit_command(s,&change)==FACTORY_RESULT_OK);
