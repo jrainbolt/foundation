@@ -47,3 +47,9 @@ renders and submits typed commands.
 Long consists protect every derived rail block occupied by any vehicle. An old
 block becomes available only after the rear wagon leaves it; see
 `train-reservations.md`.
+# Chain-lock inspection
+
+Locomotives own the ordered future reservation list used by ordinary and Chain
+Signals. Read-only inspection exposes its count and indexed block IDs together
+with chain status, required count, and current blocker. Consist occupancy remains
+rear-aware and is authoritative protection after a vehicle enters a block.

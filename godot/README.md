@@ -299,3 +299,9 @@ Rail Signal is a toolbar construction type. `R` rotates its controlled travel
 direction. Signals render as compact trackside masts with green, red, or cyan
 reserved lamps using Foundation presentation fields; their inspector shows
 attachment, upstream/downstream blocks, aspect, reservation, and occupancy.
+
+Rail Chain Signal is a distinct two-lamp toolbar construction type using the
+same rotation and attachment controls. Foundation exports its conservative
+aspect and each selected train's complete ordered reservation sequence, chain
+status, required count, and blocker. Godot renders these values and never
+derives or mutates interlocking state.

@@ -135,6 +135,7 @@ void factory_simulation_destroy(FactorySimulation *simulation)
     factory_rail_station_store_destroy(&simulation->rail_stations);
     factory_rail_switch_store_destroy(&simulation->rail_switches);
     factory_rail_signal_store_destroy(&simulation->rail_signals);
+    factory_rail_chain_signal_store_destroy(&simulation->rail_chain_signals);
     factory_locomotive_store_destroy(&simulation->locomotives);
     factory_cargo_wagon_store_destroy(&simulation->cargo_wagons);
     factory_rail_topology_destroy(&simulation->rail_topology);
@@ -880,12 +881,14 @@ static FactoryResult place_rail_switch(FactorySimulation*s,
     s->rail_topology.dirty=true;return FACTORY_RESULT_OK;
 }
 
-static FactoryResult place_rail_signal(FactorySimulation*s,
-    const FactoryCommand*c,FactoryEntityId*out_id)
+static FactoryResult place_signal(FactorySimulation*s,const FactoryCommand*c,
+    FactoryEntityId*out_id,bool chain)
 {
     static const int32_t dx[4]={0,1,0,-1},dy[4]={-1,0,1,0};
-    int32_t x=c->data.place_rail_signal.x,y=c->data.place_rail_signal.y;
-    FactoryDirection direction=c->data.place_rail_signal.orientation;
+    int32_t x=chain?c->data.place_rail_chain_signal.x:c->data.place_rail_signal.x;
+    int32_t y=chain?c->data.place_rail_chain_signal.y:c->data.place_rail_signal.y;
+    FactoryDirection direction=chain?c->data.place_rail_chain_signal.orientation:
+        c->data.place_rail_signal.orientation;
     FactoryResult result=validate_empty_tile(s,x,y);
     if(result!=FACTORY_RESULT_OK)return result;
     if(direction<FACTORY_DIRECTION_NORTH||direction>FACTORY_DIRECTION_WEST)
@@ -911,10 +914,19 @@ static FactoryResult place_rail_signal(FactorySimulation*s,
         if(factory_simulation_get_rail_signal(s,s->rail_signals.items[i].entity_id,&v)
             &&v.attached_rail_id==rail_id&&v.orientation==direction)
             return FACTORY_RESULT_ENTITY_BUSY;}
-    if(!factory_rail_signal_store_reserve_one(&s->rail_signals))
+    for(size_t i=0U;i<s->rail_chain_signals.count;++i){
+        FactoryRailChainSignalInspection v;
+        if(factory_simulation_get_rail_chain_signal(s,
+                s->rail_chain_signals.items[i].entity_id,&v)
+            &&v.attached_rail_id==rail_id&&v.orientation==direction)
+            return FACTORY_RESULT_ENTITY_BUSY;}
+    if(chain?!factory_rail_chain_signal_store_reserve_one(&s->rail_chain_signals):
+            !factory_rail_signal_store_reserve_one(&s->rail_signals))
         return FACTORY_RESULT_OUT_OF_MEMORY;
     result=occupy_with_entity(s,x,y,out_id);if(result!=FACTORY_RESULT_OK)return result;
-    factory_rail_signal_store_add(&s->rail_signals,*out_id,x,y,direction);
+    if(chain)factory_rail_chain_signal_store_add(&s->rail_chain_signals,*out_id,
+        x,y,direction);
+    else factory_rail_signal_store_add(&s->rail_signals,*out_id,x,y,direction);
     s->rail_topology.dirty=true;return FACTORY_RESULT_OK;
 }
 
@@ -1172,6 +1184,8 @@ static FactoryResult validate_demolition(
         factory_rail_switch_store_find(&simulation->rail_switches,id);
     const FactoryRailSignal *rail_signal=
         factory_rail_signal_store_find(&simulation->rail_signals,id);
+    const FactoryRailChainSignal *rail_chain_signal=
+        factory_rail_chain_signal_store_find(&simulation->rail_chain_signals,id);
     const FactoryLocomotive *locomotive=
         factory_locomotive_store_find(&simulation->locomotives,id);
     const FactoryCargoWagon *cargo_wagon=
@@ -1200,6 +1214,9 @@ static FactoryResult validate_demolition(
     } else if(rail_signal!=NULL){
         *out_type=FACTORY_ENTITY_TYPE_RAIL_SIGNAL;
         *out_x=rail_signal->x;*out_y=rail_signal->y;
+    } else if(rail_chain_signal!=NULL){
+        *out_type=FACTORY_ENTITY_TYPE_RAIL_CHAIN_SIGNAL;
+        *out_x=rail_chain_signal->x;*out_y=rail_chain_signal->y;
     } else if (extractor != NULL) {
         if (extractor->output_item != FACTORY_ITEM_NONE
             || extractor->output_amount != 0U) {
@@ -1576,6 +1593,10 @@ static bool remove_subsystem_record(
         case FACTORY_ENTITY_TYPE_RAIL_SIGNAL:
             simulation->rail_topology.dirty=true;
             return factory_rail_signal_store_remove(&simulation->rail_signals,id);
+        case FACTORY_ENTITY_TYPE_RAIL_CHAIN_SIGNAL:
+            simulation->rail_topology.dirty=true;
+            return factory_rail_chain_signal_store_remove(
+                &simulation->rail_chain_signals,id);
         case FACTORY_ENTITY_TYPE_LOCOMOTIVE:
             return factory_locomotive_store_remove(&simulation->locomotives,id);
         case FACTORY_ENTITY_TYPE_CARGO_WAGON:
@@ -1710,6 +1731,8 @@ static bool placement_type(
             *out_type=FACTORY_ENTITY_TYPE_RAIL_SWITCH;return true;
         case FACTORY_COMMAND_PLACE_RAIL_SIGNAL:
             *out_type=FACTORY_ENTITY_TYPE_RAIL_SIGNAL;return true;
+        case FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL:
+            *out_type=FACTORY_ENTITY_TYPE_RAIL_CHAIN_SIGNAL;return true;
         case FACTORY_COMMAND_PLACE_LOCOMOTIVE:
             *out_type=FACTORY_ENTITY_TYPE_LOCOMOTIVE;return true;
         case FACTORY_COMMAND_PLACE_CARGO_WAGON:
@@ -2181,8 +2204,11 @@ static void apply_commands(FactorySimulation *simulation)
                 result->result=place_rail_switch(simulation,&result->command,
                     &result->entity_id);break;
             case FACTORY_COMMAND_PLACE_RAIL_SIGNAL:
-                result->result=place_rail_signal(simulation,&result->command,
-                    &result->entity_id);break;
+                result->result=place_signal(simulation,&result->command,
+                    &result->entity_id,false);break;
+            case FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL:
+                result->result=place_signal(simulation,&result->command,
+                    &result->entity_id,true);break;
             case FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH:
                 result->result=set_rail_switch_branch(simulation,
                     &result->command,&result->entity_id);break;

@@ -134,7 +134,7 @@ func _synchronize() -> bool:
 	var waiting := int(selected_state.get("reservation_status",0)) == 2
 	canvas.set_selected_train_blocks(
 		int(selected_state.get("current_block_id",0)),
-		int(selected_state.get("reserved_block_id",0)),
+		selected_state.get("reserved_blocks",[]),
 		int(selected_state.get("next_route_block_id",0)) if waiting else 0)
 	world_controller.refresh_selection()
 	world_controller.set_hovered_grid(world_controller.hovered_grid)

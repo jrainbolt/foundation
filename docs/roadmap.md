@@ -34,6 +34,7 @@
 - [x] Deterministic train destinations and directional routing
 - [x] Derived rail blocks and one-block-ahead reservations
 - [x] Ordinary directional Rail Signals and explicit block boundaries
+- [x] Chain Signals and deterministic junction interlocking
 
 Finite deposits and seeded authoritative terrain are prerequisites for
 deterministic resource patches, remote mining outposts, rail infrastructure, and eventually

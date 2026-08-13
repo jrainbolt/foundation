@@ -157,3 +157,10 @@ reservation status, and blocking train ID. These are read-only renderer data.
 Rail Signal records expose orientation, attached/upstream rails,
 upstream/downstream blocks, derived aspect, downstream reservation owner,
 occupied-train count, and connectivity. Frontends do not calculate aspects.
+# Chain-signal presentation
+
+Presentation includes Chain Signal identity, attachment, adjacent blocks,
+conservative aspect, reservation owner, and occupancy. Locomotive records expose
+reservation count, immediate reservation, chain status/count, and blockers. The
+public indexed reservation query supplies the complete selected-train overlay;
+frontends do not derive interlocking state.

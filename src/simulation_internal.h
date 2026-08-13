@@ -71,6 +71,7 @@ struct FactorySimulation {
     FactoryRailStationStore rail_stations;
     FactoryRailSwitchStore rail_switches;
     FactoryRailSignalStore rail_signals;
+    FactoryRailChainSignalStore rail_chain_signals;
     FactoryLocomotiveStore locomotives;
     FactoryCargoWagonStore cargo_wagons;
     FactoryRailTopology rail_topology;

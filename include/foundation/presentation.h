@@ -332,6 +332,10 @@ typedef struct {
     FactoryRailBlockId reserved_block_id;
     FactoryTrainReservationStatus reservation_status;
     FactoryTrainId blocking_train_id;
+    uint32_t reserved_block_count;
+    uint32_t chain_required_block_count;
+    FactoryRailBlockId blocking_block_id;
+    FactoryTrainChainStatus chain_status;
 } FactoryPresentationLocomotive;
 
 typedef struct {
@@ -382,6 +386,7 @@ typedef struct {
         FactoryPresentationRailStation rail_station;
         FactoryPresentationRailSwitch rail_switch;
         FactoryPresentationRailSignal rail_signal;
+        FactoryPresentationRailSignal rail_chain_signal;
         FactoryPresentationLocomotive locomotive;
         FactoryPresentationCargoWagon cargo_wagon;
     } data;

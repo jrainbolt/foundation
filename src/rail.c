@@ -3,6 +3,7 @@
 #include "tick_preflight_internal.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 static const int32_t direction_x[4]={0,1,0,-1};
 static const int32_t direction_y[4]={-1,0,1,0};
@@ -74,6 +75,8 @@ STORE_FUNCTIONS(factory_rail_store,FactoryRailStore,FactoryRail)
 STORE_FUNCTIONS(factory_rail_station_store,FactoryRailStationStore,FactoryRailStation)
 STORE_FUNCTIONS(factory_rail_switch_store,FactoryRailSwitchStore,FactoryRailSwitch)
 STORE_FUNCTIONS(factory_rail_signal_store,FactoryRailSignalStore,FactoryRailSignal)
+STORE_FUNCTIONS(factory_rail_chain_signal_store,FactoryRailChainSignalStore,
+    FactoryRailChainSignal)
 #undef STORE_FUNCTIONS
 
 void factory_rail_store_add(FactoryRailStore*s,FactoryEntityId id,int32_t x,
@@ -111,6 +114,16 @@ void factory_rail_signal_store_add(FactoryRailSignalStore*s,
 
 const FactoryRailSignal *factory_rail_signal_store_find(
     const FactoryRailSignalStore*s,FactoryEntityId id)
+{if(s!=NULL){for(size_t i=0U;i<s->count;++i){
+    if(s->items[i].entity_id==id)return &s->items[i];}}
+ return NULL;}
+
+void factory_rail_chain_signal_store_add(FactoryRailChainSignalStore*s,
+    FactoryEntityId id,int32_t x,int32_t y,FactoryDirection orientation)
+{s->items[s->count++]=(FactoryRailChainSignal){id,x,y,orientation};}
+
+const FactoryRailChainSignal *factory_rail_chain_signal_store_find(
+    const FactoryRailChainSignalStore*s,FactoryEntityId id)
 {if(s!=NULL){for(size_t i=0U;i<s->count;++i){
     if(s->items[i].entity_id==id)return &s->items[i];}}
  return NULL;}
@@ -174,8 +187,11 @@ static bool find_node_by_id(FactoryRailTopology*t,FactoryEntityId id,Node*out)
 
 static bool signal_boundary_between(const FactorySimulation*s,
     const FactoryRailTopology*t,FactoryEntityId a,FactoryEntityId b)
-{for(size_t i=0U;i<s->rail_signals.count;++i){const FactoryRailSignal*signal=
-    &s->rail_signals.items[i];uint32_t d=(uint32_t)signal->orientation;
+{size_t total=s->rail_signals.count+s->rail_chain_signals.count;
+ for(size_t i=0U;i<total;++i){const FactoryRailSignal*signal=i<s->rail_signals.count
+    ?&s->rail_signals.items[i]
+    :&s->rail_chain_signals.items[i-s->rail_signals.count];
+    uint32_t d=(uint32_t)signal->orientation;
     int32_t ax=signal->x+direction_y[d],ay=signal->y-direction_x[d];
     for(size_t n=0U;n<node_count(t);++n){Node attached=node_at_index(
         (FactoryRailTopology*)t,n);if(attached.x!=ax||attached.y!=ay)continue;
@@ -396,8 +412,9 @@ size_t factory_simulation_get_rail_block_count(const FactorySimulation*s)
 static FactoryTrainId reserved_block_owner(const FactorySimulation*s,
     FactoryRailBlockId block)
 {for(size_t i=0U;i<s->locomotives.count;++i){
-    if(s->locomotives.items[i].reserved_block_id==block)
-        return s->locomotives.items[i].entity_id;}
+    const FactoryLocomotive*l=&s->locomotives.items[i];
+    for(size_t j=0U;j<l->reserved_block_count;++j)
+        if(l->reserved_blocks[j]==block)return l->entity_id;}
  return FACTORY_TRAIN_NONE;}
 
 static bool train_occupies_block(const FactorySimulation*s,FactoryTrainId train,
@@ -461,8 +478,30 @@ bool factory_simulation_get_rail_signal(const FactorySimulation*s,
  *out=(FactoryRailSignalInspection){id,signal->x,signal->y,signal->orientation,
     rail,upstream,up,down,aspect,owner,occupied,connected};return true;}
 
+bool factory_simulation_get_rail_chain_signal(const FactorySimulation*s,
+    FactoryEntityId id,FactoryRailChainSignalInspection*out)
+{if(s==NULL||out==NULL)return false;const FactoryRailChainSignal*signal=
+    factory_rail_chain_signal_store_find(&s->rail_chain_signals,id);
+ if(signal==NULL)return false;uint32_t d=(uint32_t)signal->orientation;Node attached;
+ FactoryEntityId rail=0U,upstream=0U;FactoryRailBlockId down=0U,up=0U;
+ bool connected=false;if(d<4U&&find_node_at((FactoryRailTopology*)&s->rail_topology,
+        signal->x+direction_y[d],signal->y-direction_x[d],&attached)){
+    rail=*attached.entity_id;upstream=attached.neighbors[(d+2U)%4U];
+    connected=upstream!=0U;
+    if(connected){down=factory_simulation_get_rail_block_for_rail(s,rail);
+        up=factory_simulation_get_rail_block_for_rail(s,upstream);}}
+ FactoryTrainId owner=connected?reserved_block_owner(s,down):0U;
+ uint32_t occupied=0U;if(connected)for(size_t i=0U;i<s->locomotives.count;++i)
+    if(train_occupies_block(s,s->locomotives.items[i].entity_id,down))++occupied;
+ FactoryRailSignalAspect aspect=!connected||occupied!=0U?FACTORY_RAIL_SIGNAL_RED:
+    owner!=0U?FACTORY_RAIL_SIGNAL_RESERVED:FACTORY_RAIL_SIGNAL_GREEN;
+ *out=(FactoryRailChainSignalInspection){id,signal->x,signal->y,
+    signal->orientation,rail,upstream,up,down,aspect,owner,occupied,connected};
+ return true;}
+
 void factory_locomotive_store_destroy(FactoryLocomotiveStore*s)
-{if(s!=NULL){for(size_t i=0U;i<s->count;++i)free(s->items[i].route);
+{if(s!=NULL){for(size_t i=0U;i<s->count;++i){free(s->items[i].route);
+ free(s->items[i].reserved_blocks);}
  free(s->items);free(s->plans);*s=(FactoryLocomotiveStore){0};}}
 
 bool factory_locomotive_store_reserve(FactoryLocomotiveStore*s,size_t required)
@@ -483,7 +522,9 @@ FactoryLocomotive *factory_locomotive_store_find_mutable(
     FactoryLocomotiveStore*s,FactoryEntityId id)
 {return (FactoryLocomotive*)factory_locomotive_store_find(s,id);}
 bool factory_locomotive_store_remove(FactoryLocomotiveStore*s,FactoryEntityId id)
-{if(s!=NULL)for(size_t i=0;i<s->count;++i)if(s->items[i].entity_id==id){free(s->items[i].route);--s->count;s->items[i]=s->items[s->count];return true;}return false;}
+{if(s!=NULL)for(size_t i=0;i<s->count;++i)if(s->items[i].entity_id==id){
+ free(s->items[i].route);free(s->items[i].reserved_blocks);--s->count;
+ s->items[i]=s->items[s->count];return true;}return false;}
 
 void factory_cargo_wagon_store_destroy(FactoryCargoWagonStore*s)
 {if(s!=NULL){free(s->items);*s=(FactoryCargoWagonStore){0};}}
@@ -574,7 +615,9 @@ bool factory_simulation_get_locomotive(const FactorySimulation*s,
             &&l->route_index+1U<l->route_length
             ?factory_simulation_get_rail_block_for_rail(s,
                 l->route[l->route_index+1U].rail_entity_id):0U,
-        l->reserved_block_id,l->reservation_status,l->blocking_train_id};
+        l->reserved_block_id,l->reservation_status,l->blocking_train_id,
+        (uint32_t)l->reserved_block_count,(uint32_t)l->chain_required_block_count,
+        l->blocking_block_id,l->chain_status};
     return true;
 }
 
@@ -587,6 +630,17 @@ bool factory_simulation_get_train_route_step(const FactorySimulation*s,
     if(l==NULL||index>=l->route_length)return false;
     *out=l->route[index];return true;
 }
+
+size_t factory_simulation_get_train_reserved_block_count(const FactorySimulation*s,
+    FactoryTrainId id)
+{const FactoryLocomotive*l=s!=NULL?factory_locomotive_store_find(&s->locomotives,id):NULL;
+ return l!=NULL?l->reserved_block_count:0U;}
+
+bool factory_simulation_get_train_reserved_block_at(const FactorySimulation*s,
+    FactoryTrainId id,size_t index,FactoryRailBlockId*out)
+{const FactoryLocomotive*l=s!=NULL?factory_locomotive_store_find(&s->locomotives,id):NULL;
+ if(l==NULL||out==NULL||index>=l->reserved_block_count)return false;
+ *out=l->reserved_blocks[index];return true;}
 
 typedef struct {FactoryTrainRouteStep state;size_t predecessor;} RouteSearchNode;
 
@@ -676,16 +730,20 @@ FactoryResult factory_train_set_destination(FactorySimulation*s,
     FactoryTrainRouteStep*route=NULL;size_t length=0U;
     FactoryResult result=plan_route(s,l,station.attached_rail_id,&route,&length);
     if(result!=FACTORY_RESULT_OK)return result;
+    FactoryRailBlockId*reservations=calloc(length,sizeof(*reservations));
+    if(reservations==NULL){free(route);return FACTORY_RESULT_OUT_OF_MEMORY;}
+    for(size_t i=0U;i<l->reserved_block_count;++i)
+        factory_simulation_emit_event(s,(FactoryEvent){
+            .type=FACTORY_EVENT_TRAIN_BLOCK_RELEASED,.entity_id=train_id,
+            .quantity=l->reserved_blocks[i]});
     FactoryEntityId old=l->destination_station_id;free(l->route);l->route=route;
+    free(l->reserved_blocks);l->reserved_blocks=reservations;
+    l->reserved_block_capacity=length;l->reserved_block_count=0U;
+    l->reserved_block_id=0U;l->chain_required_block_count=0U;
+    l->chain_status=FACTORY_TRAIN_CHAIN_NONE;
     l->route_length=length;l->route_index=0U;l->destination_station_id=station_id;
     l->route_status=length==1U?FACTORY_TRAIN_ROUTE_ARRIVED:
         FACTORY_TRAIN_ROUTE_ACTIVE;
-    FactoryRailBlockId required=length>1U
-        ?factory_simulation_get_rail_block_for_rail(s,route[1].rail_entity_id):0U;
-    if(l->reserved_block_id!=0U&&l->reserved_block_id!=required){
-        factory_simulation_emit_event(s,(FactoryEvent){
-            .type=FACTORY_EVENT_TRAIN_BLOCK_RELEASED,.entity_id=train_id,
-            .quantity=l->reserved_block_id});l->reserved_block_id=0U;}
     if(old!=station_id)factory_simulation_emit_event(s,(FactoryEvent){
         .type=FACTORY_EVENT_TRAIN_DESTINATION_CHANGED,.entity_id=train_id,
         .related_entity_id=station_id,.quantity=old});
@@ -701,10 +759,14 @@ FactoryResult factory_train_clear_destination(FactorySimulation*s,
     FactoryLocomotive*l=factory_locomotive_store_find_mutable(&s->locomotives,
         train_id);if(l==NULL)return factory_entity_is_valid(s->entities,train_id)
         ?FACTORY_RESULT_UNSUPPORTED_ENTITY:FACTORY_RESULT_ENTITY_NOT_FOUND;
-    FactoryEntityId old=l->destination_station_id;if(l->reserved_block_id!=0U){
+    FactoryEntityId old=l->destination_station_id;
+    for(size_t i=0U;i<l->reserved_block_count;++i)
         factory_simulation_emit_event(s,(FactoryEvent){
             .type=FACTORY_EVENT_TRAIN_BLOCK_RELEASED,.entity_id=train_id,
-            .quantity=l->reserved_block_id});l->reserved_block_id=0U;}
+            .quantity=l->reserved_blocks[i]});
+    l->reserved_block_count=0U;l->reserved_block_id=0U;
+    l->chain_status=FACTORY_TRAIN_CHAIN_NONE;
+    l->chain_required_block_count=0U;l->blocking_block_id=0U;
     free(l->route);l->route=NULL;
     l->route_length=0U;l->route_index=0U;l->destination_station_id=0U;
     l->route_status=FACTORY_TRAIN_ROUTE_NONE;
@@ -749,6 +811,22 @@ bool factory_train_routes_validate(const FactorySimulation*s)
     return true;
 }
 
+static bool directed_signal_boundary(const FactorySimulation*s,
+    FactoryEntityId from,FactoryEntityId to,bool chain)
+{size_t count=chain?s->rail_chain_signals.count:s->rail_signals.count;
+ for(size_t i=0U;i<count;++i){FactoryRailSignalInspection v;bool found=chain
+    ?factory_simulation_get_rail_chain_signal(s,
+        s->rail_chain_signals.items[i].entity_id,&v)
+    :factory_simulation_get_rail_signal(s,s->rail_signals.items[i].entity_id,&v);
+    if(found&&v.connected&&v.upstream_rail_id==from&&v.attached_rail_id==to)
+        return true;}
+ return false;}
+
+static bool locomotive_has_reservation(const FactoryLocomotive*l,
+    FactoryRailBlockId block)
+{for(size_t i=0U;i<l->reserved_block_count;++i)
+    if(l->reserved_blocks[i]==block)return true;return false;}
+
 void factory_train_reservations_update(FactorySimulation*s)
 {
     FactoryLocomotiveStore*store=&s->locomotives;
@@ -758,31 +836,58 @@ void factory_train_reservations_update(FactorySimulation*s)
         plan_compare);
     for(size_t i=0U;i<store->count;++i){FactoryLocomotive*l=
         factory_locomotive_store_find_mutable(store,store->plans[i].id);
-        l->blocking_train_id=0U;l->reservation_status=
-            l->reserved_block_id!=0U?FACTORY_TRAIN_RESERVATION_HELD:
-            FACTORY_TRAIN_RESERVATION_NONE;
-        FactoryRailBlockId required=0U;
+        l->blocking_train_id=0U;l->blocking_block_id=0U;
+        FactoryRailBlockId required[FACTORY_TRAIN_ROUTE_MAX_STEPS];size_t n=0U;
+        bool chain_request=false;
         if(l->route_status==FACTORY_TRAIN_ROUTE_ACTIVE
-            &&l->route_index+1U<l->route_length)
-            required=factory_simulation_get_rail_block_for_rail(s,
-                l->route[l->route_index+1U].rail_entity_id);
-        if(required!=0U&&train_occupies_block(s,l->entity_id,required))required=0U;
-        if(l->reserved_block_id!=0U&&l->reserved_block_id!=required){
-            factory_simulation_emit_event(s,(FactoryEvent){
-                .type=FACTORY_EVENT_TRAIN_BLOCK_RELEASED,.entity_id=l->entity_id,
-                .quantity=l->reserved_block_id});l->reserved_block_id=0U;
-            l->reservation_status=FACTORY_TRAIN_RESERVATION_NONE;
-        }
-        if(required==0U||l->reserved_block_id==required)continue;
-        FactoryTrainId blocker=reserved_block_owner(s,required);
-        if(blocker==0U)blocker=block_physical_blocker(s,required,l->entity_id);
+            &&l->route_index+1U<l->route_length){size_t next=l->route_index+1U;
+            FactoryEntityId from=l->route[l->route_index].rail_entity_id;
+            FactoryEntityId to=l->route[next].rail_entity_id;
+            chain_request=directed_signal_boundary(s,from,to,true);
+            if(chain_request){for(size_t step=next;step<l->route_length;++step){
+                FactoryRailBlockId block=factory_simulation_get_rail_block_for_rail(
+                    s,l->route[step].rail_entity_id);
+                if(block!=0U&&!train_occupies_block(s,l->entity_id,block)
+                    &&(n==0U||required[n-1U]!=block))required[n++]=block;
+                if(step>next&&directed_signal_boundary(s,
+                        l->route[step-1U].rail_entity_id,
+                        l->route[step].rail_entity_id,false))break;
+            }}else if(l->chain_status==FACTORY_TRAIN_CHAIN_HELD
+                    &&l->reserved_block_count!=0U){
+                for(size_t j=0U;j<l->reserved_block_count;++j)
+                    if(!train_occupies_block(s,l->entity_id,l->reserved_blocks[j]))
+                        required[n++]=l->reserved_blocks[j];
+            }else{FactoryRailBlockId block=factory_simulation_get_rail_block_for_rail(
+                    s,to);if(block!=0U&&!train_occupies_block(s,l->entity_id,block))
+                    required[n++]=block;}}
+        FactoryTrainId blocker=0U;FactoryRailBlockId blocking=0U;
+        for(size_t j=0U;j<n&&blocker==0U;++j){blocker=reserved_block_owner(s,
+                required[j]);if(blocker==l->entity_id)blocker=0U;
+            if(blocker==0U)blocker=block_physical_blocker(s,required[j],l->entity_id);
+            if(blocker!=0U)blocking=required[j];}
         if(blocker!=0U){l->reservation_status=FACTORY_TRAIN_RESERVATION_WAITING;
-            l->blocking_train_id=blocker;continue;}
-        l->reserved_block_id=required;
-        l->reservation_status=FACTORY_TRAIN_RESERVATION_HELD;
-        factory_simulation_emit_event(s,(FactoryEvent){
-            .type=FACTORY_EVENT_TRAIN_BLOCK_RESERVED,.entity_id=l->entity_id,
-            .quantity=required});
+            l->blocking_train_id=blocker;l->blocking_block_id=blocking;
+            l->chain_status=chain_request?FACTORY_TRAIN_CHAIN_WAITING:
+                FACTORY_TRAIN_CHAIN_NONE;
+            l->chain_required_block_count=chain_request?n:0U;continue;}
+        for(size_t j=0U;j<l->reserved_block_count;++j){bool keep=false;
+            for(size_t k=0U;k<n;++k)if(l->reserved_blocks[j]==required[k])keep=true;
+            if(!keep)factory_simulation_emit_event(s,(FactoryEvent){
+                .type=FACTORY_EVENT_TRAIN_BLOCK_RELEASED,.entity_id=l->entity_id,
+                .quantity=l->reserved_blocks[j]});}
+        for(size_t j=0U;j<n;++j)if(!locomotive_has_reservation(l,required[j]))
+            factory_simulation_emit_event(s,(FactoryEvent){
+                .type=FACTORY_EVENT_TRAIN_BLOCK_RESERVED,.entity_id=l->entity_id,
+                .quantity=required[j]});
+        if(n>l->reserved_block_capacity)n=l->reserved_block_capacity;
+        if(n!=0U)memcpy(l->reserved_blocks,required,n*sizeof(*required));
+        l->reserved_block_count=n;l->reserved_block_id=n!=0U?required[0]:0U;
+        l->reservation_status=n!=0U?FACTORY_TRAIN_RESERVATION_HELD:
+            FACTORY_TRAIN_RESERVATION_NONE;
+        if(chain_request){l->chain_status=FACTORY_TRAIN_CHAIN_HELD;
+            l->chain_required_block_count=n;}
+        else if(n==0U){l->chain_status=FACTORY_TRAIN_CHAIN_NONE;
+            l->chain_required_block_count=0U;}
     }
 }
 
@@ -794,28 +899,38 @@ void factory_train_reservations_release_for_topology(FactorySimulation*s)
     plan_compare);
  for(size_t i=0U;i<store->count;++i){FactoryLocomotive*l=
     factory_locomotive_store_find_mutable(store,store->plans[i].id);
-    if(l->reserved_block_id!=0U){
+    if(l->reserved_block_count!=0U){
+        for(size_t j=0U;j<l->reserved_block_count;++j)
         factory_simulation_emit_event(s,(FactoryEvent){
             .type=FACTORY_EVENT_TRAIN_BLOCK_RELEASED,.entity_id=l->entity_id,
-            .quantity=l->reserved_block_id});l->reserved_block_id=0U;
+            .quantity=l->reserved_blocks[j]});l->reserved_block_count=0U;
+        l->reserved_block_id=0U;
         l->reservation_status=FACTORY_TRAIN_RESERVATION_NONE;
-        l->blocking_train_id=0U;}}}
+        l->blocking_train_id=0U;}
+    l->blocking_block_id=0U;l->chain_status=FACTORY_TRAIN_CHAIN_NONE;
+    l->chain_required_block_count=0U;}}
 
 bool factory_train_reservations_validate(const FactorySimulation*s)
 {for(size_t i=0U;i<s->locomotives.count;++i){const FactoryLocomotive*l=
-    &s->locomotives.items[i];if(l->reserved_block_id==0U)continue;
-    if(l->route_status!=FACTORY_TRAIN_ROUTE_ACTIVE
-        ||factory_simulation_get_rail_block_for_rail(s,l->reserved_block_id)==0U)
+    &s->locomotives.items[i];
+    size_t route_cursor=l->route_index+1U;
+    if(l->reserved_block_count>l->reserved_block_capacity)return false;
+    if(l->reserved_block_count!=0U&&l->route_status!=FACTORY_TRAIN_ROUTE_ACTIVE)
         return false;
-    bool exists=false;for(size_t b=0U;b<s->rail_topology.block_count;++b)
-        if(s->rail_topology.blocks[b].block_id==l->reserved_block_id)exists=true;
-    if(!exists)return false;
-    FactoryRailBlockId required=factory_simulation_get_rail_block_for_rail(s,
-        l->route[l->route_index+1U].rail_entity_id);
-    if(required!=l->reserved_block_id)return false;
-    for(size_t j=i+1U;j<s->locomotives.count;++j)
-        if(s->locomotives.items[j].reserved_block_id==l->reserved_block_id)
-            return false;
+    for(size_t r=0U;r<l->reserved_block_count;++r){bool exists=false,on_route=false;
+        for(size_t b=0U;b<s->rail_topology.block_count;++b)
+            if(s->rail_topology.blocks[b].block_id==l->reserved_blocks[r])exists=true;
+        for(size_t step=route_cursor;step<l->route_length;++step)
+            if(factory_simulation_get_rail_block_for_rail(s,
+                    l->route[step].rail_entity_id)==l->reserved_blocks[r]){
+                on_route=true;route_cursor=step+1U;break;}
+        if(!exists||!on_route)return false;
+        for(size_t q=r+1U;q<l->reserved_block_count;++q)
+            if(l->reserved_blocks[q]==l->reserved_blocks[r])return false;
+        for(size_t j=i+1U;j<s->locomotives.count;++j)
+            for(size_t q=0U;q<s->locomotives.items[j].reserved_block_count;++q)
+                if(s->locomotives.items[j].reserved_blocks[q]==l->reserved_blocks[r])
+                    return false;}
  }return true;}
 
 bool factory_simulation_get_cargo_wagon(const FactorySimulation*s,
@@ -910,10 +1025,13 @@ void factory_locomotives_update(FactorySimulation*s)
                     &station)||!station.connected||!current_matches||!transition){
                 l->route_status=FACTORY_TRAIN_ROUTE_INVALID;
                 l->activity=FACTORY_LOCOMOTIVE_ROUTE_INVALID;
-                if(l->reserved_block_id!=0U){factory_simulation_emit_event(s,
-                    (FactoryEvent){.type=FACTORY_EVENT_TRAIN_BLOCK_RELEASED,
-                    .entity_id=l->entity_id,.quantity=l->reserved_block_id});
-                    l->reserved_block_id=0U;}
+                for(size_t r=0U;r<l->reserved_block_count;++r)
+                    factory_simulation_emit_event(s,(FactoryEvent){
+                        .type=FACTORY_EVENT_TRAIN_BLOCK_RELEASED,
+                        .entity_id=l->entity_id,.quantity=l->reserved_blocks[r]});
+                l->reserved_block_count=0U;l->reserved_block_id=0U;
+                l->chain_status=FACTORY_TRAIN_CHAIN_INVALID;
+                l->chain_required_block_count=0U;l->blocking_block_id=0U;
                 factory_simulation_emit_event(s,(FactoryEvent){
                     .type=FACTORY_EVENT_TRAIN_ROUTE_INVALIDATED,
                     .entity_id=l->entity_id,
@@ -932,7 +1050,7 @@ void factory_locomotives_update(FactorySimulation*s)
             s,l->rail_entity_id);FactoryRailBlockId to_block=
             factory_simulation_get_rail_block_for_rail(s,t.exit_entity_id);
         if(to_block==0U){l->activity=FACTORY_LOCOMOTIVE_DISCONNECTED;continue;}
-        if(to_block!=from_block&&l->reserved_block_id!=to_block){
+        if(to_block!=from_block&&!locomotive_has_reservation(l,to_block)){
             l->activity=FACTORY_LOCOMOTIVE_BLOCKED_RESERVATION;continue;}
         if(factory_simulation_get_rail_vehicle_occupant(s,t.exit_entity_id)!=0U){
             l->activity=FACTORY_LOCOMOTIVE_BLOCKED_OCCUPIED;continue;}
@@ -951,13 +1069,6 @@ void factory_locomotives_update(FactorySimulation*s)
         l->rail_entity_id=store->plans[i].to;
         l->entry_direction=store->plans[i].next_entry;l->progress=0U;
         l->activity=FACTORY_LOCOMOTIVE_MOVING;
-        if(l->reserved_block_id!=0U&&l->reserved_block_id==
-            factory_simulation_get_rail_block_for_rail(s,l->rail_entity_id)){
-            factory_simulation_emit_event(s,(FactoryEvent){
-                .type=FACTORY_EVENT_TRAIN_BLOCK_RELEASED,.entity_id=l->entity_id,
-                .quantity=l->reserved_block_id});l->reserved_block_id=0U;
-            l->reservation_status=FACTORY_TRAIN_RESERVATION_NONE;
-        }
         if(l->route_status==FACTORY_TRAIN_ROUTE_ACTIVE){
             ++l->route_index;
             if(l->route_index+1U==l->route_length){

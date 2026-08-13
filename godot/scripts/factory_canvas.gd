@@ -10,16 +10,16 @@ var edges: Array = []
 var terrain: Array = []
 var selected_route: Array = []
 var selected_current_block := 0
-var selected_reserved_block := 0
+var selected_reserved_blocks: Array = []
 var selected_blocked_block := 0
 
 func set_selected_route(route: Array) -> void:
 	selected_route = route.duplicate(true)
 	queue_redraw()
 
-func set_selected_train_blocks(current_block: int,reserved_block: int,blocked_block: int) -> void:
+func set_selected_train_blocks(current_block: int,reserved_blocks: Array,blocked_block: int) -> void:
 	selected_current_block = current_block
-	selected_reserved_block = reserved_block
+	selected_reserved_blocks = reserved_blocks.duplicate()
 	selected_blocked_block = blocked_block
 	queue_redraw()
 
@@ -102,7 +102,7 @@ func _draw() -> void:
 		var highlight := Color.TRANSPARENT
 		if block_id != 0 and block_id == selected_blocked_block:
 			highlight = Color("#ff785c",0.78)
-		elif block_id != 0 and block_id == selected_reserved_block:
+		elif block_id != 0 and selected_reserved_blocks.has(block_id):
 			highlight = Color("#55d7ff",0.72)
 		elif block_id != 0 and block_id == selected_current_block:
 			highlight = Color("#62d58b",0.62)

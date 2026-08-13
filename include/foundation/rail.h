@@ -71,6 +71,13 @@ typedef enum {
     FACTORY_RAIL_SIGNAL_RESERVED
 } FactoryRailSignalAspect;
 
+typedef enum {
+    FACTORY_TRAIN_CHAIN_NONE=0,
+    FACTORY_TRAIN_CHAIN_HELD,
+    FACTORY_TRAIN_CHAIN_WAITING,
+    FACTORY_TRAIN_CHAIN_INVALID
+} FactoryTrainChainStatus;
+
 typedef struct {
     FactoryEntityId rail_entity_id;
     FactoryDirection entry_direction;
@@ -110,6 +117,10 @@ typedef struct {
     FactoryRailBlockId reserved_block_id;
     FactoryTrainReservationStatus reservation_status;
     FactoryTrainId blocking_train_id;
+    uint32_t reserved_block_count;
+    uint32_t chain_required_block_count;
+    FactoryRailBlockId blocking_block_id;
+    FactoryTrainChainStatus chain_status;
 } FactoryLocomotiveInspection;
 
 typedef struct {
@@ -141,6 +152,8 @@ typedef struct {
     uint32_t occupied_train_count;
     bool connected;
 } FactoryRailSignalInspection;
+
+typedef FactoryRailSignalInspection FactoryRailChainSignalInspection;
 
 typedef struct {
     FactoryEntityId entity_id;
@@ -250,5 +263,17 @@ bool factory_simulation_get_rail_block_member(const FactorySimulation *simulatio
     FactoryRailBlockId block_id,size_t index,FactoryEntityId *out_rail_id);
 bool factory_simulation_get_rail_signal(const FactorySimulation *simulation,
     FactoryEntityId id,FactoryRailSignalInspection *out_signal);
+bool factory_simulation_get_rail_chain_signal(const FactorySimulation *simulation,
+    FactoryEntityId id,FactoryRailChainSignalInspection *out_signal);
+/*
+ * The simulation owns this ordered future-block sequence. The count and indexed
+ * values remain valid until the next mutating simulation call. Out-of-range
+ * access, a missing train, or a null output returns false.
+ */
+size_t factory_simulation_get_train_reserved_block_count(
+    const FactorySimulation *simulation,FactoryTrainId train_id);
+bool factory_simulation_get_train_reserved_block_at(
+    const FactorySimulation *simulation,FactoryTrainId train_id,size_t index,
+    FactoryRailBlockId *out_block_id);
 
 #endif

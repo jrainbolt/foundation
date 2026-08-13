@@ -14,7 +14,7 @@ const COLORS := {
 	22: Color("#475d91"),
 	23: Color("#596b46"),
 	24: Color("#9ea7af"), 25: Color("#506a78"), 26: Color("#a88946"), 27: Color("#b64b3b"), 28: Color("#3f7294"),
-	29: Color("#4a5963"),
+	29: Color("#4a5963"), 30: Color("#52606d"),
 }
 const TITLES := {
 	1: "EXTRACTOR", 2: "BELT", 3: "REFINERY", 4: "ASSEMBLER",
@@ -26,7 +26,7 @@ const TITLES := {
 	22: "RESEARCH LAB",
 	23: "CONSTRUCTION DEPOT",
 	24: "RAIL", 25: "RAIL STATION", 26: "RAIL SWITCH", 27: "LOCOMOTIVE", 28: "CARGO WAGON",
-	29: "RAIL SIGNAL",
+	29: "RAIL SIGNAL", 30: "CHAIN SIGNAL",
 }
 const ABBREVIATIONS := {
 	1: "EX", 2: "BELT", 3: "REF", 4: "ASM", 5: "BOX", 6: "SPLIT",
@@ -85,6 +85,11 @@ func _draw() -> void:
 		return
 	if entity_type == 29:
 		_draw_signal()
+		_draw_selection()
+		return
+	if entity_type == 30:
+		_draw_signal()
+		draw_circle(Vector2(38,42),5.0,Color("#dce8f2"))
 		_draw_selection()
 		return
 	if not bool(state.get("powered", true)) and entity_type in [1, 3, 4, 7, 21, 22]:

@@ -16,13 +16,19 @@ typedef struct {FactoryEntityId entity_id;int32_t x,y;FactoryDirection orientati
     FactoryRailSignal;
 typedef struct {FactoryRailSignal *items;size_t count,capacity;}
     FactoryRailSignalStore;
+typedef FactoryRailSignal FactoryRailChainSignal;
+typedef struct {FactoryRailChainSignal *items;size_t count,capacity;}
+    FactoryRailChainSignalStore;
 typedef struct {FactoryEntityId entity_id,rail_entity_id;FactoryDirection entry_direction;
     uint32_t progress;FactoryLocomotiveActivity activity;
     FactoryEntityId rear_vehicle_id;uint32_t vehicle_count;
     FactoryEntityId destination_station_id;FactoryTrainRouteStatus route_status;
     FactoryTrainRouteStep *route;size_t route_length,route_index;
     FactoryRailBlockId reserved_block_id;FactoryTrainReservationStatus reservation_status;
-    FactoryTrainId blocking_train_id;} FactoryLocomotive;
+    FactoryTrainId blocking_train_id;FactoryRailBlockId *reserved_blocks;
+    size_t reserved_block_count,reserved_block_capacity;
+    size_t chain_required_block_count;FactoryRailBlockId blocking_block_id;
+    FactoryTrainChainStatus chain_status;} FactoryLocomotive;
 typedef struct {FactoryEntityId entity_id,rail_entity_id;FactoryDirection entry_direction;
     FactoryTrainId train_id;FactoryEntityId previous_vehicle_id,next_vehicle_id;
     FactoryItemType cargo_item;uint32_t cargo_quantity;} FactoryCargoWagon;
@@ -79,6 +85,14 @@ void factory_rail_signal_store_add(FactoryRailSignalStore *s,
 const FactoryRailSignal *factory_rail_signal_store_find(
     const FactoryRailSignalStore *s,FactoryEntityId id);
 bool factory_rail_signal_store_remove(FactoryRailSignalStore *s,
+    FactoryEntityId id);
+void factory_rail_chain_signal_store_destroy(FactoryRailChainSignalStore *s);
+bool factory_rail_chain_signal_store_reserve_one(FactoryRailChainSignalStore *s);
+void factory_rail_chain_signal_store_add(FactoryRailChainSignalStore *s,
+    FactoryEntityId id,int32_t x,int32_t y,FactoryDirection orientation);
+const FactoryRailChainSignal *factory_rail_chain_signal_store_find(
+    const FactoryRailChainSignalStore *s,FactoryEntityId id);
+bool factory_rail_chain_signal_store_remove(FactoryRailChainSignalStore *s,
     FactoryEntityId id);
 void factory_rail_topology_destroy(FactoryRailTopology *t);
 FactoryResult factory_rail_topology_rebuild(FactorySimulation *s);

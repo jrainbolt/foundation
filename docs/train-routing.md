@@ -55,3 +55,9 @@ Block permission is a separate one-block-ahead layer documented in
 Ordinary signals do not alter route search or switch selection. They split the
 derived exclusive block map, so route execution obtains permission through that
 same reservation layer before crossing a signal-defined boundary.
+# Chain interlocking
+
+Routing remains independent of interlocking. Chain Signals consume the installed
+ordered route and never rerun BFS, choose another exit, change a destination, or
+throw a switch. Destination replacement transactionally installs a new route and
+releases reservations belonging to the old route before later planning.

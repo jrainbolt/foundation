@@ -39,6 +39,7 @@ boundary mapping, blocks, aspect, occupancy, and reservation display are
 reconstructed. Invalid orientation, terrain, attachment, connection, or
 duplicate direction/attachment is rejected without load-time events.
 
-Ordinary signals do not throw switches, reserve routes, provide fairness, or
-guarantee liveness. Chain signals, interlocking, multi-block lookahead,
-deadlock handling, freight, and schedules remain deferred.
+Ordinary signals do not recursively look ahead. Chain Signals are distinct
+infrastructure and atomically lock the routed sequence through nested chain
+boundaries to a safe ordinary-signal exit; see `rail-chain-signals.md`.
+Neither signal type throws switches or provides fairness or deadlock recovery.

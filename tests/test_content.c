@@ -29,7 +29,7 @@ static void test_lookup_and_compatibility(void)
         view->nuclear_fuels,view->nuclear_fuel_count));
     CHECK(factory_content_steam_recipes_validate(
         view->steam_recipes,view->steam_recipe_count));
-    CHECK(factory_content_entity_definition_count()==29U);
+    CHECK(factory_content_entity_definition_count()==30U);
     for(size_t i=0U;i<view->entity_count;++i) {
         const FactoryEntityDefinition *d=factory_content_entity_definition_at(i);
         FactoryConstructionMaterial cost=0U;

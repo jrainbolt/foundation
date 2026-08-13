@@ -418,4 +418,7 @@ add_test(NAME factory_train_reservation_tests COMMAND factory_train_reservation_
 add_executable(factory_rail_signal_tests tests/test_rail_signal.c)
 target_link_libraries(factory_rail_signal_tests PRIVATE factory_engine foundation_project_options)
 add_test(NAME factory_rail_signal_tests COMMAND factory_rail_signal_tests)
+add_executable(factory_rail_chain_signal_tests tests/test_rail_chain_signal.c)
+target_link_libraries(factory_rail_chain_signal_tests PRIVATE factory_engine foundation_project_options)
+add_test(NAME factory_rail_chain_signal_tests COMMAND factory_rail_chain_signal_tests)
 endif()

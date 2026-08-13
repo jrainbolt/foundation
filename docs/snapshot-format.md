@@ -211,3 +211,11 @@ position, stable three-port geometry, and authoritative selected branch.
 Physical neighbors, masks, component ID, and traversal results are excluded
 and reconstructed. Load rejects invalid geometry/branch values, non-Ground
 placement, occupancy conflicts, and entity/component mismatch.
+
+## Version 27 chain-signal and reservation sections
+
+Version 27 adds 16-byte Chain Signal records containing entity ID, signed grid
+position, and orientation. Locomotive records store the reservation count,
+while a following canonical section stores ordered reserved block IDs. Derived
+chain status/count, blocks, aspects, blockers, and occupancy are excluded. Load
+rebuilds topology and rejects invalid or conflicting ownership.

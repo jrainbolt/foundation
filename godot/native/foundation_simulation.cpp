@@ -105,6 +105,8 @@ FactoryCommand place(
         command.data.place_rail_switch={x,y,(uint32_t)first};break;
     case FACTORY_COMMAND_PLACE_RAIL_SIGNAL:
         command.data.place_rail_signal={x,y,first};break;
+    case FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL:
+        command.data.place_rail_chain_signal={x,y,first};break;
     default:
         break;
     }
@@ -630,7 +632,7 @@ FactoryResult FoundationSimulation::build_demo()
                 :rail_result->result;
     }
     const FactoryCommand signal_demo[] = {
-        place(FACTORY_COMMAND_PLACE_RAIL_SIGNAL,2,-1,
+        place(FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL,2,-1,
             FACTORY_DIRECTION_EAST),
         place(FACTORY_COMMAND_PLACE_RAIL_SIGNAL,3,-1,
             FACTORY_DIRECTION_EAST)
@@ -704,7 +706,8 @@ int64_t FoundationSimulation::queue_place_entity(
 {
     if (simulation_==nullptr || entity_type<=FACTORY_ENTITY_TYPE_NONE
         || (entity_type>FACTORY_ENTITY_TYPE_RAIL_SWITCH
-            &&entity_type!=FACTORY_ENTITY_TYPE_RAIL_SIGNAL)
+            &&entity_type!=FACTORY_ENTITY_TYPE_RAIL_SIGNAL
+            &&entity_type!=FACTORY_ENTITY_TYPE_RAIL_CHAIN_SIGNAL)
         || x<INT32_MIN || x>INT32_MAX || y<INT32_MIN || y>INT32_MAX
         || direction<0
         || (entity_type==FACTORY_ENTITY_TYPE_RAIL
@@ -742,6 +745,8 @@ int64_t FoundationSimulation::queue_place_entity(
     case FACTORY_ENTITY_TYPE_RAIL_STATION: command_type=FACTORY_COMMAND_PLACE_RAIL_STATION;break;
     case FACTORY_ENTITY_TYPE_RAIL_SWITCH: command_type=FACTORY_COMMAND_PLACE_RAIL_SWITCH;break;
     case FACTORY_ENTITY_TYPE_RAIL_SIGNAL: command_type=FACTORY_COMMAND_PLACE_RAIL_SIGNAL;break;
+    case FACTORY_ENTITY_TYPE_RAIL_CHAIN_SIGNAL:
+        command_type=FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL;break;
     default:return FACTORY_RESULT_INVALID_ARGUMENT;
     }
     FactoryCommand command=place(command_type,(int32_t)x,(int32_t)y,
@@ -1573,6 +1578,22 @@ bool FoundationSimulation::entity_to_dictionary(
         value["reserved_block_id"]=(int64_t)entity.data.locomotive.reserved_block_id;
         value["reservation_status"]=(int64_t)entity.data.locomotive.reservation_status;
         value["blocking_train_id"]=(int64_t)entity.data.locomotive.blocking_train_id;
+        value["reserved_block_count"]=(int64_t)entity.data.locomotive.reserved_block_count;
+        value["chain_required_block_count"]=(int64_t)entity.data.locomotive.chain_required_block_count;
+        value["blocking_block_id"]=(int64_t)entity.data.locomotive.blocking_block_id;
+        value["chain_status"]=(int64_t)entity.data.locomotive.chain_status;
+        {
+            Array reserved_blocks;
+            const size_t count=factory_simulation_get_train_reserved_block_count(
+                simulation_,entity.entity_id);
+            for(size_t index=0U;index<count;++index){
+                FactoryRailBlockId block=0U;
+                if(factory_simulation_get_train_reserved_block_at(simulation_,
+                        entity.entity_id,index,&block))
+                    reserved_blocks.append((int64_t)block);
+            }
+            value["reserved_blocks"]=reserved_blocks;
+        }
         break;
     case FACTORY_ENTITY_TYPE_CARGO_WAGON:
         value["rail_entity_id"]=(int64_t)entity.data.cargo_wagon.rail_entity_id;
@@ -1595,6 +1616,17 @@ bool FoundationSimulation::entity_to_dictionary(
         value["reserved_train_id"]=(int64_t)entity.data.rail_signal.reserved_train_id;
         value["occupied_train_count"]=(int64_t)entity.data.rail_signal.occupied_train_count;
         value["rail_connected"]=entity.data.rail_signal.connected;
+        break;
+    case FACTORY_ENTITY_TYPE_RAIL_CHAIN_SIGNAL:
+        value["signal_orientation"]=(int64_t)entity.data.rail_chain_signal.orientation;
+        value["attached_rail_id"]=(int64_t)entity.data.rail_chain_signal.attached_rail_id;
+        value["upstream_rail_id"]=(int64_t)entity.data.rail_chain_signal.upstream_rail_id;
+        value["upstream_block_id"]=(int64_t)entity.data.rail_chain_signal.upstream_block_id;
+        value["downstream_block_id"]=(int64_t)entity.data.rail_chain_signal.downstream_block_id;
+        value["signal_aspect"]=(int64_t)entity.data.rail_chain_signal.aspect;
+        value["reserved_train_id"]=(int64_t)entity.data.rail_chain_signal.reserved_train_id;
+        value["occupied_train_count"]=(int64_t)entity.data.rail_chain_signal.occupied_train_count;
+        value["rail_connected"]=entity.data.rail_chain_signal.connected;
         break;
     default:
         break;

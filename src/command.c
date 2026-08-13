@@ -80,6 +80,9 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
         case FACTORY_COMMAND_PLACE_RAIL_SIGNAL:
             direction=command->data.place_rail_signal.orientation;
             break;
+        case FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL:
+            direction=command->data.place_rail_chain_signal.orientation;
+            break;
         case FACTORY_COMMAND_PLACE_RAIL_SWITCH:
             return factory_rail_switch_geometry_is_valid(
                 (FactoryRailSwitchGeometry)

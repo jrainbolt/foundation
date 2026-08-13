@@ -216,6 +216,8 @@ static FactoryResult populate_entity(
         factory_rail_switch_store_find(&simulation->rail_switches,id);
     const FactoryRailSignal *rail_signal=
         factory_rail_signal_store_find(&simulation->rail_signals,id);
+    const FactoryRailChainSignal *rail_chain_signal=
+        factory_rail_chain_signal_store_find(&simulation->rail_chain_signals,id);
     const FactoryLocomotive *locomotive=
         factory_locomotive_store_find(&simulation->locomotives,id);
     const FactoryCargoWagon *cargo_wagon=
@@ -639,6 +641,20 @@ static FactoryResult populate_entity(
             inspection.downstream_block_id,inspection.aspect,
             inspection.reserved_train_id,inspection.occupied_train_count,
             inspection.connected};
+    } else if(rail_chain_signal!=NULL){FactoryRailChainSignalInspection inspection;
+        if(!factory_simulation_get_rail_chain_signal(simulation,id,&inspection))
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        out->entity_type=FACTORY_ENTITY_TYPE_RAIL_CHAIN_SIGNAL;
+        out->x=inspection.x;out->y=inspection.y;out->direction=inspection.orientation;
+        out->status=inspection.aspect==FACTORY_RAIL_SIGNAL_GREEN
+            ?FACTORY_PRESENTATION_MACHINE_STATUS_IDLE
+            :FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_OUTPUT;
+        out->data.rail_chain_signal=(FactoryPresentationRailSignal){
+            inspection.orientation,inspection.attached_rail_id,
+            inspection.upstream_rail_id,inspection.upstream_block_id,
+            inspection.downstream_block_id,inspection.aspect,
+            inspection.reserved_train_id,inspection.occupied_train_count,
+            inspection.connected};
     } else if(locomotive!=NULL){FactoryLocomotiveInspection inspection;
         if(!factory_simulation_get_locomotive(simulation,id,&inspection))
             return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
@@ -658,7 +674,9 @@ static FactoryResult populate_entity(
             inspection.route_index,inspection.next_planned_rail_id,
             inspection.current_block_id,inspection.next_route_block_id,
             inspection.reserved_block_id,inspection.reservation_status,
-            inspection.blocking_train_id};
+            inspection.blocking_train_id,inspection.reserved_block_count,
+            inspection.chain_required_block_count,inspection.blocking_block_id,
+            inspection.chain_status};
     } else if(cargo_wagon!=NULL){FactoryCargoWagonInspection inspection;
         if(!factory_simulation_get_cargo_wagon(simulation,id,&inspection))
             return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;

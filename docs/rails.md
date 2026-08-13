@@ -98,3 +98,9 @@ cannot be demolished. Removing a locomotive preserves its underlying rail.
 Snapshot version 22 stores only locomotive ID, occupied rail ID, entry
 direction, and progress. Wagons, consists, routing, signals, reservations,
 schedules, freight, fuel, and station stopping remain deferred.
+# Signal boundaries
+
+Ordinary and Chain Signals both split the derived physical block graph at their
+directional rail attachment. Structural switch, station, endpoint, and branching
+boundaries remain unchanged. Chain behavior is an interlocking policy over the
+same route and block topology, not a second rail graph.

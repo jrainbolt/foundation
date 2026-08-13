@@ -10,7 +10,7 @@
 
 #define SNAPSHOT_HEADER_SIZE 48U
 #define SNAPSHOT_SECTION_HEADER_SIZE 16U
-#define SNAPSHOT_SECTION_COUNT 35U
+#define SNAPSHOT_SECTION_COUNT 37U
 
 static const uint8_t snapshot_magic[8] = {
     'F', 'O', 'U', 'N', 'D', 'A', 'T', 'N'
@@ -47,8 +47,10 @@ typedef enum {
     SNAPSHOT_SECTION_RAIL_STATIONS,
     SNAPSHOT_SECTION_RAIL_SWITCHES,
     SNAPSHOT_SECTION_RAIL_SIGNALS,
+    SNAPSHOT_SECTION_RAIL_CHAIN_SIGNALS,
     SNAPSHOT_SECTION_LOCOMOTIVES,
     SNAPSHOT_SECTION_TRAIN_ROUTE_STEPS,
+    SNAPSHOT_SECTION_TRAIN_RESERVED_BLOCKS,
     SNAPSHOT_SECTION_CARGO_WAGONS,
     SNAPSHOT_SECTION_COMMANDS,
     SNAPSHOT_SECTION_RESULTS
@@ -260,10 +262,13 @@ static FactoryResult snapshot_size_unvalidated(
 {
     size_t size = SNAPSHOT_HEADER_SIZE
         + SNAPSHOT_SECTION_COUNT * SNAPSHOT_SECTION_HEADER_SIZE;
-    size_t tiles,route_steps=0U;
+    size_t tiles,route_steps=0U,reserved_blocks=0U;
 
     for(size_t i=0U;i<simulation->locomotives.count;++i){
         if(!checked_add(&route_steps,simulation->locomotives.items[i].route_length))
+            return FACTORY_RESULT_SNAPSHOT_SIZE_OVERFLOW;
+        if(!checked_add(&reserved_blocks,
+                simulation->locomotives.items[i].reserved_block_count))
             return FACTORY_RESULT_SNAPSHOT_SIZE_OVERFLOW;
     }
 
@@ -306,8 +311,10 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_records(&size,simulation->rail_stations.count,16U)
         || !checked_records(&size,simulation->rail_switches.count,20U)
         || !checked_records(&size,simulation->rail_signals.count,16U)
+        || !checked_records(&size,simulation->rail_chain_signals.count,16U)
         || !checked_records(&size,simulation->locomotives.count,44U)
         || !checked_records(&size,route_steps,8U)
+        || !checked_records(&size,reserved_blocks,4U)
         || !checked_records(&size,simulation->cargo_wagons.count,36U)
         || !checked_records(&size, simulation->command_count, 24U)
         || !checked_records(&size, simulation->result_count, 72U)
@@ -340,9 +347,11 @@ static FactoryResult snapshot_size_unvalidated(
         || !size_to_u32(simulation->rail_stations.count)
         || !size_to_u32(simulation->rail_switches.count)
         || !size_to_u32(simulation->rail_signals.count)
+        || !size_to_u32(simulation->rail_chain_signals.count)
         || !size_to_u32(simulation->locomotives.count)
         || !size_to_u32(simulation->cargo_wagons.count)
         || !size_to_u32(route_steps)
+        || !size_to_u32(reserved_blocks)
         || !section_size_valid(
             simulation->entities->count, 4U, 8U)
         || !section_size_valid(tiles, 16U, 16U)
@@ -373,8 +382,10 @@ static FactoryResult snapshot_size_unvalidated(
         || !section_size_valid(simulation->rail_stations.count,16U,0U)
         || !section_size_valid(simulation->rail_switches.count,20U,0U)
         || !section_size_valid(simulation->rail_signals.count,16U,0U)
+        || !section_size_valid(simulation->rail_chain_signals.count,16U,0U)
         || !section_size_valid(simulation->locomotives.count,44U,0U)
         || !section_size_valid(route_steps,8U,0U)
+        || !section_size_valid(reserved_blocks,4U,0U)
         || !section_size_valid(simulation->cargo_wagons.count,36U,0U)
         || size > UINT64_MAX) {
         return FACTORY_RESULT_SNAPSHOT_SIZE_OVERFLOW;
@@ -434,6 +445,8 @@ static bool entity_has_subsystem(
         factory_rail_switch_store_find(&simulation->rail_switches,id);
     const FactoryRailSignal *rail_signal=
         factory_rail_signal_store_find(&simulation->rail_signals,id);
+    const FactoryRailChainSignal *rail_chain_signal=
+        factory_rail_chain_signal_store_find(&simulation->rail_chain_signals,id);
     const FactoryLocomotive *locomotive=
         factory_locomotive_store_find(&simulation->locomotives,id);
     const FactoryCargoWagon *cargo_wagon=
@@ -468,6 +481,7 @@ static bool entity_has_subsystem(
     found += rail_station != NULL;
     found += rail_switch != NULL;
     found += rail_signal != NULL;
+    found += rail_chain_signal != NULL;
     found += locomotive != NULL;
     found += cargo_wagon != NULL;
     if (steam_engine != NULL && generator != NULL) --found;
@@ -515,6 +529,8 @@ static bool entity_has_subsystem(
         *out_x=rail_switch->x;*out_y=rail_switch->y;
     } else if(rail_signal!=NULL){
         *out_x=rail_signal->x;*out_y=rail_signal->y;
+    } else if(rail_chain_signal!=NULL){
+        *out_x=rail_chain_signal->x;*out_y=rail_chain_signal->y;
     } else if(locomotive!=NULL){const FactoryRail*r=factory_rail_store_find(
             &simulation->rails,locomotive->rail_entity_id);
         const FactoryRailSwitch*w=factory_rail_switch_store_find(
@@ -650,6 +666,7 @@ static FactoryResult validate_simulation(
         + simulation->construction_depots.count
         + simulation->rails.count + simulation->rail_stations.count
         + simulation->rail_switches.count+simulation->rail_signals.count
+        + simulation->rail_chain_signals.count
         + simulation->locomotives.count
         + simulation->cargo_wagons.count
         + simulation->solar_generators.count
@@ -889,6 +906,12 @@ static FactoryResult validate_simulation(
             ||factory_world_get_terrain(simulation->world,signal->x,signal->y)
                 !=FACTORY_TERRAIN_GROUND)
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
+    for(index=0U;index<simulation->rail_chain_signals.count;++index){
+        const FactoryRailChainSignal*signal=&simulation->rail_chain_signals.items[index];
+        if(!direction_valid((uint32_t)signal->orientation)
+            ||factory_world_get_terrain(simulation->world,signal->x,signal->y)
+                !=FACTORY_TERRAIN_GROUND)return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
     for(index=0U;index<simulation->locomotives.count;++index){
         const FactoryLocomotive*l=&simulation->locomotives.items[index];
@@ -1315,7 +1338,7 @@ static FactoryResult validate_simulation(
         const FactoryCommandResult *value = &simulation->results[index];
         if (!snapshot_command_valid(&value->command)
             || value->result > FACTORY_RESULT_CONSTRUCTION_DEPOT_NOT_EMPTY
-            || value->entity_type > FACTORY_ENTITY_TYPE_RAIL_SIGNAL
+            || value->entity_type > FACTORY_ENTITY_TYPE_RAIL_CHAIN_SIGNAL
             || value->previous_assembler_recipe
                 >= FACTORY_ASSEMBLER_RECIPE_COUNT
             || value->new_assembler_recipe
@@ -1494,6 +1517,10 @@ static void write_command(
             fields[0]=(uint32_t)command->data.place_rail_signal.x;
             fields[1]=(uint32_t)command->data.place_rail_signal.y;
             fields[2]=command->data.place_rail_signal.orientation;break;
+        case FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL:
+            fields[0]=(uint32_t)command->data.place_rail_chain_signal.x;
+            fields[1]=(uint32_t)command->data.place_rail_chain_signal.y;
+            fields[2]=command->data.place_rail_chain_signal.orientation;break;
         case FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH:
             fields[0]=command->data.set_rail_switch_branch.entity_id;
             fields[1]=command->data.set_rail_switch_branch.branch;break;
@@ -1537,7 +1564,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             return false;
         }
     }
-    if (type > FACTORY_COMMAND_PLACE_RAIL_SIGNAL) {
+    if (type > FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL) {
         return false;
     }
     command->type = (FactoryCommandType)type;
@@ -1558,6 +1585,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             case FACTORY_COMMAND_PLACE_RAIL_STATION:
             case FACTORY_COMMAND_PLACE_RAIL_SWITCH:
             case FACTORY_COMMAND_PLACE_RAIL_SIGNAL:
+            case FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL:
                 used = 3U;
                 break;
             case FACTORY_COMMAND_PLACE_STORAGE:
@@ -1771,6 +1799,11 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             command->data.place_rail_signal.x=(int32_t)fields[0];
             command->data.place_rail_signal.y=(int32_t)fields[1];
             command->data.place_rail_signal.orientation=
+                (FactoryDirection)fields[2];break;
+        case FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL:
+            command->data.place_rail_chain_signal.x=(int32_t)fields[0];
+            command->data.place_rail_chain_signal.y=(int32_t)fields[1];
+            command->data.place_rail_chain_signal.orientation=
                 (FactoryDirection)fields[2];break;
         case FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH:
             command->data.set_rail_switch_branch.entity_id=fields[0];
@@ -2254,6 +2287,14 @@ static void write_snapshot(
         write_u32(writer,v->entity_id);write_i32(writer,v->x);
         write_i32(writer,v->y);write_u32(writer,v->orientation);
     }
+    write_section_header(writer,SNAPSHOT_SECTION_RAIL_CHAIN_SIGNALS,
+        simulation->rail_chain_signals.count,
+        simulation->rail_chain_signals.count*16U);
+    for(index=0U;index<simulation->rail_chain_signals.count;++index){
+        const FactoryRailChainSignal*v=&simulation->rail_chain_signals.items[index];
+        write_u32(writer,v->entity_id);write_i32(writer,v->x);
+        write_i32(writer,v->y);write_u32(writer,v->orientation);
+    }
     write_section_header(writer,SNAPSHOT_SECTION_LOCOMOTIVES,
         simulation->locomotives.count,simulation->locomotives.count*44U);
     for(index=0U;index<simulation->locomotives.count;++index){
@@ -2264,7 +2305,7 @@ static void write_snapshot(
         write_u32(writer,v->destination_station_id);write_u32(writer,v->route_status);
         write_u32(writer,(uint32_t)v->route_length);
         write_u32(writer,(uint32_t)v->route_index);
-        write_u32(writer,v->reserved_block_id);
+        write_u32(writer,(uint32_t)v->reserved_block_count);
     }
     size_t route_step_count=0U;
     for(index=0U;index<simulation->locomotives.count;++index)
@@ -2277,6 +2318,16 @@ static void write_snapshot(
             write_u32(writer,v->route[step].rail_entity_id);
             write_u32(writer,v->route[step].entry_direction);
         }
+    }
+    size_t reserved_block_count=0U;
+    for(index=0U;index<simulation->locomotives.count;++index)
+        reserved_block_count+=simulation->locomotives.items[index].reserved_block_count;
+    write_section_header(writer,SNAPSHOT_SECTION_TRAIN_RESERVED_BLOCKS,
+        reserved_block_count,reserved_block_count*4U);
+    for(index=0U;index<simulation->locomotives.count;++index){
+        const FactoryLocomotive*v=&simulation->locomotives.items[index];
+        for(size_t r=0U;r<v->reserved_block_count;++r)
+            write_u32(writer,v->reserved_blocks[r]);
     }
     write_section_header(writer,SNAPSHOT_SECTION_CARGO_WAGONS,
         simulation->cargo_wagons.count,simulation->cargo_wagons.count*36U);
@@ -3029,6 +3080,18 @@ static bool load_sections(
             ||!direction_valid(value))return false;
         v->orientation=(FactoryDirection)value;
     }
+    if(!read_section_header(reader,SNAPSHOT_SECTION_RAIL_CHAIN_SIGNALS,16U,0U,&count)
+        ||!allocate_records((void**)&simulation->rail_chain_signals.items,count,
+            sizeof(FactoryRailChainSignal)))return false;
+    simulation->rail_chain_signals.count=count;
+    simulation->rail_chain_signals.capacity=count;
+    for(index=0U;index<count;++index){FactoryRailChainSignal*v=
+        &simulation->rail_chain_signals.items[index];
+        if(!read_u32(reader,&v->entity_id)||!read_i32(reader,&v->x)
+            ||!read_i32(reader,&v->y)||!read_u32(reader,&value)
+            ||!direction_valid(value))return false;
+        v->orientation=(FactoryDirection)value;
+    }
     if(!read_section_header(reader,SNAPSHOT_SECTION_LOCOMOTIVES,44U,0U,&count)
         ||!factory_locomotive_store_reserve(&simulation->locomotives,count))
         return false;
@@ -3037,17 +3100,18 @@ static bool load_sections(
         count*sizeof(*simulation->locomotives.items));
     for(index=0U;index<count;++index){FactoryLocomotive*v=
         &simulation->locomotives.items[index];uint32_t direction,progress,status,
-        route_length,route_index;
+        route_length,route_index,reservation_count;
         *v=(FactoryLocomotive){0};
         if(!read_u32(reader,&v->entity_id)||!read_u32(reader,&v->rail_entity_id)
             ||!read_u32(reader,&direction)||!read_u32(reader,&progress)
             ||!read_u32(reader,&v->rear_vehicle_id)||!read_u32(reader,&v->vehicle_count)
             ||!read_u32(reader,&v->destination_station_id)||!read_u32(reader,&status)
             ||!read_u32(reader,&route_length)||!read_u32(reader,&route_index)
-            ||!read_u32(reader,&v->reserved_block_id)
+            ||!read_u32(reader,&reservation_count)
             ||!direction_valid(direction)||progress>FACTORY_LOCOMOTIVE_MOVE_TICKS
             ||status>FACTORY_TRAIN_ROUTE_INVALID
             ||route_length>FACTORY_TRAIN_ROUTE_MAX_STEPS
+            ||reservation_count>route_length
             ||(route_length==0U&&route_index!=0U)
             ||(route_length!=0U&&route_index>=route_length))
             return false;
@@ -3055,6 +3119,7 @@ static bool load_sections(
         v->activity=FACTORY_LOCOMOTIVE_MOVING;
         v->route_status=(FactoryTrainRouteStatus)status;
         v->route_length=route_length;v->route_index=route_index;
+        v->reserved_block_count=reservation_count;
     }
     if(!read_section_header(reader,SNAPSHOT_SECTION_TRAIN_ROUTE_STEPS,8U,0U,
             &count))return false;
@@ -3071,6 +3136,28 @@ static bool load_sections(
                 ||!read_u32(reader,&direction)||!direction_valid(direction)
                 ||v->route[step].rail_entity_id==0U)return false;
             v->route[step].entry_direction=(FactoryDirection)direction;
+        }
+     }}
+    if(!read_section_header(reader,SNAPSHOT_SECTION_TRAIN_RESERVED_BLOCKS,4U,0U,
+            &count))return false;
+    {size_t expected=0U;for(index=0U;index<simulation->locomotives.count;++index)
+        if(!checked_add(&expected,simulation->locomotives.items[index].reserved_block_count))
+            return false;
+     if(expected!=count)return false;
+     for(index=0U;index<simulation->locomotives.count;++index){FactoryLocomotive*v=
+        &simulation->locomotives.items[index];
+        if(v->route_length!=0U){v->reserved_blocks=calloc(v->route_length,
+                sizeof(*v->reserved_blocks));if(v->reserved_blocks==NULL)return false;
+            v->reserved_block_capacity=v->route_length;}
+        for(size_t r=0U;r<v->reserved_block_count;++r)
+            if(!read_u32(reader,&v->reserved_blocks[r])
+                ||v->reserved_blocks[r]==0U)return false;
+        v->reserved_block_id=v->reserved_block_count!=0U?v->reserved_blocks[0]:0U;
+        v->reservation_status=v->reserved_block_count!=0U
+            ?FACTORY_TRAIN_RESERVATION_HELD:FACTORY_TRAIN_RESERVATION_NONE;
+        if(v->reserved_block_count>1U){
+            v->chain_status=FACTORY_TRAIN_CHAIN_HELD;
+            v->chain_required_block_count=v->reserved_block_count;
         }
      }}
     if(!read_section_header(reader,SNAPSHOT_SECTION_CARGO_WAGONS,36U,0U,&count)
@@ -3293,6 +3380,29 @@ FactoryResult factory_simulation_load_snapshot(
             ||!signal.connected){factory_simulation_destroy(simulation);
             return FACTORY_RESULT_SNAPSHOT_CORRUPT;}
         for(size_t j=i+1U;j<simulation->rail_signals.count;++j){
+            FactoryRailSignalInspection other;
+            if(!factory_simulation_get_rail_signal(simulation,
+                    simulation->rail_signals.items[j].entity_id,&other)
+                ||(signal.attached_rail_id==other.attached_rail_id
+                    &&signal.orientation==other.orientation)){
+                factory_simulation_destroy(simulation);
+                return FACTORY_RESULT_SNAPSHOT_CORRUPT;}}
+    }
+    for(size_t i=0U;i<simulation->rail_chain_signals.count;++i){
+        FactoryRailChainSignalInspection signal;
+        if(!factory_simulation_get_rail_chain_signal(simulation,
+                simulation->rail_chain_signals.items[i].entity_id,&signal)
+            ||!signal.connected){factory_simulation_destroy(simulation);
+            return FACTORY_RESULT_SNAPSHOT_CORRUPT;}
+        for(size_t j=i+1U;j<simulation->rail_chain_signals.count;++j){
+            FactoryRailChainSignalInspection other;
+            if(!factory_simulation_get_rail_chain_signal(simulation,
+                    simulation->rail_chain_signals.items[j].entity_id,&other)
+                ||(signal.attached_rail_id==other.attached_rail_id
+                    &&signal.orientation==other.orientation)){
+                factory_simulation_destroy(simulation);
+                return FACTORY_RESULT_SNAPSHOT_CORRUPT;}}
+        for(size_t j=0U;j<simulation->rail_signals.count;++j){
             FactoryRailSignalInspection other;
             if(!factory_simulation_get_rail_signal(simulation,
                     simulation->rail_signals.items[j].entity_id,&other)
