@@ -297,6 +297,14 @@ typedef struct {
     FactoryEntityId attached_rail_id;
     FactoryRailNetworkId network_id;
     bool connected;
+    FactoryRailStationFreightMode freight_mode;
+    FactoryItemType configured_item;
+    uint32_t freight_quantity;
+    uint32_t freight_capacity;
+    FactoryTrainId eligible_train_id;
+    bool freight_transfer_possible;
+    uint32_t latest_transfer_quantity;
+    FactoryRailFreightActivity latest_transfer_activity;
 } FactoryPresentationRailStation;
 
 typedef struct {

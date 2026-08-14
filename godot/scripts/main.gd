@@ -42,6 +42,8 @@ func _ready() -> void:
 	inspector.storage_output_requested.connect(_on_storage_output_requested)
 	inspector.rail_switch_branch_requested.connect(_on_rail_switch_branch_requested)
 	inspector.train_destination_requested.connect(_on_train_destination_requested)
+	inspector.rail_station_freight_mode_requested.connect(_on_rail_station_freight_mode_requested)
+	inspector.rail_station_freight_item_requested.connect(_on_rail_station_freight_item_requested)
 	_reset_demo()
 	build_toolbar.configure(simulation)
 	inspector.configure_catalogs(
@@ -259,6 +261,20 @@ func _on_train_destination_requested(entity_id: int,station_id: int) -> void:
 		status_label.text = "Status: %s" % simulation.result_name(queued)
 		return
 	_execute_queued_command("Train destination updated")
+
+func _on_rail_station_freight_mode_requested(entity_id: int,mode: int) -> void:
+	var queued: int = simulation.queue_set_rail_station_freight_mode(entity_id,mode)
+	if queued != 0:
+		status_label.text = "Status: %s" % simulation.result_name(queued)
+		return
+	_execute_queued_command("Station freight mode updated")
+
+func _on_rail_station_freight_item_requested(entity_id: int,item_type: int) -> void:
+	var queued: int = simulation.queue_set_rail_station_freight_item(entity_id,item_type)
+	if queued != 0:
+		status_label.text = "Status: %s" % simulation.result_name(queued)
+		return
+	_execute_queued_command("Station freight item updated")
 
 func _execute_queued_command(success_message: String) -> void:
 	if not _advance(1): return

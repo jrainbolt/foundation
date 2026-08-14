@@ -308,7 +308,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_records(&size, simulation->research_labs.count, 16U)
         || !checked_records(&size,simulation->construction_depots.count,16U)
         || !checked_records(&size,simulation->rails.count,16U)
-        || !checked_records(&size,simulation->rail_stations.count,16U)
+        || !checked_records(&size,simulation->rail_stations.count,32U)
         || !checked_records(&size,simulation->rail_switches.count,20U)
         || !checked_records(&size,simulation->rail_signals.count,16U)
         || !checked_records(&size,simulation->rail_chain_signals.count,16U)
@@ -379,7 +379,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !section_size_valid(simulation->research_labs.count,16U,0U)
         || !section_size_valid(simulation->construction_depots.count,16U,0U)
         || !section_size_valid(simulation->rails.count,16U,0U)
-        || !section_size_valid(simulation->rail_stations.count,16U,0U)
+        || !section_size_valid(simulation->rail_stations.count,32U,0U)
         || !section_size_valid(simulation->rail_switches.count,20U,0U)
         || !section_size_valid(simulation->rail_signals.count,16U,0U)
         || !section_size_valid(simulation->rail_chain_signals.count,16U,0U)
@@ -889,6 +889,10 @@ static FactoryResult validate_simulation(
     for(index=0U;index<simulation->rail_stations.count;++index){
         const FactoryRailStation*st=&simulation->rail_stations.items[index];
         if(!direction_valid((uint32_t)st->orientation)
+            ||st->freight_mode>FACTORY_RAIL_STATION_FREIGHT_UNLOAD
+            ||!item_valid_or_none((uint32_t)st->configured_item)
+            ||st->freight_quantity>FACTORY_RAIL_STATION_FREIGHT_CAPACITY
+            ||(st->freight_quantity!=0U&&st->configured_item==FACTORY_ITEM_NONE)
             ||factory_world_get_terrain(simulation->world,st->x,st->y)
                 !=FACTORY_TERRAIN_GROUND)return FACTORY_RESULT_SNAPSHOT_CORRUPT;
     }
@@ -1542,6 +1546,12 @@ static void write_command(
             fields[0]=command->data.clear_train_destination.train_id;break;
         case FACTORY_COMMAND_REPLAN_TRAIN_ROUTE:
             fields[0]=command->data.replan_train_route.train_id;break;
+        case FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_MODE:
+            fields[0]=command->data.set_rail_station_freight_mode.station_entity_id;
+            fields[1]=command->data.set_rail_station_freight_mode.mode;break;
+        case FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM:
+            fields[0]=command->data.set_rail_station_freight_item.station_entity_id;
+            fields[1]=command->data.set_rail_station_freight_item.item;break;
     }
     write_u32(writer, (uint32_t)command->type);
     for (index = 0U; index < 5U; ++index) {
@@ -1564,7 +1574,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             return false;
         }
     }
-    if (type > FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL) {
+    if (type > FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM) {
         return false;
     }
     command->type = (FactoryCommandType)type;
@@ -1615,6 +1625,8 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             case FACTORY_COMMAND_PLACE_CARGO_WAGON:
             case FACTORY_COMMAND_COUPLE_REAR_WAGON:
             case FACTORY_COMMAND_SET_TRAIN_DESTINATION:
+            case FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_MODE:
+            case FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM:
                 used = 2U;
                 break;
             case FACTORY_COMMAND_DEMOLISH_ENTITY:
@@ -1826,6 +1838,13 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             command->data.clear_train_destination.train_id=fields[0];break;
         case FACTORY_COMMAND_REPLAN_TRAIN_ROUTE:
             command->data.replan_train_route.train_id=fields[0];break;
+        case FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_MODE:
+            command->data.set_rail_station_freight_mode.station_entity_id=fields[0];
+            command->data.set_rail_station_freight_mode.mode=fields[1];break;
+        case FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM:
+            command->data.set_rail_station_freight_item.station_entity_id=fields[0];
+            command->data.set_rail_station_freight_item.item=
+                (FactoryItemType)fields[1];break;
     }
     return snapshot_command_valid(command);
 }
@@ -2266,11 +2285,13 @@ static void write_snapshot(
         write_i32(writer,v->y);write_u32(writer,v->geometry);
     }
     write_section_header(writer,SNAPSHOT_SECTION_RAIL_STATIONS,
-        simulation->rail_stations.count,simulation->rail_stations.count*16U);
+        simulation->rail_stations.count,simulation->rail_stations.count*32U);
     for(index=0U;index<simulation->rail_stations.count;++index){
         const FactoryRailStation*v=&simulation->rail_stations.items[index];
         write_u32(writer,v->entity_id);write_i32(writer,v->x);
         write_i32(writer,v->y);write_u32(writer,v->orientation);
+        write_u32(writer,v->freight_mode);write_u32(writer,v->configured_item);
+        write_u32(writer,v->freight_quantity);write_u32(writer,0U);
     }
     write_section_header(writer,SNAPSHOT_SECTION_RAIL_SWITCHES,
         simulation->rail_switches.count,simulation->rail_switches.count*20U);
@@ -3043,15 +3064,25 @@ static bool load_sections(
             ||!factory_rail_geometry_is_valid((FactoryRailGeometry)value))return false;
         v->geometry=(FactoryRailGeometry)value;
     }
-    if(!read_section_header(reader,SNAPSHOT_SECTION_RAIL_STATIONS,16U,0U,&count)
+    if(!read_section_header(reader,SNAPSHOT_SECTION_RAIL_STATIONS,32U,0U,&count)
         ||!allocate_records((void**)&simulation->rail_stations.items,count,
             sizeof(FactoryRailStation)))return false;
     simulation->rail_stations.count=count;simulation->rail_stations.capacity=count;
     for(index=0U;index<count;++index){FactoryRailStation*v=&simulation->rail_stations.items[index];
+        uint32_t mode,item,quantity,reserved;
         if(!read_u32(reader,&v->entity_id)||!read_i32(reader,&v->x)
             ||!read_i32(reader,&v->y)||!read_u32(reader,&value)
-            ||!direction_valid(value))return false;
+            ||!read_u32(reader,&mode)||!read_u32(reader,&item)
+            ||!read_u32(reader,&quantity)||!read_u32(reader,&reserved)
+            ||!direction_valid(value)
+            ||mode>FACTORY_RAIL_STATION_FREIGHT_UNLOAD||!item_valid_or_none(item)
+            ||quantity>FACTORY_RAIL_STATION_FREIGHT_CAPACITY
+            ||(quantity!=0U&&item==FACTORY_ITEM_NONE)||reserved!=0U)return false;
         v->orientation=(FactoryDirection)value;
+        v->freight_mode=(FactoryRailStationFreightMode)mode;
+        v->configured_item=(FactoryItemType)item;v->freight_quantity=quantity;
+        v->latest_transfer_quantity=0U;
+        v->latest_transfer_activity=FACTORY_RAIL_FREIGHT_NONE;
     }
     if(!read_section_header(reader,SNAPSHOT_SECTION_RAIL_SWITCHES,20U,0U,&count)
         ||!allocate_records((void**)&simulation->rail_switches.items,count,

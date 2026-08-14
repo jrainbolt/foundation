@@ -170,8 +170,14 @@ func _draw_cargo_wagon(color: Color) -> void:
 func _draw_station(color: Color) -> void:
 	draw_rect(Rect2(8,14,60,48),Color("#111820"),true)
 	draw_rect(Rect2(11,17,54,42),color,true)
+	var mode := int(state.get("freight_mode",0))
+	var capacity := maxi(1,int(state.get("freight_capacity",200)))
+	var fill := clampf(float(state.get("freight_quantity",0))/float(capacity),0.0,1.0)
+	var freight_color := Color("#e4b84b") if mode == 1 else Color("#4bc1d9")
+	draw_rect(Rect2(15,43,46,8),Color("#172027"),true)
+	draw_rect(Rect2(15,43,46*fill,8),freight_color,true)
 	draw_line(Vector2(12,55),Vector2(64,55),Color("#c8d1d6"),5.0)
-	_draw_centered("STN",43.0,18,Color.WHITE)
+	_draw_centered(["OFF","LOAD","UNLOAD"][clampi(mode,0,2)],37.0,11,Color.WHITE)
 	_draw_centered("CONNECTED" if bool(state.get("rail_connected",false)) else "NO RAIL",57.0,9,Color("#cfe7d4") if bool(state.get("rail_connected",false)) else Color("#ff9f91"))
 
 func _draw_switch() -> void:

@@ -953,6 +953,30 @@ static FactoryResult set_rail_switch_branch(FactorySimulation*s,
     return FACTORY_RESULT_OK;
 }
 
+static FactoryResult set_station_freight(FactorySimulation*s,
+    const FactoryCommand*c,FactoryEntityId*out_id,bool mode_command)
+{
+    FactoryEntityId id=mode_command
+        ?c->data.set_rail_station_freight_mode.station_entity_id
+        :c->data.set_rail_station_freight_item.station_entity_id;
+    FactoryRailStation*station=factory_rail_station_store_find_mutable(
+        &s->rail_stations,id);
+    if(station==NULL)return factory_entity_is_valid(s->entities,id)
+        ?FACTORY_RESULT_UNSUPPORTED_ENTITY:FACTORY_RESULT_ENTITY_NOT_FOUND;
+    if(mode_command){uint32_t mode=c->data.set_rail_station_freight_mode.mode;
+        if(mode>FACTORY_RAIL_STATION_FREIGHT_UNLOAD)
+            return FACTORY_RESULT_INVALID_ARGUMENT;
+        station->freight_mode=(FactoryRailStationFreightMode)mode;
+    }else{FactoryItemType item=c->data.set_rail_station_freight_item.item;
+        if(item<FACTORY_ITEM_NONE||item>FACTORY_ITEM_CONSTRUCTION_MATERIAL)
+            return FACTORY_RESULT_INVALID_ARGUMENT;
+        if(station->freight_quantity!=0U&&item!=station->configured_item)
+            return FACTORY_RESULT_INVALID_STATE;
+        station->configured_item=item;
+    }
+    *out_id=id;return FACTORY_RESULT_OK;
+}
+
 static FactoryResult place_locomotive(FactorySimulation*s,
     const FactoryCommand*c,FactoryEntityId*out_id)
 {
@@ -2209,6 +2233,12 @@ static void apply_commands(FactorySimulation *simulation)
             case FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL:
                 result->result=place_signal(simulation,&result->command,
                     &result->entity_id,true);break;
+            case FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_MODE:
+                result->result=set_station_freight(simulation,&result->command,
+                    &result->entity_id,true);break;
+            case FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM:
+                result->result=set_station_freight(simulation,&result->command,
+                    &result->entity_id,false);break;
             case FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH:
                 result->result=set_rail_switch_branch(simulation,
                     &result->command,&result->entity_id);break;
@@ -2846,6 +2876,7 @@ static bool inspect_inserter_source(
     const FactoryRefinery *refinery;
     const FactoryAssembler *assembler;
     const FactoryStorage *storage;
+    const FactoryRailStation *station;
 
     if (tile == NULL || tile->occupying_entity == 0U) {
         return false;
@@ -2928,6 +2959,14 @@ static bool inspect_inserter_source(
         return factory_logistics_endpoint_peek(
             simulation, *out_endpoint, out_item
         ) == FACTORY_LOGISTICS_RESULT_OK;
+    }
+    station=factory_rail_station_store_find(&simulation->rail_stations,
+        tile->occupying_entity);
+    if(station!=NULL){
+        *out_endpoint=(FactoryLogisticsEndpoint){station->entity_id,
+            FACTORY_LOGISTICS_SLOT_RAIL_STATION_FREIGHT};
+        return factory_logistics_endpoint_peek(simulation,*out_endpoint,out_item)
+            ==FACTORY_LOGISTICS_RESULT_OK;
     }
     return false;
 }
@@ -3053,6 +3092,7 @@ static bool inspect_inserter_destination(
     const FactoryPowerGenerator *generator;
     const FactoryResearchLab *research_lab;
     const FactoryConstructionDepot *depot;
+    const FactoryRailStation *station;
 
     *out_endpoint = (FactoryLogisticsEndpoint){
         0U, FACTORY_LOGISTICS_SLOT_NONE
@@ -3151,6 +3191,10 @@ static bool inspect_inserter_destination(
         *out_endpoint=(FactoryLogisticsEndpoint){depot->entity_id,
             FACTORY_LOGISTICS_SLOT_CONSTRUCTION_DEPOT_INPUT};
     }
+    station=factory_rail_station_store_find(&simulation->rail_stations,
+        tile->occupying_entity);
+    if(station!=NULL)*out_endpoint=(FactoryLogisticsEndpoint){station->entity_id,
+        FACTORY_LOGISTICS_SLOT_RAIL_STATION_FREIGHT};
     return out_endpoint->entity_id != 0U
         && factory_logistics_endpoint_can_accept(
             simulation, *out_endpoint, inserter->held_item
@@ -3276,6 +3320,7 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     (void)factory_rail_topology_rebuild(simulation);
     factory_train_reservations_update(simulation);
     factory_locomotives_update(simulation);
+    factory_rail_stations_update_freight(simulation);
     factory_fluid_network_transfer(simulation);
     factory_burner_store_begin_tick(&simulation->burners, simulation);
     factory_fluid_machines_update(simulation);

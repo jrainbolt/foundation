@@ -604,7 +604,12 @@ static FactoryResult populate_entity(
             :FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_INPUT;
         out->data.rail_station=(FactoryPresentationRailStation){
             inspection.attached_rail_id,inspection.network_id,
-            inspection.connected};
+            inspection.connected,inspection.freight_mode,
+            inspection.configured_item,inspection.freight_quantity,
+            inspection.freight_capacity,inspection.eligible_train_id,
+            inspection.freight_transfer_possible,
+            inspection.latest_transfer_quantity,
+            inspection.latest_transfer_activity};
     } else if(rail_switch!=NULL){
         FactoryRailSwitchInspection inspection;
         if(!factory_simulation_get_rail_switch(simulation,id,&inspection))

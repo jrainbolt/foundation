@@ -49,6 +49,8 @@ typedef FactoryEntityId FactoryRailBlockId;
 #define FACTORY_RAIL_NEIGHBOR_COUNT 4U
 #define FACTORY_LOCOMOTIVE_MOVE_TICKS 4U
 #define FACTORY_CARGO_WAGON_CAPACITY 100U
+#define FACTORY_RAIL_STATION_FREIGHT_CAPACITY 200U
+#define FACTORY_RAIL_STATION_TRANSFER_QUANTITY 10U
 #define FACTORY_TRAIN_ROUTE_MAX_STEPS 4096U
 
 typedef enum {
@@ -77,6 +79,18 @@ typedef enum {
     FACTORY_TRAIN_CHAIN_WAITING,
     FACTORY_TRAIN_CHAIN_INVALID
 } FactoryTrainChainStatus;
+
+typedef enum {
+    FACTORY_RAIL_STATION_FREIGHT_DISABLED=0,
+    FACTORY_RAIL_STATION_FREIGHT_LOAD,
+    FACTORY_RAIL_STATION_FREIGHT_UNLOAD
+} FactoryRailStationFreightMode;
+
+typedef enum {
+    FACTORY_RAIL_FREIGHT_NONE=0,
+    FACTORY_RAIL_FREIGHT_LOADING,
+    FACTORY_RAIL_FREIGHT_UNLOADING
+} FactoryRailFreightActivity;
 
 typedef struct {
     FactoryEntityId rail_entity_id;
@@ -211,6 +225,14 @@ typedef struct {
     FactoryEntityId attached_rail_id;
     FactoryRailNetworkId network_id;
     bool connected;
+    FactoryRailStationFreightMode freight_mode;
+    FactoryItemType configured_item;
+    uint32_t freight_quantity;
+    uint32_t freight_capacity;
+    FactoryTrainId eligible_train_id;
+    bool freight_transfer_possible;
+    uint32_t latest_transfer_quantity;
+    FactoryRailFreightActivity latest_transfer_activity;
 } FactoryRailStationInspection;
 
 typedef struct {

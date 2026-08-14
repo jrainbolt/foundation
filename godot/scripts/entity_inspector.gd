@@ -5,12 +5,16 @@ signal assembler_recipe_requested(entity_id: int,recipe_id: int)
 signal storage_output_requested(entity_id: int,item_type: int)
 signal rail_switch_branch_requested(entity_id: int,branch: int)
 signal train_destination_requested(entity_id: int,station_id: int)
+signal rail_station_freight_mode_requested(entity_id: int,mode: int)
+signal rail_station_freight_item_requested(entity_id: int,item_type: int)
 
 const Format := preload("res://scripts/presentation_format.gd")
 @onready var title_label: Label = %InspectorTitle
 @onready var details: RichTextLabel = %InspectorDetails
 @onready var configuration_label: Label = %ConfigurationLabel
 @onready var configuration_selector: OptionButton = %ConfigurationSelector
+@onready var secondary_configuration_label: Label = %SecondaryConfigurationLabel
+@onready var secondary_configuration_selector: OptionButton = %SecondaryConfigurationSelector
 var entity_id := 0
 var recipe_catalog: Array = []
 var item_catalog: Array = []
@@ -19,6 +23,7 @@ var configuring := false
 
 func _ready() -> void:
 	configuration_selector.item_selected.connect(_on_configuration_selected)
+	secondary_configuration_selector.item_selected.connect(_on_secondary_configuration_selected)
 
 func configure_catalogs(recipes: Array,items: Array) -> void:
 	recipe_catalog = recipes.duplicate(true)
@@ -76,6 +81,10 @@ func show_entity(state: Dictionary) -> void:
 	if state.has("rail_neighbors"): field(lines,"Neighbors",str(state.rail_neighbors))
 	if state.has("rail_connected"): field(lines,"Rail connected",Format.yes_no(bool(state.rail_connected)))
 	if state.has("attached_rail_id"): field(lines,"Attached rail","#%d" % int(state.attached_rail_id))
+	if state.has("freight_mode"): field(lines,"Freight mode",["DISABLED","LOAD","UNLOAD"][clampi(int(state.freight_mode),0,2)])
+	if state.has("freight_item"): field(lines,"Freight item",Format.item(int(state.freight_item)))
+	if state.has("freight_quantity"): field(lines,"Station freight","%s / %s" % [Format.number(int(state.freight_quantity)),Format.number(int(state.get("freight_capacity",0)))])
+	if state.has("eligible_train_id"): field(lines,"Eligible train","None" if int(state.eligible_train_id) == 0 else "#%d" % int(state.eligible_train_id))
 	if state.has("signal_orientation"): field(lines,"Controlled direction",Format.direction(int(state.signal_orientation)))
 	if state.has("upstream_block_id"): field(lines,"Upstream block","#%d" % int(state.upstream_block_id))
 	if state.has("downstream_block_id"): field(lines,"Downstream block","#%d" % int(state.downstream_block_id))
@@ -157,6 +166,8 @@ func field(lines: Array[String], name: String, value: String) -> void:
 func _hide_configuration() -> void:
 	configuration_label.hide()
 	configuration_selector.hide()
+	secondary_configuration_label.hide()
+	secondary_configuration_selector.hide()
 
 func _show_configuration(type_id: int,state: Dictionary) -> void:
 	configuring = true
@@ -185,6 +196,23 @@ func _show_configuration(type_id: int,state: Dictionary) -> void:
 			configuration_selector.set_item_metadata(branch,branch)
 			if branch == int(state.get("selected_branch",0)):
 				configuration_selector.select(branch)
+	elif type_id == 25:
+		configuration_label.text = "Freight mode"
+		for mode in range(3):
+			configuration_selector.add_item(["Disabled","Load","Unload"][mode])
+			configuration_selector.set_item_metadata(mode,mode)
+			if mode == int(state.get("freight_mode",0)):
+				configuration_selector.select(mode)
+		secondary_configuration_label.text = "Freight item"
+		secondary_configuration_selector.clear()
+		for definition: Dictionary in item_catalog:
+			var index := secondary_configuration_selector.item_count
+			secondary_configuration_selector.add_item(str(definition.get("name","Item")))
+			secondary_configuration_selector.set_item_metadata(index,int(definition.get("item_type",0)))
+			if int(definition.get("item_type",0)) == int(state.get("freight_item",0)):
+				secondary_configuration_selector.select(index)
+		secondary_configuration_label.show()
+		secondary_configuration_selector.show()
 	elif type_id == 27:
 		configuration_label.text = "Train destination"
 		configuration_selector.add_item("None")
@@ -213,5 +241,12 @@ func _on_configuration_selected(index: int) -> void:
 		rail_switch_branch_requested.emit(entity_id,value)
 	elif configuration_label.text == "Train destination":
 		train_destination_requested.emit(entity_id,value)
+	elif configuration_label.text == "Freight mode":
+		rail_station_freight_mode_requested.emit(entity_id,value)
 	else:
 		storage_output_requested.emit(entity_id,value)
+
+func _on_secondary_configuration_selected(index: int) -> void:
+	if configuring or index < 0: return
+	var value := int(secondary_configuration_selector.get_item_metadata(index))
+	rail_station_freight_item_requested.emit(entity_id,value)

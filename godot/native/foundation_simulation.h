@@ -49,6 +49,8 @@ public:
     int64_t queue_set_assembler_recipe(int64_t entity_id,int64_t recipe_id);
     int64_t queue_set_storage_output(int64_t entity_id,int64_t item_type);
     int64_t queue_set_rail_switch_branch(int64_t entity_id,int64_t branch);
+    int64_t queue_set_rail_station_freight_mode(int64_t entity_id,int64_t mode);
+    int64_t queue_set_rail_station_freight_item(int64_t entity_id,int64_t item);
     int64_t queue_place_locomotive(int64_t rail_entity_id,int64_t direction);
     int64_t queue_place_cargo_wagon(int64_t rail_entity_id,int64_t direction);
     int64_t queue_couple_rear_wagon(int64_t locomotive_id,int64_t wagon_id);

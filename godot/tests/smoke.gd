@@ -52,6 +52,8 @@ func _initialize() -> void:
 		and simulation.has_method("queue_set_assembler_recipe")
 		and simulation.has_method("queue_set_storage_output")
 		and simulation.has_method("queue_set_rail_switch_branch")
+		and simulation.has_method("queue_set_rail_station_freight_mode")
+		and simulation.has_method("queue_set_rail_station_freight_item")
 		and simulation.has_method("queue_place_locomotive")
 		and simulation.has_method("queue_place_cargo_wagon")
 		and simulation.has_method("queue_couple_rear_wagon")

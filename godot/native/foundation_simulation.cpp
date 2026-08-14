@@ -221,6 +221,12 @@ void FoundationSimulation::_bind_methods()
         D_METHOD("queue_set_rail_switch_branch","entity_id","branch"),
         &FoundationSimulation::queue_set_rail_switch_branch);
     ClassDB::bind_method(
+        D_METHOD("queue_set_rail_station_freight_mode","entity_id","mode"),
+        &FoundationSimulation::queue_set_rail_station_freight_mode);
+    ClassDB::bind_method(
+        D_METHOD("queue_set_rail_station_freight_item","entity_id","item"),
+        &FoundationSimulation::queue_set_rail_station_freight_item);
+    ClassDB::bind_method(
         D_METHOD("queue_place_locomotive","rail_entity_id","direction"),
         &FoundationSimulation::queue_place_locomotive);
     ClassDB::bind_method(D_METHOD("queue_place_cargo_wagon","rail_entity_id","direction"),
@@ -805,6 +811,33 @@ int64_t FoundationSimulation::queue_set_rail_switch_branch(
     command.type=FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH;
     command.data.set_rail_switch_branch={
         (FactoryEntityId)entity_id,(uint32_t)branch};
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
+int64_t FoundationSimulation::queue_set_rail_station_freight_mode(
+    int64_t entity_id,int64_t mode)
+{
+    if(simulation_==nullptr||entity_id<=0||entity_id>UINT32_MAX
+        ||mode<FACTORY_RAIL_STATION_FREIGHT_DISABLED
+        ||mode>FACTORY_RAIL_STATION_FREIGHT_UNLOAD)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};
+    command.type=FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_MODE;
+    command.data.set_rail_station_freight_mode={
+        (FactoryEntityId)entity_id,(uint32_t)mode};
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
+int64_t FoundationSimulation::queue_set_rail_station_freight_item(
+    int64_t entity_id,int64_t item)
+{
+    if(simulation_==nullptr||entity_id<=0||entity_id>UINT32_MAX
+        ||item<FACTORY_ITEM_NONE||item>FACTORY_ITEM_CONSTRUCTION_MATERIAL)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};
+    command.type=FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM;
+    command.data.set_rail_station_freight_item={
+        (FactoryEntityId)entity_id,(FactoryItemType)item};
     return factory_simulation_submit_command(simulation_,&command);
 }
 
@@ -1540,7 +1573,18 @@ bool FoundationSimulation::entity_to_dictionary(
         value["attached_rail_id"]=(int64_t)
             entity.data.rail_station.attached_rail_id;
         value["rail_network_id"]=(int64_t)entity.data.rail_station.network_id;
-        value["rail_connected"]=entity.data.rail_station.connected;break;
+        value["rail_connected"]=entity.data.rail_station.connected;
+        value["freight_mode"]=(int64_t)entity.data.rail_station.freight_mode;
+        value["freight_item"]=(int64_t)entity.data.rail_station.configured_item;
+        value["freight_quantity"]=(int64_t)entity.data.rail_station.freight_quantity;
+        value["freight_capacity"]=(int64_t)entity.data.rail_station.freight_capacity;
+        value["eligible_train_id"]=(int64_t)entity.data.rail_station.eligible_train_id;
+        value["freight_transfer_possible"]=
+            entity.data.rail_station.freight_transfer_possible;
+        value["freight_transferred_last_tick"]=(int64_t)
+            entity.data.rail_station.latest_transfer_quantity;
+        value["freight_activity"]=(int64_t)
+            entity.data.rail_station.latest_transfer_activity;break;
     case FACTORY_ENTITY_TYPE_RAIL_SWITCH: {
         value["switch_geometry"]=(int64_t)entity.data.rail_switch.geometry;
         value["selected_branch"]=(int64_t)entity.data.rail_switch.selected_branch;

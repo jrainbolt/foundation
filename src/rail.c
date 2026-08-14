@@ -89,11 +89,16 @@ const FactoryRail *factory_rail_store_find(const FactoryRailStore*s,
 
 void factory_rail_station_store_add(FactoryRailStationStore*s,
     FactoryEntityId id,int32_t x,int32_t y,FactoryDirection orientation)
-{s->items[s->count++]=(FactoryRailStation){id,x,y,orientation};}
+{s->items[s->count++]=(FactoryRailStation){.entity_id=id,.x=x,.y=y,
+    .orientation=orientation,.freight_mode=FACTORY_RAIL_STATION_FREIGHT_DISABLED,
+    .configured_item=FACTORY_ITEM_NONE};}
 
 const FactoryRailStation *factory_rail_station_store_find(
     const FactoryRailStationStore*s,FactoryEntityId id)
 {if(s!=NULL)for(size_t i=0U;i<s->count;++i)if(s->items[i].entity_id==id)return &s->items[i];return NULL;}
+FactoryRailStation *factory_rail_station_store_find_mutable(
+    FactoryRailStationStore*s,FactoryEntityId id)
+{return (FactoryRailStation*)factory_rail_station_store_find(s,id);}
 
 void factory_rail_switch_store_add(FactoryRailSwitchStore*s,
     FactoryEntityId id,int32_t x,int32_t y,FactoryRailSwitchGeometry geometry)
@@ -360,7 +365,23 @@ bool factory_simulation_get_rail_switch(const FactorySimulation*s,
 
 bool factory_simulation_get_rail_station(const FactorySimulation*s,
     FactoryEntityId id,FactoryRailStationInspection*out)
-{if(s==NULL||out==NULL)return false;for(size_t i=0U;i<s->rail_topology.station_count;++i)if(s->rail_topology.stations[i].entity_id==id){*out=s->rail_topology.stations[i];return true;}return false;}
+{if(s==NULL||out==NULL)return false;for(size_t i=0U;i<s->rail_topology.station_count;++i)if(s->rail_topology.stations[i].entity_id==id){
+    const FactoryRailStation*station=factory_rail_station_store_find(
+        &s->rail_stations,id);*out=s->rail_topology.stations[i];
+    if(station==NULL)return false;
+    out->freight_mode=station->freight_mode;
+    out->configured_item=station->configured_item;
+    out->freight_quantity=station->freight_quantity;
+    out->freight_capacity=FACTORY_RAIL_STATION_FREIGHT_CAPACITY;
+    out->latest_transfer_quantity=station->latest_transfer_quantity;
+    out->latest_transfer_activity=station->latest_transfer_activity;
+    for(size_t j=0U;j<s->locomotives.count;++j){const FactoryLocomotive*l=
+        &s->locomotives.items[j];if(l->route_status==FACTORY_TRAIN_ROUTE_ARRIVED
+            &&l->destination_station_id==id){out->eligible_train_id=l->entity_id;
+            out->freight_transfer_possible=station->freight_mode
+                !=FACTORY_RAIL_STATION_FREIGHT_DISABLED
+                &&station->configured_item!=FACTORY_ITEM_NONE;break;}}
+    return true;}return false;}
 
 bool factory_simulation_get_rail_traversal(const FactorySimulation*s,
     FactoryEntityId id,FactoryDirection entry,FactoryRailTraversal*out)
@@ -561,6 +582,85 @@ const FactoryCargoWagon *factory_cargo_wagon_store_find(
 FactoryCargoWagon *factory_cargo_wagon_store_find_mutable(
     FactoryCargoWagonStore*s,FactoryEntityId id)
 {return (FactoryCargoWagon*)factory_cargo_wagon_store_find(s,id);}
+
+static FactoryLocomotive *arrived_train_at_station(FactorySimulation*s,
+    FactoryEntityId station_id)
+{
+    FactoryLocomotive *best=NULL;
+    for(size_t i=0U;i<s->locomotives.count;++i){FactoryLocomotive*l=
+        &s->locomotives.items[i];
+        if(l->route_status==FACTORY_TRAIN_ROUTE_ARRIVED
+            &&l->destination_station_id==station_id
+            &&(best==NULL||l->entity_id<best->entity_id))best=l;
+    }
+    return best;
+}
+
+static bool station_transfer_wagon(FactorySimulation*s,FactoryRailStation*station,
+    FactoryLocomotive*train)
+{
+    FactoryEntityId wagon_id=train->rear_vehicle_id;
+    while(wagon_id!=0U){FactoryCargoWagon*w=
+        factory_cargo_wagon_store_find_mutable(&s->cargo_wagons,wagon_id);
+        if(w==NULL||w->train_id!=train->entity_id)return false;
+        uint32_t quantity=0U;
+        if(station->freight_mode==FACTORY_RAIL_STATION_FREIGHT_LOAD
+            &&station->freight_quantity!=0U
+            &&(w->cargo_item==FACTORY_ITEM_NONE
+                ||w->cargo_item==station->configured_item)
+            &&w->cargo_quantity<FACTORY_CARGO_WAGON_CAPACITY){
+            quantity=station->freight_quantity;
+            if(quantity>FACTORY_RAIL_STATION_TRANSFER_QUANTITY)
+                quantity=FACTORY_RAIL_STATION_TRANSFER_QUANTITY;
+            if(quantity>FACTORY_CARGO_WAGON_CAPACITY-w->cargo_quantity)
+                quantity=FACTORY_CARGO_WAGON_CAPACITY-w->cargo_quantity;
+            station->freight_quantity-=quantity;w->cargo_quantity+=quantity;
+            w->cargo_item=station->configured_item;
+            station->latest_transfer_activity=FACTORY_RAIL_FREIGHT_LOADING;
+        }else if(station->freight_mode==FACTORY_RAIL_STATION_FREIGHT_UNLOAD
+            &&w->cargo_item==station->configured_item&&w->cargo_quantity!=0U
+            &&station->freight_quantity<FACTORY_RAIL_STATION_FREIGHT_CAPACITY){
+            quantity=w->cargo_quantity;
+            if(quantity>FACTORY_RAIL_STATION_TRANSFER_QUANTITY)
+                quantity=FACTORY_RAIL_STATION_TRANSFER_QUANTITY;
+            if(quantity>FACTORY_RAIL_STATION_FREIGHT_CAPACITY
+                    -station->freight_quantity)
+                quantity=FACTORY_RAIL_STATION_FREIGHT_CAPACITY
+                    -station->freight_quantity;
+            w->cargo_quantity-=quantity;station->freight_quantity+=quantity;
+            if(w->cargo_quantity==0U)w->cargo_item=FACTORY_ITEM_NONE;
+            station->latest_transfer_activity=FACTORY_RAIL_FREIGHT_UNLOADING;
+        }
+        if(quantity!=0U){station->latest_transfer_quantity=quantity;
+            factory_simulation_emit_event(s,(FactoryEvent){
+                .type=FACTORY_EVENT_RAIL_FREIGHT_TRANSFERRED,
+                .entity_id=station->entity_id,.related_entity_id=w->entity_id,
+                .item_type=station->configured_item,.quantity=quantity,
+                .related_quantity=train->entity_id,
+                .third_quantity=(uint32_t)station->freight_mode});return true;}
+        wagon_id=w->next_vehicle_id;
+    }
+    return false;
+}
+
+void factory_rail_stations_update_freight(FactorySimulation*s)
+{
+    FactoryEntityId previous=0U;
+    for(size_t processed=0U;processed<s->rail_stations.count;++processed){
+        FactoryRailStation*station=NULL;
+        for(size_t i=0U;i<s->rail_stations.count;++i){FactoryRailStation*candidate=
+            &s->rail_stations.items[i];if(candidate->entity_id>previous
+                &&(station==NULL||candidate->entity_id<station->entity_id))
+                station=candidate;}
+        if(station==NULL)break;previous=station->entity_id;
+        station->latest_transfer_quantity=0U;
+        station->latest_transfer_activity=FACTORY_RAIL_FREIGHT_NONE;
+        if(station->freight_mode!=FACTORY_RAIL_STATION_FREIGHT_DISABLED
+            &&station->configured_item!=FACTORY_ITEM_NONE){FactoryLocomotive*train=
+                arrived_train_at_station(s,station->entity_id);
+            if(train!=NULL)(void)station_transfer_wagon(s,station,train);}
+    }
+}
 bool factory_cargo_wagon_store_remove(FactoryCargoWagonStore*s,FactoryEntityId id)
 {if(s!=NULL)for(size_t i=0;i<s->count;++i)if(s->items[i].entity_id==id){--s->count;s->items[i]=s->items[s->count];return true;}return false;}
 

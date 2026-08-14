@@ -44,6 +44,7 @@ FactoryLogisticsResult factory_logistics_endpoint_peek(
     const FactoryAssembler *assembler;
     const FactoryStorage *storage;
     const FactoryInserter *inserter;
+    const FactoryRailStation *station;
     FactoryLogisticsResult result = validate_entity(simulation, endpoint);
 
     if (result != FACTORY_LOGISTICS_RESULT_OK) {
@@ -51,6 +52,17 @@ FactoryLogisticsResult factory_logistics_endpoint_peek(
     }
     if (out_item == NULL) {
         return FACTORY_LOGISTICS_RESULT_STATE_MISMATCH;
+    }
+    station=factory_rail_station_store_find(&simulation->rail_stations,
+        endpoint.entity_id);
+    if(station!=NULL){
+        if(endpoint.slot!=FACTORY_LOGISTICS_SLOT_RAIL_STATION_FREIGHT)
+            return FACTORY_LOGISTICS_RESULT_INVALID_SLOT;
+        if(station->freight_mode!=FACTORY_RAIL_STATION_FREIGHT_UNLOAD)
+            return FACTORY_LOGISTICS_RESULT_INVALID_SLOT;
+        if(station->configured_item==FACTORY_ITEM_NONE
+            ||station->freight_quantity==0U)return FACTORY_LOGISTICS_RESULT_EMPTY;
+        *out_item=station->configured_item;return FACTORY_LOGISTICS_RESULT_OK;
     }
     extractor = factory_extractor_store_find(
         &simulation->extractors, endpoint.entity_id
@@ -167,10 +179,23 @@ FactoryLogisticsResult factory_logistics_endpoint_can_accept(
     const FactoryBurner *burner;
     const FactoryResearchLab *research_lab;
     const FactoryConstructionDepot *depot;
+    const FactoryRailStation *station;
     FactoryLogisticsResult result = validate_entity(simulation, endpoint);
 
     if (result != FACTORY_LOGISTICS_RESULT_OK) {
         return result;
+    }
+    station=factory_rail_station_store_find(&simulation->rail_stations,
+        endpoint.entity_id);
+    if(station!=NULL){
+        if(endpoint.slot!=FACTORY_LOGISTICS_SLOT_RAIL_STATION_FREIGHT)
+            return FACTORY_LOGISTICS_RESULT_INVALID_SLOT;
+        if(station->freight_mode!=FACTORY_RAIL_STATION_FREIGHT_LOAD)
+            return FACTORY_LOGISTICS_RESULT_INVALID_SLOT;
+        if(station->configured_item!=item)
+            return FACTORY_LOGISTICS_RESULT_INCOMPATIBLE_ITEM;
+        return station->freight_quantity<FACTORY_RAIL_STATION_FREIGHT_CAPACITY
+            ?FACTORY_LOGISTICS_RESULT_OK:FACTORY_LOGISTICS_RESULT_BLOCKED;
     }
     depot=factory_construction_depot_store_find(
         &simulation->construction_depots,endpoint.entity_id);
@@ -356,8 +381,11 @@ static void remove_unchecked(
     FactoryInserter *inserter = factory_inserter_store_find_mutable(
         &simulation->inserters, endpoint.entity_id
     );
+    FactoryRailStation *station=factory_rail_station_store_find_mutable(
+        &simulation->rail_stations,endpoint.entity_id);
 
-    if (extractor != NULL) {
+    if(station!=NULL){--station->freight_quantity;
+    } else if (extractor != NULL) {
         extractor->output_item = FACTORY_ITEM_NONE;
         extractor->output_amount = 0U;
     } else if (belt != NULL) {
@@ -429,8 +457,13 @@ static void insert_unchecked(
         &simulation->research_labs,endpoint.entity_id);
     FactoryConstructionDepot *depot=factory_construction_depot_store_find_mutable(
         &simulation->construction_depots,endpoint.entity_id);
+    FactoryRailStation *station=factory_rail_station_store_find_mutable(
+        &simulation->rail_stations,endpoint.entity_id);
 
-    if(depot!=NULL
+    if(station!=NULL
+        &&endpoint.slot==FACTORY_LOGISTICS_SLOT_RAIL_STATION_FREIGHT){
+        ++station->freight_quantity;
+    } else if(depot!=NULL
         && endpoint.slot==FACTORY_LOGISTICS_SLOT_CONSTRUCTION_DEPOT_INPUT){
         ++depot->material_quantity;
     } else if(research_lab!=NULL

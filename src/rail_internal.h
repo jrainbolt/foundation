@@ -5,7 +5,10 @@
 
 typedef struct {FactoryEntityId entity_id;int32_t x,y;FactoryRailGeometry geometry;} FactoryRail;
 typedef struct {FactoryRail *items;size_t count,capacity;} FactoryRailStore;
-typedef struct {FactoryEntityId entity_id;int32_t x,y;FactoryDirection orientation;} FactoryRailStation;
+typedef struct {FactoryEntityId entity_id;int32_t x,y;FactoryDirection orientation;
+    FactoryRailStationFreightMode freight_mode;FactoryItemType configured_item;
+    uint32_t freight_quantity,latest_transfer_quantity;
+    FactoryRailFreightActivity latest_transfer_activity;} FactoryRailStation;
 typedef struct {FactoryRailStation *items;size_t count,capacity;} FactoryRailStationStore;
 typedef struct {FactoryEntityId entity_id;int32_t x,y;
     FactoryRailSwitchGeometry geometry;FactoryRailSwitchBranch selected_branch;}
@@ -66,8 +69,11 @@ void factory_rail_station_store_add(FactoryRailStationStore *s,
     FactoryEntityId id,int32_t x,int32_t y,FactoryDirection orientation);
 const FactoryRailStation *factory_rail_station_store_find(
     const FactoryRailStationStore *s,FactoryEntityId id);
+FactoryRailStation *factory_rail_station_store_find_mutable(
+    FactoryRailStationStore *s,FactoryEntityId id);
 bool factory_rail_station_store_remove(FactoryRailStationStore *s,
     FactoryEntityId id);
+void factory_rail_stations_update_freight(FactorySimulation *simulation);
 void factory_rail_switch_store_destroy(FactoryRailSwitchStore *s);
 bool factory_rail_switch_store_reserve_one(FactoryRailSwitchStore *s);
 void factory_rail_switch_store_add(FactoryRailSwitchStore *s,

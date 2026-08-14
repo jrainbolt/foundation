@@ -31,6 +31,17 @@ unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(0, 38)
 
+[node name="SecondaryConfigurationLabel" type="Label" parent="Margin/Layout"]
+unique_name_in_owner = true
+visible = false
+text = "Configuration"
+theme_override_font_sizes/font_size = 13
+
+[node name="SecondaryConfigurationSelector" type="OptionButton" parent="Margin/Layout"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(0, 38)
+
 [node name="InspectorDetails" type="RichTextLabel" parent="Margin/Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(250, 280)

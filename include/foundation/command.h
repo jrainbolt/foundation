@@ -67,7 +67,9 @@ typedef enum {
     FACTORY_COMMAND_CLEAR_TRAIN_DESTINATION,
     FACTORY_COMMAND_REPLAN_TRAIN_ROUTE,
     FACTORY_COMMAND_PLACE_RAIL_SIGNAL,
-    FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL
+    FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL,
+    FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_MODE,
+    FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM
 } FactoryCommandType;
 
 typedef struct {
@@ -196,6 +198,10 @@ typedef struct {
             place_rail_signal;
         struct { int32_t x; int32_t y; FactoryDirection orientation; }
             place_rail_chain_signal;
+        struct { FactoryEntityId station_entity_id; uint32_t mode; }
+            set_rail_station_freight_mode;
+        struct { FactoryEntityId station_entity_id; FactoryItemType item; }
+            set_rail_station_freight_item;
     } data;
 } FactoryCommand;
 

@@ -83,6 +83,15 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
         case FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL:
             direction=command->data.place_rail_chain_signal.orientation;
             break;
+        case FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_MODE:
+            return command->data.set_rail_station_freight_mode.station_entity_id!=0U
+                &&command->data.set_rail_station_freight_mode.mode
+                    <=FACTORY_RAIL_STATION_FREIGHT_UNLOAD;
+        case FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM:
+            return command->data.set_rail_station_freight_item.station_entity_id!=0U
+                &&command->data.set_rail_station_freight_item.item>=FACTORY_ITEM_NONE
+                &&command->data.set_rail_station_freight_item.item
+                    <=FACTORY_ITEM_CONSTRUCTION_MATERIAL;
         case FACTORY_COMMAND_PLACE_RAIL_SWITCH:
             return factory_rail_switch_geometry_is_valid(
                 (FactoryRailSwitchGeometry)
