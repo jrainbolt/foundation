@@ -219,7 +219,6 @@ static void autonomous_scheduled_freight_loop(void)
     FactorySimulation *s=factory_simulation_create_with_construction_units(
         world,UINT32_MAX);
     FactoryEntityId top[7]={0};
-    FactoryEntityId bottom[7]={0};
     FactoryEntityId left[3]={0};
     FactoryEntityId right[3]={0};
     const FactoryRailGeometry top_geometry[7]={
@@ -235,7 +234,7 @@ static void autonomous_scheduled_freight_loop(void)
     for(int32_t index=0;index<7;++index){
         top[index]=place(s,(FactoryCommand){FACTORY_COMMAND_PLACE_RAIL,
             {.place_rail={index+2,3,top_geometry[index]}}});
-        bottom[index]=place(s,(FactoryCommand){FACTORY_COMMAND_PLACE_RAIL,
+        (void)place(s,(FactoryCommand){FACTORY_COMMAND_PLACE_RAIL,
             {.place_rail={index+2,7,bottom_geometry[index]}}});
     }
     for(int32_t index=0;index<3;++index){
