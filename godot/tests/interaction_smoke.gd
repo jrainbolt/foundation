@@ -160,7 +160,7 @@ func run_test() -> void:
 	controller.select_entity(1)
 	main._reset_demo()
 	if not require_value(controller.selected_entity_id == 0 and inspector.entity_id == 0, "reset selection policy"): return
-	if not require_value(canvas.entity_nodes.size() == 67, "reset visual parity"): return
+	if not require_value(canvas.entity_nodes.size() == 104, "reset visual parity"): return
 	main.queue_free()
 	await process_frame
 	print("Foundation interaction smoke test passed")

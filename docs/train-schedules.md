@@ -56,3 +56,21 @@ second schedule.
 This milestone deliberately does not include station names, multiple schedules,
 conditional branching, circuit conditions, refueling policy, timetables, train
 priorities, or automatic station selection.
+
+## Autonomous freight integration
+
+The integration suite proves a complete two-station loop using ordinary
+authoritative owners: seeded source Storage, configured Storage output, powered
+Inserter, LOAD Station, one Cargo Wagon, scheduled/reserved rail movement,
+UNLOAD Station, powered Inserter, and destination Storage. Its schedule is
+exactly `LOAD / CARGO_FULL` followed by `UNLOAD / CARGO_EMPTY`. After the
+schedule-enable command, the fixture issues neither a destination command nor
+an item mutation. It checks all ownership locations for exact conservation on
+every tick, validates freight/wait/advance event order, snapshots during partial
+loading, and advances the original and loaded simulations in lockstep through
+unloading and the return arrival.
+
+The Godot demonstration contains the same small two-station pattern on a closed
+rail loop. Its source Storage is seeded once during deterministic setup; all
+visible movement thereafter belongs to Foundation's logistics, freight,
+schedule, routing, reservation, and consist systems.

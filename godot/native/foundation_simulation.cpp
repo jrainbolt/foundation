@@ -672,20 +672,186 @@ FactoryResult FoundationSimulation::build_demo()
     couple2.data.couple_rear_wagon={65U,67U};
     result=submit(couple1);if(result!=FACTORY_RESULT_OK)return result;
     result=submit(couple2);if(result!=FACTORY_RESULT_OK)return result;
-    FactoryCommand schedule_stop={};
-    schedule_stop.type=FACTORY_COMMAND_TRAIN_SCHEDULE_ADD_STOP;
-    schedule_stop.data.train_schedule_add_stop={
-        65U,62U,FACTORY_TRAIN_WAIT_TIME,120U};
-    result=submit(schedule_stop);if(result!=FACTORY_RESULT_OK)return result;
-    FactoryCommand schedule_enable={};
-    schedule_enable.type=FACTORY_COMMAND_TRAIN_SCHEDULE_SET_ENABLED;
-    schedule_enable.data.train_schedule_set_enabled={65U,true};
-    result=submit(schedule_enable);if(result!=FACTORY_RESULT_OK)return result;
     result=factory_simulation_tick(simulation_);if(result!=FACTORY_RESULT_OK)return result;
-    for(size_t i=0U;i<9U;++i){const FactoryCommandResult*r=
+    for(size_t i=0U;i<7U;++i){const FactoryCommandResult*r=
         factory_simulation_get_command_result(simulation_,i);
         if(r==nullptr||r->result!=FACTORY_RESULT_OK)
             return r==nullptr?FACTORY_RESULT_INTERNAL_STATE_MISMATCH:r->result;}
+
+    const FactoryCommand freight_loop[] = {
+        place(FACTORY_COMMAND_PLACE_RAIL,14,2,
+            (FactoryDirection)FACTORY_RAIL_CURVE_SE),
+        place(FACTORY_COMMAND_PLACE_RAIL,15,2,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,16,2,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,17,2,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,18,2,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,19,2,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,20,2,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,21,2,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,22,2,
+            (FactoryDirection)FACTORY_RAIL_CURVE_SW),
+        place(FACTORY_COMMAND_PLACE_RAIL,14,6,
+            (FactoryDirection)FACTORY_RAIL_CURVE_NE),
+        place(FACTORY_COMMAND_PLACE_RAIL,15,6,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,16,6,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,17,6,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,18,6,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,19,6,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,20,6,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,21,6,
+            (FactoryDirection)FACTORY_RAIL_HORIZONTAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,22,6,
+            (FactoryDirection)FACTORY_RAIL_CURVE_NW),
+        place(FACTORY_COMMAND_PLACE_RAIL,14,3,
+            (FactoryDirection)FACTORY_RAIL_VERTICAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,14,4,
+            (FactoryDirection)FACTORY_RAIL_VERTICAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,14,5,
+            (FactoryDirection)FACTORY_RAIL_VERTICAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,22,3,
+            (FactoryDirection)FACTORY_RAIL_VERTICAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,22,4,
+            (FactoryDirection)FACTORY_RAIL_VERTICAL),
+        place(FACTORY_COMMAND_PLACE_RAIL,22,5,
+            (FactoryDirection)FACTORY_RAIL_VERTICAL),
+        place(FACTORY_COMMAND_PLACE_RAIL_STATION,16,1,
+            FACTORY_DIRECTION_SOUTH),
+        place(FACTORY_COMMAND_PLACE_RAIL_STATION,20,7,
+            FACTORY_DIRECTION_NORTH),
+        place(FACTORY_COMMAND_PLACE_STORAGE,16,-1),
+        place(FACTORY_COMMAND_PLACE_INSERTER,16,0,
+            FACTORY_DIRECTION_SOUTH),
+        place(FACTORY_COMMAND_PLACE_INSERTER,20,8,
+            FACTORY_DIRECTION_SOUTH),
+        place(FACTORY_COMMAND_PLACE_STORAGE,20,9),
+        place(FACTORY_COMMAND_PLACE_POWER_POLE,14,0),
+        place(FACTORY_COMMAND_PLACE_POWER_GENERATOR,14,-1),
+        place(FACTORY_COMMAND_PLACE_POWER_POLE,22,8),
+        place(FACTORY_COMMAND_PLACE_POWER_GENERATOR,22,9),
+        place(FACTORY_COMMAND_PLACE_RAIL_SIGNAL,17,3,
+            FACTORY_DIRECTION_EAST)
+    };
+    for(size_t i=0U;i<24U;++i){
+        result=submit(freight_loop[i]);
+        if(result!=FACTORY_RESULT_OK)return result;
+    }
+    result=factory_simulation_tick(simulation_);
+    if(result!=FACTORY_RESULT_OK)return result;
+    for(size_t i=0U;i<24U;++i){
+        const FactoryCommandResult *command_result=
+            factory_simulation_get_command_result(simulation_,i);
+        if(command_result==nullptr||command_result->result!=FACTORY_RESULT_OK){
+            return command_result==nullptr
+                ?FACTORY_RESULT_INTERNAL_STATE_MISMATCH:command_result->result;
+        }
+    }
+    const FactoryEntityId wagon_rail_id=
+        factory_simulation_get_command_result(simulation_,1U)->entity_id;
+    const FactoryEntityId locomotive_rail_id=
+        factory_simulation_get_command_result(simulation_,2U)->entity_id;
+    for(size_t i=24U;i<sizeof(freight_loop)/sizeof(freight_loop[0]);++i){
+        result=submit(freight_loop[i]);
+        if(result!=FACTORY_RESULT_OK)return result;
+    }
+    result=factory_simulation_tick(simulation_);
+    if(result!=FACTORY_RESULT_OK)return result;
+    for(size_t i=0U;i<11U;++i){
+        const FactoryCommandResult *command_result=
+            factory_simulation_get_command_result(simulation_,i);
+        if(command_result==nullptr||command_result->result!=FACTORY_RESULT_OK){
+            return command_result==nullptr
+                ?FACTORY_RESULT_INTERNAL_STATE_MISMATCH:command_result->result;
+        }
+    }
+    const FactoryEntityId load_station_id=
+        factory_simulation_get_command_result(simulation_,0U)->entity_id;
+    const FactoryEntityId unload_station_id=
+        factory_simulation_get_command_result(simulation_,1U)->entity_id;
+    const FactoryEntityId source_storage_id=
+        factory_simulation_get_command_result(simulation_,2U)->entity_id;
+    const FactoryEntityId source_generator_id=
+        factory_simulation_get_command_result(simulation_,7U)->entity_id;
+    const FactoryEntityId destination_generator_id=
+        factory_simulation_get_command_result(simulation_,9U)->entity_id;
+    if(factory_logistics_endpoint_insert(simulation_,{
+            source_generator_id,FACTORY_LOGISTICS_SLOT_BURNER_INPUT},
+            FACTORY_ITEM_BIOMASS_PELLET)!=FACTORY_LOGISTICS_RESULT_OK
+        ||factory_logistics_endpoint_insert(simulation_,{
+            destination_generator_id,FACTORY_LOGISTICS_SLOT_BURNER_INPUT},
+            FACTORY_ITEM_BIOMASS_PELLET)!=FACTORY_LOGISTICS_RESULT_OK){
+        return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+    }
+    FactoryCommand loop_wagon={};
+    loop_wagon.type=FACTORY_COMMAND_PLACE_CARGO_WAGON;
+    loop_wagon.data.place_cargo_wagon={wagon_rail_id,FACTORY_DIRECTION_EAST};
+    FactoryCommand loop_locomotive={};
+    loop_locomotive.type=FACTORY_COMMAND_PLACE_LOCOMOTIVE;
+    loop_locomotive.data.place_locomotive={
+        locomotive_rail_id,FACTORY_DIRECTION_EAST};
+    result=submit(loop_wagon);if(result!=FACTORY_RESULT_OK)return result;
+    result=submit(loop_locomotive);if(result!=FACTORY_RESULT_OK)return result;
+    result=factory_simulation_tick(simulation_);
+    if(result!=FACTORY_RESULT_OK)return result;
+    const FactoryEntityId loop_wagon_id=
+        factory_simulation_get_command_result(simulation_,0U)->entity_id;
+    const FactoryEntityId loop_train_id=
+        factory_simulation_get_command_result(simulation_,1U)->entity_id;
+    FactoryCommand loop_configuration[8]={};
+    loop_configuration[0].type=FACTORY_COMMAND_COUPLE_REAR_WAGON;
+    loop_configuration[0].data.couple_rear_wagon={loop_train_id,loop_wagon_id};
+    loop_configuration[1].type=FACTORY_COMMAND_SET_STORAGE_OUTPUT;
+    loop_configuration[1].data.set_storage_output={
+        source_storage_id,FACTORY_ITEM_IRON_PLATE};
+    loop_configuration[2].type=FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM;
+    loop_configuration[2].data.set_rail_station_freight_item={
+        load_station_id,FACTORY_ITEM_IRON_PLATE};
+    loop_configuration[3].type=FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_MODE;
+    loop_configuration[3].data.set_rail_station_freight_mode={
+        load_station_id,FACTORY_RAIL_STATION_FREIGHT_LOAD};
+    loop_configuration[4].type=FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM;
+    loop_configuration[4].data.set_rail_station_freight_item={
+        unload_station_id,FACTORY_ITEM_IRON_PLATE};
+    loop_configuration[5].type=FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_MODE;
+    loop_configuration[5].data.set_rail_station_freight_mode={
+        unload_station_id,FACTORY_RAIL_STATION_FREIGHT_UNLOAD};
+    loop_configuration[6].type=FACTORY_COMMAND_TRAIN_SCHEDULE_ADD_STOP;
+    loop_configuration[6].data.train_schedule_add_stop={
+        loop_train_id,load_station_id,FACTORY_TRAIN_WAIT_CARGO_FULL,0U};
+    loop_configuration[7].type=FACTORY_COMMAND_TRAIN_SCHEDULE_ADD_STOP;
+    loop_configuration[7].data.train_schedule_add_stop={
+        loop_train_id,unload_station_id,FACTORY_TRAIN_WAIT_CARGO_EMPTY,0U};
+    for(const FactoryCommand &command:loop_configuration){
+        result=submit(command);if(result!=FACTORY_RESULT_OK)return result;
+    }
+    result=factory_simulation_tick(simulation_);
+    if(result!=FACTORY_RESULT_OK)return result;
+    FactoryLogisticsEndpoint source_input={
+        source_storage_id,FACTORY_LOGISTICS_SLOT_STORAGE_INPUT};
+    for(uint32_t item=0U;item<FACTORY_CARGO_WAGON_CAPACITY;++item){
+        if(factory_logistics_endpoint_insert(simulation_,source_input,
+                FACTORY_ITEM_IRON_PLATE)!=FACTORY_LOGISTICS_RESULT_OK){
+            return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;
+        }
+    }
+    FactoryCommand enable_loop={};
+    enable_loop.type=FACTORY_COMMAND_TRAIN_SCHEDULE_SET_ENABLED;
+    enable_loop.data.train_schedule_set_enabled={loop_train_id,true};
+    result=submit(enable_loop);if(result!=FACTORY_RESULT_OK)return result;
+    result=factory_simulation_tick(simulation_);
+    if(result!=FACTORY_RESULT_OK)return result;
     return factory_presentation_snapshot_rebuild(presentation_, simulation_);
 }
 

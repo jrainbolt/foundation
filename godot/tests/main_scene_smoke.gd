@@ -33,7 +33,7 @@ func _run() -> void:
 		return
 	var initial_tick := int(main.simulation.get_tick())
 	var canvas: Node = main.canvas
-	if initial_tick != 56 or canvas.entity_nodes.size() != 67:
+	if initial_tick != 61 or canvas.entity_nodes.size() != 104:
 		_fail("deterministic demo or entity visuals are incorrect")
 		return
 	var research: Dictionary = main.simulation.get_research()
@@ -85,13 +85,13 @@ func _run() -> void:
 				gated_assembler_count += 1
 		elif int(visual.state.get("type", 0)) == 12:
 			water_extractor_count += 1
-			if int(visual.state.get("stored_water", -1)) != 0 \
+			if int(visual.state.get("stored_water", -1)) != 50 \
 					or int(visual.state.get("output_capacity", 0)) != 1000:
 				_fail("water extractor visual has incorrect fields")
 				return
 		elif int(visual.state.get("type", 0)) == 13:
 			boiler_count += 1
-			if int(visual.state.get("stored_water", -1)) != 0 \
+			if int(visual.state.get("stored_water", -1)) != 50 \
 					or int(visual.state.get("stored_steam", -1)) != 0 \
 					or bool(visual.state.get("fuel_active", true)) \
 					or bool(visual.state.get("conversion_active", true)):
@@ -113,16 +113,16 @@ func _run() -> void:
 				return
 		elif int(visual.state.get("type", 0)) == 16:
 			accumulator_count += 1
-			if int(visual.state.get("stored_energy", -1)) != 0 \
+			if int(visual.state.get("stored_energy", -1)) != 285 \
 					or int(visual.state.get("capacity", 0)) != 10000 \
 					or int(visual.state.get("power_network_id", 0)) == 0:
 				_fail("accumulator visual has incorrect fields")
 				return
 		elif int(visual.state.get("type", 0)) == 17:
 			reactor_count += 1
-			if int(visual.state.get("stored_heat", -1)) != 200 \
+			if int(visual.state.get("stored_heat", -1)) != 700 \
 					or int(visual.state.get("heat_capacity", 0)) != 10000 \
-					or int(visual.state.get("remaining_burn_ticks", 0)) != 97:
+					or int(visual.state.get("remaining_burn_ticks", 0)) != 92:
 				_fail("reactor visual has incorrect fields")
 				return
 		elif int(visual.state.get("type", 0)) == 18:
@@ -160,7 +160,7 @@ func _run() -> void:
 	if canvas.resources.size() <= 2 or canvas.terrain.size() != 48 * 32 or canvas.edges.is_empty():
 		_fail("resource or power-edge visuals are missing")
 		return
-	if not main.tick_label.text.contains("56"):
+	if not main.tick_label.text.contains("61"):
 		_fail("debug tick panel did not update")
 		return
 
@@ -189,7 +189,7 @@ func _run() -> void:
 	if int(main.simulation.get_tick()) != initial_tick:
 		_fail("reset did not restore initial tick")
 		return
-	if canvas.entity_nodes.size() != 67 or canvas.resources.size() <= 2:
+	if canvas.entity_nodes.size() != 104 or canvas.resources.size() <= 2:
 		_fail("reset did not restore deterministic visuals")
 		return
 

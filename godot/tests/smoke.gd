@@ -75,7 +75,7 @@ func _initialize() -> void:
 		"construction command bridge"
 	):
 		return
-	if not _require(simulation.get_tick() == 56, "unexpected reset tick"):
+	if not _require(simulation.get_tick() == 61, "unexpected reset tick"):
 		return
 	var research: Dictionary = simulation.get_research()
 	if not _require(
@@ -90,7 +90,7 @@ func _initialize() -> void:
 	if not _require(not simulation.has_error(), simulation.get_last_error()):
 		return
 	if not _require(
-		entities.size() == 67,
+		entities.size() == 104,
 		"missing presentation entities: got %d" % entities.size()
 	):
 		return
@@ -106,7 +106,11 @@ func _initialize() -> void:
 		12, 11, 13, 11, 14, 15, 8, 16, 7, 17,
 		18, 18, 18, 19, 11, 10, 11, 20,
 		11, 21,
-		24, 24, 24, 24, 24, 26, 24, 24, 25, 30, 29, 27, 28, 28
+		24, 24, 24, 24, 24, 26, 24, 24, 25, 30, 29, 27, 28, 28,
+		24, 24, 24, 24, 24, 24, 24, 24, 24,
+		24, 24, 24, 24, 24, 24, 24, 24, 24,
+		24, 24, 24, 24, 24, 24,
+		25, 25, 5, 7, 7, 5, 8, 9, 8, 9, 29, 28, 27
 	]
 	var seen_ids := {}
 	for index in entities.size():
@@ -120,7 +124,7 @@ func _initialize() -> void:
 		):
 			return
 		seen_ids[entity_id] = true
-	if not _require(seen_ids.size() == 67, "duplicate or missing stable IDs"):
+	if not _require(seen_ids.size() == 104, "duplicate or missing stable IDs"):
 		return
 	var first_signal: Dictionary = entities[62]
 	var second_signal: Dictionary = entities[63]
@@ -150,23 +154,20 @@ func _initialize() -> void:
 		int(locomotive.type) == 27
 		and int(locomotive.rail_entity_id) == 57
 		and int(locomotive.travel_direction) == 1
-		and int(locomotive.movement_progress) == 1
+		and int(locomotive.movement_progress) == 4
 		and int(locomotive.movement_interval) == 4
 		and int(locomotive.rail_network_id) == 54
 		and int(locomotive.train_id) == 65
 		and int(locomotive.vehicle_count) == 3
-		and int(locomotive.destination_station_id) == 62
-		and int(locomotive.route_status) == 1
-		and bool(locomotive.schedule_enabled)
-		and int(locomotive.schedule_count) == 1
-		and int(locomotive.current_scheduled_station_id) == 62
-		and int(locomotive.wait_condition) == 1
-		and int(locomotive.wait_value) == 120
-		and simulation.get_train_schedule(65).size() == 1
+		and int(locomotive.destination_station_id) == 0
+		and int(locomotive.route_status) == 0
+		and not bool(locomotive.schedule_enabled)
+		and int(locomotive.schedule_count) == 0
+		and simulation.get_train_schedule(65).is_empty()
 		and int(locomotive.current_block_id) != 0
-		and int(locomotive.reserved_block_id) != 0
-		and int(locomotive.reservation_status) == 1
-		and not simulation.get_train_route(65).is_empty(),
+		and int(locomotive.reserved_block_id) == 0
+		and int(locomotive.reservation_status) == 0
+		and simulation.get_train_route(65).is_empty(),
 		"locomotive presentation: %s" % locomotive
 	):
 		return
@@ -174,6 +175,21 @@ func _initialize() -> void:
 	if not _require(int(wagon.type) == 28 and int(wagon.train_id) == 65
 		and int(wagon.consist_index) == 1 and bool(wagon.coupled),
 		"cargo wagon presentation: %s" % wagon):
+		return
+	var scheduled_train: Dictionary = {}
+	for entity: Dictionary in entities:
+		if int(entity.get("type",0)) == 27 \
+				and bool(entity.get("schedule_enabled",false)):
+			scheduled_train = entity
+			break
+	if not _require(
+		int(scheduled_train.get("id",0)) == 104
+		and int(scheduled_train.get("vehicle_count",0)) == 2
+		and int(scheduled_train.get("schedule_count",0)) == 2
+		and int(scheduled_train.get("current_scheduled_station_id",0)) == 92
+		and int(scheduled_train.get("wait_condition",0)) == 3
+		and simulation.get_train_schedule(104).size() == 2,
+		"autonomous freight schedule presentation: %s" % scheduled_train):
 		return
 	var tank: Dictionary = {}
 	for entity: Dictionary in entities:
@@ -208,10 +224,10 @@ func _initialize() -> void:
 	var steam_turbine: Dictionary = entities[50]
 	if not _require(
 		int(water_extractor.type) == 12
-		and int(water_extractor.stored_water) == 0
+		and int(water_extractor.stored_water) == 50
 		and int(water_extractor.output_capacity) == 1000
 		and int(water_extractor.progress) == 3,
-		"water extractor presentation fields"
+		"water extractor presentation fields: %s" % water_extractor
 	):
 		return
 	if not _require(
@@ -252,11 +268,11 @@ func _initialize() -> void:
 		return
 	if not _require(
 		int(reactor.type) == 17
-		and int(reactor.stored_heat) == 200
+		and int(reactor.stored_heat) == 700
 		and int(reactor.heat_capacity) == 10000
 		and int(reactor.active_fuel_id) == 1
-		and int(reactor.remaining_burn_ticks) == 97
-		and int(reactor.remaining_heat_yield) == 9700
+		and int(reactor.remaining_burn_ticks) == 92
+		and int(reactor.remaining_heat_yield) == 9200
 		and int(reactor.generated_last_tick) == 100
 		and int(reactor.reactor_activity) == 1
 		and int(reactor.heat_network_id) == 44
@@ -288,13 +304,13 @@ func _initialize() -> void:
 		return
 	if not _require(
 		int(accumulator.type) == 16
-		and int(accumulator.stored_energy) == 0
+		and int(accumulator.stored_energy) == 285
 		and int(accumulator.capacity) == 10000
 		and int(accumulator.maximum_charge_rate) == 100
 		and int(accumulator.maximum_discharge_rate) == 100
 		and int(accumulator.power_network_id) != 0
 		and bool(accumulator.connected),
-		"accumulator presentation fields"
+		"accumulator presentation fields: %s" % accumulator
 	):
 		return
 	if not _require(
@@ -319,11 +335,11 @@ func _initialize() -> void:
 		return
 	if not _require(
 		int(boiler.type) == 13
-		and int(boiler.stored_water) == 0
+		and int(boiler.stored_water) == 50
 		and int(boiler.stored_steam) == 0
 		and not bool(boiler.fuel_active)
 		and not bool(boiler.conversion_active),
-		"boiler presentation fields"
+		"boiler presentation fields: %s" % boiler
 	):
 		return
 	var tank_id := int(tank.id)
@@ -438,7 +454,7 @@ func _initialize() -> void:
 		return
 	if not _require(second.reset_demo() == 0, "second reset failed"):
 		return
-	if not _require(second.get_tick() == 56, "second adapter tick"):
+	if not _require(second.get_tick() == 61, "second adapter tick"):
 		return
 	if not _require(simulation.get_tick() == tick_before, "adapter interference"):
 		return
