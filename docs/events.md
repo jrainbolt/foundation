@@ -128,3 +128,10 @@ blocked attempts emit no event.
 `FACTORY_EVENT_TRAIN_BLOCK_RELEASED` occur once per ownership transition.
 `entity_id` identifies the train and `quantity` is the stable block ID.
 Reservation waiting produces no per-tick event.
+
+`FACTORY_EVENT_TRAIN_WAIT_COMPLETED` is immediately followed by
+`FACTORY_EVENT_TRAIN_SCHEDULE_ADVANCED`. For wait completion, `entity_id` is
+the locomotive/train, `related_entity_id` is the station, `quantity` is the
+wait condition, and `related_quantity` is its canonical value. For advancement,
+`related_entity_id` is the newly selected station, `quantity` is the previous
+zero-based stop index, and `related_quantity` is the new zero-based stop index.

@@ -747,7 +747,27 @@ bool factory_simulation_get_locomotive(const FactorySimulation*s,
                 l->route[l->route_index+1U].rail_entity_id):0U,
         l->reserved_block_id,l->reservation_status,l->blocking_train_id,
         (uint32_t)l->reserved_block_count,(uint32_t)l->chain_required_block_count,
-        l->blocking_block_id,l->chain_status};
+        l->blocking_block_id,l->chain_status,l->schedule_enabled,
+        l->schedule_count,l->current_stop_index,
+        l->schedule_count!=0U
+            ?l->schedule[l->current_stop_index].station_entity_id:0U,
+        l->schedule_count!=0U
+            ?l->schedule[l->current_stop_index].wait_condition
+            :FACTORY_TRAIN_WAIT_NONE,
+        l->schedule_count!=0U
+            ?l->schedule[l->current_stop_index].wait_value:0U,
+        l->wait_progress,l->schedule_status};
+    return true;
+}
+
+bool factory_simulation_get_train_schedule_stop(const FactorySimulation*s,
+    FactoryTrainId train_id,size_t index,FactoryTrainScheduleStop*out)
+{
+    if(s==NULL||out==NULL)return false;
+    const FactoryLocomotive*l=factory_locomotive_store_find(
+        &s->locomotives,train_id);
+    if(l==NULL||index>=l->schedule_count)return false;
+    *out=l->schedule[index];
     return true;
 }
 
@@ -1127,6 +1147,8 @@ static FactoryDirection opposite_direction(FactoryDirection d)
 void factory_locomotives_update(FactorySimulation*s)
 {
     FactoryLocomotiveStore*store=&s->locomotives;
+    for(size_t i=0U;i<store->count;++i)
+        store->items[i].arrived_this_tick=false;
     for(size_t i=0;i<store->count;++i)store->plans[i]=(FactoryLocomotivePlan){
         .id=store->items[i].entity_id,.from=store->items[i].rail_entity_id};
     if(store->count>1U)
@@ -1211,6 +1233,7 @@ void factory_locomotives_update(FactorySimulation*s)
             if(l->route_index+1U==l->route_length){
                 l->route_status=FACTORY_TRAIN_ROUTE_ARRIVED;
                 l->activity=FACTORY_LOCOMOTIVE_ARRIVED;
+                l->arrived_this_tick=true;
             }
         }
         while(wagon_id!=0U){FactoryCargoWagon*w=
@@ -1227,5 +1250,93 @@ void factory_locomotives_update(FactorySimulation*s)
                 .type=FACTORY_EVENT_TRAIN_ARRIVED,.entity_id=l->entity_id,
                 .related_entity_id=l->destination_station_id,
                 .quantity=l->rail_entity_id});
+    }
+}
+
+static bool train_cargo_condition(const FactorySimulation*s,
+    const FactoryLocomotive*l,FactoryTrainWaitCondition condition)
+{
+    FactoryEntityId wagon_id=l->rear_vehicle_id;
+    bool has_wagon=false;
+    while(wagon_id!=0U){
+        const FactoryCargoWagon*w=factory_cargo_wagon_store_find(
+            &s->cargo_wagons,wagon_id);
+        if(w==NULL||w->train_id!=l->entity_id)return false;
+        has_wagon=true;
+        if(condition==FACTORY_TRAIN_WAIT_CARGO_EMPTY
+            &&w->cargo_quantity!=0U)return false;
+        if(condition==FACTORY_TRAIN_WAIT_CARGO_FULL
+            &&w->cargo_quantity!=FACTORY_CARGO_WAGON_CAPACITY)return false;
+        wagon_id=w->next_vehicle_id;
+    }
+    return condition==FACTORY_TRAIN_WAIT_CARGO_EMPTY
+        ?true:has_wagon;
+}
+
+static void update_one_schedule(FactorySimulation*s,FactoryLocomotive*l)
+{
+    if(!l->schedule_enabled||l->schedule_count==0U){
+        l->schedule_status=FACTORY_TRAIN_SCHEDULE_DISABLED;
+        return;
+    }
+    if(l->current_stop_index>=l->schedule_count){
+        l->schedule_status=FACTORY_TRAIN_SCHEDULE_ROUTE_UNAVAILABLE;
+        return;
+    }
+    const FactoryTrainScheduleStop*stop=&l->schedule[l->current_stop_index];
+    if(l->route_status==FACTORY_TRAIN_ROUTE_INVALID
+        ||l->schedule_status==FACTORY_TRAIN_SCHEDULE_ROUTE_UNAVAILABLE){
+        l->schedule_status=FACTORY_TRAIN_SCHEDULE_ROUTE_UNAVAILABLE;
+        return;
+    }
+    if(l->destination_station_id!=stop->station_entity_id
+        ||l->route_status!=FACTORY_TRAIN_ROUTE_ARRIVED){
+        l->schedule_status=FACTORY_TRAIN_SCHEDULE_TRAVELING;
+        return;
+    }
+    l->schedule_status=FACTORY_TRAIN_SCHEDULE_WAITING;
+    if(l->arrived_this_tick)return;
+    bool complete=false;
+    if(stop->wait_condition==FACTORY_TRAIN_WAIT_NONE)complete=true;
+    else if(stop->wait_condition==FACTORY_TRAIN_WAIT_TIME){
+        if(l->wait_progress<stop->wait_value)++l->wait_progress;
+        complete=l->wait_progress>=stop->wait_value;
+    }else complete=train_cargo_condition(s,l,stop->wait_condition);
+    if(!complete)return;
+    factory_simulation_emit_event(s,(FactoryEvent){
+        .type=FACTORY_EVENT_TRAIN_WAIT_COMPLETED,.entity_id=l->entity_id,
+        .related_entity_id=stop->station_entity_id,
+        .quantity=(uint32_t)stop->wait_condition});
+    uint32_t previous=l->current_stop_index;
+    l->current_stop_index=(previous+1U)%l->schedule_count;
+    l->wait_progress=0U;
+    const FactoryEntityId next=l->schedule[l->current_stop_index].station_entity_id;
+    factory_simulation_emit_event(s,(FactoryEvent){
+        .type=FACTORY_EVENT_TRAIN_SCHEDULE_ADVANCED,.entity_id=l->entity_id,
+        .related_entity_id=next,.quantity=previous,
+        .related_quantity=l->current_stop_index});
+    FactoryResult result=factory_train_set_destination(s,l->entity_id,next,false);
+    l->schedule_status=result==FACTORY_RESULT_OK
+        ?(l->route_status==FACTORY_TRAIN_ROUTE_ARRIVED
+            ?FACTORY_TRAIN_SCHEDULE_WAITING
+            :FACTORY_TRAIN_SCHEDULE_TRAVELING)
+        :FACTORY_TRAIN_SCHEDULE_ROUTE_UNAVAILABLE;
+    l->arrived_this_tick=l->route_status==FACTORY_TRAIN_ROUTE_ARRIVED;
+}
+
+void factory_train_schedules_update(FactorySimulation*s)
+{
+    FactoryEntityId previous=0U;
+    for(size_t processed=0U;processed<s->locomotives.count;++processed){
+        FactoryLocomotive*next=NULL;
+        for(size_t i=0U;i<s->locomotives.count;++i){
+            FactoryLocomotive*candidate=&s->locomotives.items[i];
+            if(candidate->entity_id>previous
+                &&(next==NULL||candidate->entity_id<next->entity_id))
+                next=candidate;
+        }
+        if(next==NULL)break;
+        previous=next->entity_id;
+        update_one_schedule(s,next);
     }
 }

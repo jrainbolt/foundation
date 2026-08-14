@@ -1,4 +1,9 @@
-# Snapshot format version 26
+# Snapshot format version 29
+
+Version 29 adds fixed-capacity Locomotive schedule state. Each record stores the
+enabled flag, current stop, completed wait progress, schedule status, and 16
+canonical stop slots containing station ID, wait condition, and wait value.
+Unused slots are zero. Route and reservation state remains derived and excluded.
 
 Version 26 adds Rail Signal records containing entity ID, trackside position,
 and controlled direction. Attachment, downstream block, aspect, occupancy,

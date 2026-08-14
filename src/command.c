@@ -123,6 +123,25 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
             return command->data.clear_train_destination.train_id!=0U;
         case FACTORY_COMMAND_REPLAN_TRAIN_ROUTE:
             return command->data.replan_train_route.train_id!=0U;
+        case FACTORY_COMMAND_TRAIN_SCHEDULE_ADD_STOP:
+            return command->data.train_schedule_add_stop.train_id!=0U
+                &&command->data.train_schedule_add_stop.station_entity_id!=0U
+                &&command->data.train_schedule_add_stop.wait_condition
+                    <=FACTORY_TRAIN_WAIT_CARGO_FULL
+                &&((command->data.train_schedule_add_stop.wait_condition
+                        ==FACTORY_TRAIN_WAIT_TIME
+                    &&command->data.train_schedule_add_stop.wait_value!=0U
+                    &&command->data.train_schedule_add_stop.wait_value
+                        <=FACTORY_TRAIN_WAIT_TIME_MAX)
+                   ||(command->data.train_schedule_add_stop.wait_condition
+                        !=FACTORY_TRAIN_WAIT_TIME
+                    &&command->data.train_schedule_add_stop.wait_value==0U));
+        case FACTORY_COMMAND_TRAIN_SCHEDULE_REMOVE_STOP:
+            return command->data.train_schedule_remove_stop.train_id!=0U;
+        case FACTORY_COMMAND_TRAIN_SCHEDULE_CLEAR:
+            return command->data.train_schedule_clear.train_id!=0U;
+        case FACTORY_COMMAND_TRAIN_SCHEDULE_SET_ENABLED:
+            return command->data.train_schedule_set_enabled.train_id!=0U;
         case FACTORY_COMMAND_INSERT_REACTOR_FUEL:
             return command->data.insert_reactor_fuel.reactor_entity_id != 0U
                 && factory_nuclear_fuel_definition_get(

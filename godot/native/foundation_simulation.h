@@ -59,6 +59,12 @@ public:
     int64_t queue_clear_train_destination(int64_t train_id);
     int64_t queue_replan_train_route(int64_t train_id);
     Array get_train_route(int64_t train_id) const;
+    int64_t queue_train_schedule_add_stop(int64_t train_id,int64_t station_id,
+        int64_t wait_condition,int64_t wait_value);
+    int64_t queue_train_schedule_remove_stop(int64_t train_id,int64_t index);
+    int64_t queue_train_schedule_clear(int64_t train_id);
+    int64_t queue_train_schedule_set_enabled(int64_t train_id,bool enabled);
+    Array get_train_schedule(int64_t train_id) const;
     Array get_command_results() const;
     Array get_build_catalog() const;
     Array get_assembler_recipe_catalog() const;

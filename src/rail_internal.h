@@ -31,7 +31,11 @@ typedef struct {FactoryEntityId entity_id,rail_entity_id;FactoryDirection entry_
     FactoryTrainId blocking_train_id;FactoryRailBlockId *reserved_blocks;
     size_t reserved_block_count,reserved_block_capacity;
     size_t chain_required_block_count;FactoryRailBlockId blocking_block_id;
-    FactoryTrainChainStatus chain_status;} FactoryLocomotive;
+    FactoryTrainChainStatus chain_status;
+    FactoryTrainScheduleStop schedule[FACTORY_TRAIN_SCHEDULE_MAX_STOPS];
+    uint32_t schedule_count,current_stop_index,wait_progress;
+    bool schedule_enabled,arrived_this_tick;
+    FactoryTrainScheduleStatus schedule_status;} FactoryLocomotive;
 typedef struct {FactoryEntityId entity_id,rail_entity_id;FactoryDirection entry_direction;
     FactoryTrainId train_id;FactoryEntityId previous_vehicle_id,next_vehicle_id;
     FactoryItemType cargo_item;uint32_t cargo_quantity;} FactoryCargoWagon;
@@ -125,5 +129,6 @@ void factory_locomotives_update(FactorySimulation *simulation);
 void factory_train_reservations_update(FactorySimulation *simulation);
 bool factory_train_reservations_validate(const FactorySimulation *simulation);
 void factory_train_reservations_release_for_topology(FactorySimulation *simulation);
+void factory_train_schedules_update(FactorySimulation *simulation);
 
 #endif

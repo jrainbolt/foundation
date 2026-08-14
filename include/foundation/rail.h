@@ -92,6 +92,29 @@ typedef enum {
     FACTORY_RAIL_FREIGHT_UNLOADING
 } FactoryRailFreightActivity;
 
+#define FACTORY_TRAIN_SCHEDULE_MAX_STOPS 16U
+#define FACTORY_TRAIN_WAIT_TIME_MAX UINT32_C(1000000)
+
+typedef enum {
+    FACTORY_TRAIN_WAIT_NONE=0,
+    FACTORY_TRAIN_WAIT_TIME,
+    FACTORY_TRAIN_WAIT_CARGO_EMPTY,
+    FACTORY_TRAIN_WAIT_CARGO_FULL
+} FactoryTrainWaitCondition;
+
+typedef enum {
+    FACTORY_TRAIN_SCHEDULE_DISABLED=0,
+    FACTORY_TRAIN_SCHEDULE_TRAVELING,
+    FACTORY_TRAIN_SCHEDULE_WAITING,
+    FACTORY_TRAIN_SCHEDULE_ROUTE_UNAVAILABLE
+} FactoryTrainScheduleStatus;
+
+typedef struct {
+    FactoryEntityId station_entity_id;
+    FactoryTrainWaitCondition wait_condition;
+    uint32_t wait_value;
+} FactoryTrainScheduleStop;
+
 typedef struct {
     FactoryEntityId rail_entity_id;
     FactoryDirection entry_direction;
@@ -135,6 +158,14 @@ typedef struct {
     uint32_t chain_required_block_count;
     FactoryRailBlockId blocking_block_id;
     FactoryTrainChainStatus chain_status;
+    bool schedule_enabled;
+    uint32_t schedule_count;
+    uint32_t current_stop_index;
+    FactoryEntityId current_scheduled_station_id;
+    FactoryTrainWaitCondition wait_condition;
+    uint32_t wait_value;
+    uint32_t wait_progress;
+    FactoryTrainScheduleStatus schedule_status;
 } FactoryLocomotiveInspection;
 
 typedef struct {
@@ -266,6 +297,8 @@ const FactoryRailNetworkInspection *factory_simulation_get_rail_network(
     const FactorySimulation *simulation,size_t index);
 bool factory_simulation_get_locomotive(const FactorySimulation *simulation,
     FactoryEntityId id,FactoryLocomotiveInspection *out_locomotive);
+bool factory_simulation_get_train_schedule_stop(const FactorySimulation *simulation,
+    FactoryTrainId train_id,size_t index,FactoryTrainScheduleStop *out_stop);
 bool factory_simulation_get_cargo_wagon(const FactorySimulation *simulation,
     FactoryEntityId id,FactoryCargoWagonInspection *out_wagon);
 FactoryResult factory_simulation_cargo_wagon_insert(FactorySimulation *simulation,

@@ -312,7 +312,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !checked_records(&size,simulation->rail_switches.count,20U)
         || !checked_records(&size,simulation->rail_signals.count,16U)
         || !checked_records(&size,simulation->rail_chain_signals.count,16U)
-        || !checked_records(&size,simulation->locomotives.count,44U)
+        || !checked_records(&size,simulation->locomotives.count,256U)
         || !checked_records(&size,route_steps,8U)
         || !checked_records(&size,reserved_blocks,4U)
         || !checked_records(&size,simulation->cargo_wagons.count,36U)
@@ -383,7 +383,7 @@ static FactoryResult snapshot_size_unvalidated(
         || !section_size_valid(simulation->rail_switches.count,20U,0U)
         || !section_size_valid(simulation->rail_signals.count,16U,0U)
         || !section_size_valid(simulation->rail_chain_signals.count,16U,0U)
-        || !section_size_valid(simulation->locomotives.count,44U,0U)
+        || !section_size_valid(simulation->locomotives.count,256U,0U)
         || !section_size_valid(route_steps,8U,0U)
         || !section_size_valid(reserved_blocks,4U,0U)
         || !section_size_valid(simulation->cargo_wagons.count,36U,0U)
@@ -895,6 +895,29 @@ static FactoryResult validate_simulation(
             ||(st->freight_quantity!=0U&&st->configured_item==FACTORY_ITEM_NONE)
             ||factory_world_get_terrain(simulation->world,st->x,st->y)
                 !=FACTORY_TERRAIN_GROUND)return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+    }
+    for(index=0U;index<simulation->locomotives.count;++index){
+        const FactoryLocomotive*l=&simulation->locomotives.items[index];
+        if(l->schedule_count>FACTORY_TRAIN_SCHEDULE_MAX_STOPS
+            ||(l->schedule_count==0U&&l->current_stop_index!=0U)
+            ||(l->schedule_count!=0U
+                &&l->current_stop_index>=l->schedule_count)
+            ||l->schedule_status>FACTORY_TRAIN_SCHEDULE_ROUTE_UNAVAILABLE)
+            return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+        for(uint32_t stop=0U;stop<FACTORY_TRAIN_SCHEDULE_MAX_STOPS;++stop){
+            const FactoryTrainScheduleStop*v=&l->schedule[stop];
+            if(stop>=l->schedule_count){
+                if(v->station_entity_id!=0U||v->wait_condition!=0
+                    ||v->wait_value!=0U)return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+            }else if(v->station_entity_id==0U
+                ||v->wait_condition>FACTORY_TRAIN_WAIT_CARGO_FULL
+                ||(v->wait_condition==FACTORY_TRAIN_WAIT_TIME
+                    &&(v->wait_value==0U
+                        ||v->wait_value>FACTORY_TRAIN_WAIT_TIME_MAX))
+                ||(v->wait_condition!=FACTORY_TRAIN_WAIT_TIME
+                    &&v->wait_value!=0U))
+                return FACTORY_RESULT_SNAPSHOT_CORRUPT;
+        }
     }
     for(index=0U;index<simulation->rail_switches.count;++index){
         const FactoryRailSwitch*rail_switch=&simulation->rail_switches.items[index];
@@ -1552,6 +1575,19 @@ static void write_command(
         case FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM:
             fields[0]=command->data.set_rail_station_freight_item.station_entity_id;
             fields[1]=command->data.set_rail_station_freight_item.item;break;
+        case FACTORY_COMMAND_TRAIN_SCHEDULE_ADD_STOP:
+            fields[0]=command->data.train_schedule_add_stop.train_id;
+            fields[1]=command->data.train_schedule_add_stop.station_entity_id;
+            fields[2]=command->data.train_schedule_add_stop.wait_condition;
+            fields[3]=command->data.train_schedule_add_stop.wait_value;break;
+        case FACTORY_COMMAND_TRAIN_SCHEDULE_REMOVE_STOP:
+            fields[0]=command->data.train_schedule_remove_stop.train_id;
+            fields[1]=command->data.train_schedule_remove_stop.index;break;
+        case FACTORY_COMMAND_TRAIN_SCHEDULE_CLEAR:
+            fields[0]=command->data.train_schedule_clear.train_id;break;
+        case FACTORY_COMMAND_TRAIN_SCHEDULE_SET_ENABLED:
+            fields[0]=command->data.train_schedule_set_enabled.train_id;
+            fields[1]=command->data.train_schedule_set_enabled.enabled?1U:0U;break;
     }
     write_u32(writer, (uint32_t)command->type);
     for (index = 0U; index < 5U; ++index) {
@@ -1574,7 +1610,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             return false;
         }
     }
-    if (type > FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM) {
+    if (type > FACTORY_COMMAND_TRAIN_SCHEDULE_SET_ENABLED) {
         return false;
     }
     command->type = (FactoryCommandType)type;
@@ -1582,6 +1618,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
         size_t used = 0U;
         switch (command->type) {
             case FACTORY_COMMAND_PLACE_REFINERY:
+            case FACTORY_COMMAND_TRAIN_SCHEDULE_ADD_STOP:
                 used = 4U;
                 break;
             case FACTORY_COMMAND_PLACE_EXTRACTOR:
@@ -1627,6 +1664,8 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             case FACTORY_COMMAND_SET_TRAIN_DESTINATION:
             case FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_MODE:
             case FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM:
+            case FACTORY_COMMAND_TRAIN_SCHEDULE_REMOVE_STOP:
+            case FACTORY_COMMAND_TRAIN_SCHEDULE_SET_ENABLED:
                 used = 2U;
                 break;
             case FACTORY_COMMAND_DEMOLISH_ENTITY:
@@ -1635,6 +1674,7 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             case FACTORY_COMMAND_DECOUPLE_REAR_WAGON:
             case FACTORY_COMMAND_CLEAR_TRAIN_DESTINATION:
             case FACTORY_COMMAND_REPLAN_TRAIN_ROUTE:
+            case FACTORY_COMMAND_TRAIN_SCHEDULE_CLEAR:
                 used = 1U;
                 break;
         }
@@ -1845,6 +1885,20 @@ static bool read_command(SnapshotReader *reader, FactoryCommand *command)
             command->data.set_rail_station_freight_item.station_entity_id=fields[0];
             command->data.set_rail_station_freight_item.item=
                 (FactoryItemType)fields[1];break;
+        case FACTORY_COMMAND_TRAIN_SCHEDULE_ADD_STOP:
+            command->data.train_schedule_add_stop.train_id=fields[0];
+            command->data.train_schedule_add_stop.station_entity_id=fields[1];
+            command->data.train_schedule_add_stop.wait_condition=fields[2];
+            command->data.train_schedule_add_stop.wait_value=fields[3];break;
+        case FACTORY_COMMAND_TRAIN_SCHEDULE_REMOVE_STOP:
+            command->data.train_schedule_remove_stop.train_id=fields[0];
+            command->data.train_schedule_remove_stop.index=fields[1];break;
+        case FACTORY_COMMAND_TRAIN_SCHEDULE_CLEAR:
+            command->data.train_schedule_clear.train_id=fields[0];break;
+        case FACTORY_COMMAND_TRAIN_SCHEDULE_SET_ENABLED:
+            if(fields[1]>1U)return false;
+            command->data.train_schedule_set_enabled.train_id=fields[0];
+            command->data.train_schedule_set_enabled.enabled=fields[1]!=0U;break;
     }
     return snapshot_command_valid(command);
 }
@@ -2317,7 +2371,7 @@ static void write_snapshot(
         write_i32(writer,v->y);write_u32(writer,v->orientation);
     }
     write_section_header(writer,SNAPSHOT_SECTION_LOCOMOTIVES,
-        simulation->locomotives.count,simulation->locomotives.count*44U);
+        simulation->locomotives.count,simulation->locomotives.count*256U);
     for(index=0U;index<simulation->locomotives.count;++index){
         const FactoryLocomotive*v=&simulation->locomotives.items[index];
         write_u32(writer,v->entity_id);write_u32(writer,v->rail_entity_id);
@@ -2327,6 +2381,16 @@ static void write_snapshot(
         write_u32(writer,(uint32_t)v->route_length);
         write_u32(writer,(uint32_t)v->route_index);
         write_u32(writer,(uint32_t)v->reserved_block_count);
+        write_u32(writer,v->schedule_enabled?1U:0U);
+        write_u32(writer,v->schedule_count);
+        write_u32(writer,v->current_stop_index);
+        write_u32(writer,v->wait_progress);
+        write_u32(writer,v->schedule_status);
+        for(uint32_t stop=0U;stop<FACTORY_TRAIN_SCHEDULE_MAX_STOPS;++stop){
+            write_u32(writer,v->schedule[stop].station_entity_id);
+            write_u32(writer,v->schedule[stop].wait_condition);
+            write_u32(writer,v->schedule[stop].wait_value);
+        }
     }
     size_t route_step_count=0U;
     for(index=0U;index<simulation->locomotives.count;++index)
@@ -3123,7 +3187,7 @@ static bool load_sections(
             ||!direction_valid(value))return false;
         v->orientation=(FactoryDirection)value;
     }
-    if(!read_section_header(reader,SNAPSHOT_SECTION_LOCOMOTIVES,44U,0U,&count)
+    if(!read_section_header(reader,SNAPSHOT_SECTION_LOCOMOTIVES,256U,0U,&count)
         ||!factory_locomotive_store_reserve(&simulation->locomotives,count))
         return false;
     simulation->locomotives.count=count;
@@ -3131,7 +3195,8 @@ static bool load_sections(
         count*sizeof(*simulation->locomotives.items));
     for(index=0U;index<count;++index){FactoryLocomotive*v=
         &simulation->locomotives.items[index];uint32_t direction,progress,status,
-        route_length,route_index,reservation_count;
+        route_length,route_index,reservation_count,schedule_enabled,
+        schedule_count,current_stop,wait_progress,schedule_status;
         *v=(FactoryLocomotive){0};
         if(!read_u32(reader,&v->entity_id)||!read_u32(reader,&v->rail_entity_id)
             ||!read_u32(reader,&direction)||!read_u32(reader,&progress)
@@ -3139,6 +3204,11 @@ static bool load_sections(
             ||!read_u32(reader,&v->destination_station_id)||!read_u32(reader,&status)
             ||!read_u32(reader,&route_length)||!read_u32(reader,&route_index)
             ||!read_u32(reader,&reservation_count)
+            ||!read_u32(reader,&schedule_enabled)
+            ||!read_u32(reader,&schedule_count)
+            ||!read_u32(reader,&current_stop)
+            ||!read_u32(reader,&wait_progress)
+            ||!read_u32(reader,&schedule_status)
             ||!direction_valid(direction)||progress>FACTORY_LOCOMOTIVE_MOVE_TICKS
             ||status>FACTORY_TRAIN_ROUTE_INVALID
             ||route_length>FACTORY_TRAIN_ROUTE_MAX_STEPS
@@ -3146,11 +3216,34 @@ static bool load_sections(
             ||(route_length==0U&&route_index!=0U)
             ||(route_length!=0U&&route_index>=route_length))
             return false;
+        if(schedule_enabled>1U
+            ||schedule_count>FACTORY_TRAIN_SCHEDULE_MAX_STOPS
+            ||(schedule_count==0U&&current_stop!=0U)
+            ||(schedule_count!=0U&&current_stop>=schedule_count)
+            ||schedule_status>FACTORY_TRAIN_SCHEDULE_ROUTE_UNAVAILABLE)
+            return false;
+        for(uint32_t stop=0U;stop<FACTORY_TRAIN_SCHEDULE_MAX_STOPS;++stop){
+            uint32_t station,wait,wait_value;
+            if(!read_u32(reader,&station)||!read_u32(reader,&wait)
+                ||!read_u32(reader,&wait_value))return false;
+            if(stop>=schedule_count){
+                if(station!=0U||wait!=0U||wait_value!=0U)return false;
+            }else if(station==0U||wait>FACTORY_TRAIN_WAIT_CARGO_FULL
+                ||(wait==FACTORY_TRAIN_WAIT_TIME
+                    &&(wait_value==0U||wait_value>FACTORY_TRAIN_WAIT_TIME_MAX))
+                ||(wait!=FACTORY_TRAIN_WAIT_TIME&&wait_value!=0U))return false;
+            v->schedule[stop]=(FactoryTrainScheduleStop){station,
+                (FactoryTrainWaitCondition)wait,wait_value};
+        }
         v->entry_direction=(FactoryDirection)direction;v->progress=progress;
         v->activity=FACTORY_LOCOMOTIVE_MOVING;
         v->route_status=(FactoryTrainRouteStatus)status;
         v->route_length=route_length;v->route_index=route_index;
         v->reserved_block_count=reservation_count;
+        v->schedule_enabled=schedule_enabled!=0U;
+        v->schedule_count=schedule_count;v->current_stop_index=current_stop;
+        v->wait_progress=wait_progress;
+        v->schedule_status=(FactoryTrainScheduleStatus)schedule_status;
     }
     if(!read_section_header(reader,SNAPSHOT_SECTION_TRAIN_ROUTE_STEPS,8U,0U,
             &count))return false;

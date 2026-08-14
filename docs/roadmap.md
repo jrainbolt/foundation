@@ -36,6 +36,7 @@
 - [x] Deterministic rail freight stations and bounded Cargo Wagon transfer
 - [x] Ordinary directional Rail Signals and explicit block boundaries
 - [x] Chain Signals and deterministic junction interlocking
+- [x] Deterministic train schedules and integer wait conditions
 
 Finite deposits and seeded authoritative terrain are prerequisites for
 deterministic resource patches, remote mining outposts, rail infrastructure, and eventually

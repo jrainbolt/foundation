@@ -7,6 +7,10 @@ signal rail_switch_branch_requested(entity_id: int,branch: int)
 signal train_destination_requested(entity_id: int,station_id: int)
 signal rail_station_freight_mode_requested(entity_id: int,mode: int)
 signal rail_station_freight_item_requested(entity_id: int,item_type: int)
+signal train_schedule_add_requested(entity_id: int,station_id: int,wait_condition: int,wait_value: int)
+signal train_schedule_remove_requested(entity_id: int,index: int)
+signal train_schedule_clear_requested(entity_id: int)
+signal train_schedule_enabled_requested(entity_id: int,enabled: bool)
 
 const Format := preload("res://scripts/presentation_format.gd")
 @onready var title_label: Label = %InspectorTitle
@@ -15,6 +19,15 @@ const Format := preload("res://scripts/presentation_format.gd")
 @onready var configuration_selector: OptionButton = %ConfigurationSelector
 @onready var secondary_configuration_label: Label = %SecondaryConfigurationLabel
 @onready var secondary_configuration_selector: OptionButton = %SecondaryConfigurationSelector
+@onready var schedule_panel: VBoxContainer = %SchedulePanel
+@onready var schedule_enabled: CheckButton = %ScheduleEnabled
+@onready var schedule_stop_selector: OptionButton = %ScheduleStopSelector
+@onready var schedule_station_selector: OptionButton = %ScheduleStationSelector
+@onready var schedule_wait_selector: OptionButton = %ScheduleWaitSelector
+@onready var schedule_wait_ticks: SpinBox = %ScheduleWaitTicks
+@onready var schedule_add: Button = %ScheduleAdd
+@onready var schedule_remove: Button = %ScheduleRemove
+@onready var schedule_clear: Button = %ScheduleClear
 var entity_id := 0
 var recipe_catalog: Array = []
 var item_catalog: Array = []
@@ -24,6 +37,13 @@ var configuring := false
 func _ready() -> void:
 	configuration_selector.item_selected.connect(_on_configuration_selected)
 	secondary_configuration_selector.item_selected.connect(_on_secondary_configuration_selected)
+	schedule_enabled.toggled.connect(_on_schedule_enabled_toggled)
+	schedule_wait_selector.item_selected.connect(_on_schedule_wait_selected)
+	schedule_add.pressed.connect(_on_schedule_add_pressed)
+	schedule_remove.pressed.connect(_on_schedule_remove_pressed)
+	schedule_clear.pressed.connect(_on_schedule_clear_pressed)
+	for wait_name in ["None", "Time", "Cargo empty", "Cargo full"]:
+		schedule_wait_selector.add_item(wait_name)
 
 func configure_catalogs(recipes: Array,items: Array) -> void:
 	recipe_catalog = recipes.duplicate(true)
@@ -31,6 +51,32 @@ func configure_catalogs(recipes: Array,items: Array) -> void:
 
 func configure_stations(stations: Array) -> void:
 	station_catalog = stations.duplicate(true)
+
+func configure_train_schedule(stops: Array,enabled: bool) -> void:
+	configuring = true
+	schedule_stop_selector.clear()
+	for stop: Dictionary in stops:
+		var wait_condition := int(stop.get("wait_condition",0))
+		var wait_name: String = ["none","time","cargo empty","cargo full"][
+			clampi(wait_condition,0,3)]
+		schedule_stop_selector.add_item("%d: Station #%d — %s" % [
+			int(stop.get("index",0))+1,int(stop.get("station_id",0)),wait_name])
+	schedule_station_selector.clear()
+	for station: Dictionary in station_catalog:
+		var station_id := int(station.get("id",0))
+		schedule_station_selector.add_item("Station #%d" % station_id)
+		schedule_station_selector.set_item_metadata(
+			schedule_station_selector.item_count-1,station_id)
+	schedule_enabled.button_pressed = enabled
+	var editable := not enabled
+	schedule_station_selector.disabled = not editable
+	schedule_wait_selector.disabled = not editable
+	schedule_wait_ticks.editable = editable
+	schedule_add.disabled = not editable or stops.size() >= 16 or station_catalog.is_empty()
+	schedule_remove.disabled = not editable or stops.is_empty()
+	schedule_clear.disabled = not editable or stops.is_empty()
+	_on_schedule_wait_selected(schedule_wait_selector.selected)
+	configuring = false
 
 func clear_entity() -> void:
 	entity_id = 0
@@ -108,6 +154,16 @@ func show_entity(state: Dictionary) -> void:
 	if state.has("reservation_status"): field(lines,"Reservation status",["NONE","HELD","WAITING","INVALID"][clampi(int(state.reservation_status),0,3)])
 	if state.has("chain_status"): field(lines,"Chain status",["NONE","HELD","WAITING","INVALID"][clampi(int(state.chain_status),0,3)])
 	if state.has("chain_required_block_count"): field(lines,"Chain blocks required",str(int(state.chain_required_block_count)))
+	if state.has("schedule_enabled"):
+		section(lines,"Schedule")
+		field(lines,"Enabled",Format.yes_no(bool(state.schedule_enabled)))
+		field(lines,"Stops",str(int(state.get("schedule_count",0))))
+		field(lines,"Current stop",str(int(state.get("current_stop_index",0))+1))
+		field(lines,"Scheduled station","None" if int(state.get("current_scheduled_station_id",0)) == 0 else "#%d" % int(state.current_scheduled_station_id))
+		field(lines,"Schedule status",["DISABLED","TRAVELING","WAITING","ROUTE UNAVAILABLE"][clampi(int(state.get("schedule_status",0)),0,3)])
+		field(lines,"Wait",["NONE","TIME","CARGO EMPTY","CARGO FULL"][clampi(int(state.get("wait_condition",0)),0,3)])
+		if int(state.get("wait_condition",0)) == 1:
+			field(lines,"Wait progress","%d / %d ticks" % [int(state.get("wait_progress",0)),int(state.get("wait_value",0))])
 	if state.has("blocking_block_id"): field(lines,"Blocking block","None" if int(state.blocking_block_id) == 0 else "#%d" % int(state.blocking_block_id))
 	if state.has("blocking_train_id"): field(lines,"Blocking train","None" if int(state.blocking_train_id) == 0 else "#%d" % int(state.blocking_train_id))
 	if state.has("consist_index"): field(lines,"Consist index",str(int(state.consist_index)))
@@ -168,6 +224,7 @@ func _hide_configuration() -> void:
 	configuration_selector.hide()
 	secondary_configuration_label.hide()
 	secondary_configuration_selector.hide()
+	schedule_panel.hide()
 
 func _show_configuration(type_id: int,state: Dictionary) -> void:
 	configuring = true
@@ -224,6 +281,7 @@ func _show_configuration(type_id: int,state: Dictionary) -> void:
 			configuration_selector.set_item_metadata(index,station_id)
 			if station_id == int(state.get("destination_station_id",0)):
 				configuration_selector.select(index)
+		schedule_panel.show()
 	else:
 		_hide_configuration()
 		configuring = false
@@ -250,3 +308,28 @@ func _on_secondary_configuration_selected(index: int) -> void:
 	if configuring or index < 0: return
 	var value := int(secondary_configuration_selector.get_item_metadata(index))
 	rail_station_freight_item_requested.emit(entity_id,value)
+
+func _on_schedule_enabled_toggled(enabled: bool) -> void:
+	if configuring:
+		return
+	train_schedule_enabled_requested.emit(entity_id,enabled)
+
+func _on_schedule_wait_selected(index: int) -> void:
+	schedule_wait_ticks.visible = index == 1
+
+func _on_schedule_add_pressed() -> void:
+	if schedule_station_selector.selected < 0:
+		return
+	var station_id := int(schedule_station_selector.get_item_metadata(
+		schedule_station_selector.selected))
+	var wait_condition := schedule_wait_selector.selected
+	var wait_value := int(schedule_wait_ticks.value) if wait_condition == 1 else 0
+	train_schedule_add_requested.emit(
+		entity_id,station_id,wait_condition,wait_value)
+
+func _on_schedule_remove_pressed() -> void:
+	if schedule_stop_selector.selected >= 0:
+		train_schedule_remove_requested.emit(entity_id,schedule_stop_selector.selected)
+
+func _on_schedule_clear_pressed() -> void:
+	train_schedule_clear_requested.emit(entity_id)

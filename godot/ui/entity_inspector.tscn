@@ -42,6 +42,49 @@ unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(0, 38)
 
+[node name="SchedulePanel" type="VBoxContainer" parent="Margin/Layout"]
+unique_name_in_owner = true
+visible = false
+theme_override_constants/separation = 6
+
+[node name="ScheduleEnabled" type="CheckButton" parent="Margin/Layout/SchedulePanel"]
+unique_name_in_owner = true
+text = "Automatic schedule enabled"
+
+[node name="ScheduleStopSelector" type="OptionButton" parent="Margin/Layout/SchedulePanel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 34)
+
+[node name="ScheduleStationSelector" type="OptionButton" parent="Margin/Layout/SchedulePanel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 34)
+
+[node name="ScheduleWaitSelector" type="OptionButton" parent="Margin/Layout/SchedulePanel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 34)
+
+[node name="ScheduleWaitTicks" type="SpinBox" parent="Margin/Layout/SchedulePanel"]
+unique_name_in_owner = true
+min_value = 1.0
+max_value = 1000000.0
+value = 60.0
+suffix = " ticks"
+
+[node name="ScheduleButtons" type="HBoxContainer" parent="Margin/Layout/SchedulePanel"]
+theme_override_constants/separation = 6
+
+[node name="ScheduleAdd" type="Button" parent="Margin/Layout/SchedulePanel/ScheduleButtons"]
+unique_name_in_owner = true
+text = "Add"
+
+[node name="ScheduleRemove" type="Button" parent="Margin/Layout/SchedulePanel/ScheduleButtons"]
+unique_name_in_owner = true
+text = "Remove"
+
+[node name="ScheduleClear" type="Button" parent="Margin/Layout/SchedulePanel/ScheduleButtons"]
+unique_name_in_owner = true
+text = "Clear"
+
 [node name="InspectorDetails" type="RichTextLabel" parent="Margin/Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(250, 280)

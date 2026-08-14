@@ -977,6 +977,88 @@ static FactoryResult set_station_freight(FactorySimulation*s,
     *out_id=id;return FACTORY_RESULT_OK;
 }
 
+static FactoryResult edit_train_schedule(FactorySimulation*s,
+    const FactoryCommand*c,FactoryEntityId*out_id)
+{
+    FactoryTrainId train_id=0U;
+    switch(c->type){
+        case FACTORY_COMMAND_TRAIN_SCHEDULE_ADD_STOP:
+            train_id=c->data.train_schedule_add_stop.train_id;break;
+        case FACTORY_COMMAND_TRAIN_SCHEDULE_REMOVE_STOP:
+            train_id=c->data.train_schedule_remove_stop.train_id;break;
+        case FACTORY_COMMAND_TRAIN_SCHEDULE_CLEAR:
+            train_id=c->data.train_schedule_clear.train_id;break;
+        case FACTORY_COMMAND_TRAIN_SCHEDULE_SET_ENABLED:
+            train_id=c->data.train_schedule_set_enabled.train_id;break;
+        default:return FACTORY_RESULT_INVALID_ARGUMENT;
+    }
+    FactoryLocomotive*l=factory_locomotive_store_find_mutable(
+        &s->locomotives,train_id);
+    if(l==NULL)return factory_entity_is_valid(s->entities,train_id)
+        ?FACTORY_RESULT_UNSUPPORTED_ENTITY:FACTORY_RESULT_ENTITY_NOT_FOUND;
+    *out_id=train_id;
+    if(c->type!=FACTORY_COMMAND_TRAIN_SCHEDULE_SET_ENABLED
+        &&l->schedule_enabled)return FACTORY_RESULT_INVALID_STATE;
+    if(c->type==FACTORY_COMMAND_TRAIN_SCHEDULE_ADD_STOP){
+        const uint32_t wait=c->data.train_schedule_add_stop.wait_condition;
+        const uint32_t value=c->data.train_schedule_add_stop.wait_value;
+        const FactoryEntityId station_id=
+            c->data.train_schedule_add_stop.station_entity_id;
+        FactoryRailStationInspection station;
+        if(!factory_simulation_get_rail_station(s,station_id,&station))
+            return factory_entity_is_valid(s->entities,station_id)
+                ?FACTORY_RESULT_UNSUPPORTED_ENTITY
+                :FACTORY_RESULT_ENTITY_NOT_FOUND;
+        if(wait>FACTORY_TRAIN_WAIT_CARGO_FULL
+            ||(wait==FACTORY_TRAIN_WAIT_TIME
+                &&(value==0U||value>FACTORY_TRAIN_WAIT_TIME_MAX))
+            ||(wait!=FACTORY_TRAIN_WAIT_TIME&&value!=0U))
+            return FACTORY_RESULT_INVALID_ARGUMENT;
+        if(l->schedule_count>=FACTORY_TRAIN_SCHEDULE_MAX_STOPS)
+            return FACTORY_RESULT_QUEUE_FULL;
+        l->schedule[l->schedule_count++]=(FactoryTrainScheduleStop){
+            station_id,(FactoryTrainWaitCondition)wait,value};
+        return FACTORY_RESULT_OK;
+    }
+    if(c->type==FACTORY_COMMAND_TRAIN_SCHEDULE_REMOVE_STOP){
+        const uint32_t index=c->data.train_schedule_remove_stop.index;
+        if(index>=l->schedule_count)return FACTORY_RESULT_INVALID_ARGUMENT;
+        for(uint32_t i=index+1U;i<l->schedule_count;++i)
+            l->schedule[i-1U]=l->schedule[i];
+        --l->schedule_count;
+        l->schedule[l->schedule_count]=(FactoryTrainScheduleStop){0};
+        if(l->schedule_count==0U)l->current_stop_index=0U;
+        else if(l->current_stop_index>=l->schedule_count)
+            l->current_stop_index=0U;
+        return FACTORY_RESULT_OK;
+    }
+    if(c->type==FACTORY_COMMAND_TRAIN_SCHEDULE_CLEAR){
+        for(uint32_t i=0U;i<l->schedule_count;++i)
+            l->schedule[i]=(FactoryTrainScheduleStop){0};
+        l->schedule_count=0U;l->current_stop_index=0U;l->wait_progress=0U;
+        return FACTORY_RESULT_OK;
+    }
+    const bool enabled=c->data.train_schedule_set_enabled.enabled;
+    if(enabled==l->schedule_enabled)return FACTORY_RESULT_OK;
+    if(enabled&&l->schedule_count==0U)return FACTORY_RESULT_INVALID_STATE;
+    if(!enabled){
+        l->schedule_enabled=false;l->wait_progress=0U;
+        l->schedule_status=FACTORY_TRAIN_SCHEDULE_DISABLED;
+        return FACTORY_RESULT_OK;
+    }
+    l->schedule_enabled=true;l->current_stop_index=0U;l->wait_progress=0U;
+    FactoryResult route=factory_train_set_destination(s,train_id,
+        l->schedule[0].station_entity_id,false);
+    l->schedule_status=route==FACTORY_RESULT_OK
+        ?(l->route_status==FACTORY_TRAIN_ROUTE_ARRIVED
+            ?FACTORY_TRAIN_SCHEDULE_WAITING
+            :FACTORY_TRAIN_SCHEDULE_TRAVELING)
+        :FACTORY_TRAIN_SCHEDULE_ROUTE_UNAVAILABLE;
+    l->arrived_this_tick=route==FACTORY_RESULT_OK
+        &&l->route_status==FACTORY_TRAIN_ROUTE_ARRIVED;
+    return FACTORY_RESULT_OK;
+}
+
 static FactoryResult place_locomotive(FactorySimulation*s,
     const FactoryCommand*c,FactoryEntityId*out_id)
 {
@@ -2239,6 +2321,12 @@ static void apply_commands(FactorySimulation *simulation)
             case FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM:
                 result->result=set_station_freight(simulation,&result->command,
                     &result->entity_id,false);break;
+            case FACTORY_COMMAND_TRAIN_SCHEDULE_ADD_STOP:
+            case FACTORY_COMMAND_TRAIN_SCHEDULE_REMOVE_STOP:
+            case FACTORY_COMMAND_TRAIN_SCHEDULE_CLEAR:
+            case FACTORY_COMMAND_TRAIN_SCHEDULE_SET_ENABLED:
+                result->result=edit_train_schedule(simulation,&result->command,
+                    &result->entity_id);break;
             case FACTORY_COMMAND_SET_RAIL_SWITCH_BRANCH:
                 result->result=set_rail_switch_branch(simulation,
                     &result->command,&result->entity_id);break;
@@ -2256,18 +2344,42 @@ static void apply_commands(FactorySimulation *simulation)
                     &result->entity_id);break;
             case FACTORY_COMMAND_SET_TRAIN_DESTINATION:
                 result->entity_id=result->command.data.set_train_destination.train_id;
-                result->result=factory_train_set_destination(simulation,
+                {FactoryLocomotive*l=factory_locomotive_store_find_mutable(
+                    &simulation->locomotives,result->entity_id);
+                result->result=l!=NULL&&l->schedule_enabled
+                    ?FACTORY_RESULT_INVALID_STATE:factory_train_set_destination(simulation,
                     result->entity_id,
                     result->command.data.set_train_destination.station_entity_id,
-                    false);break;
+                    false);}break;
             case FACTORY_COMMAND_CLEAR_TRAIN_DESTINATION:
                 result->entity_id=result->command.data.clear_train_destination.train_id;
-                result->result=factory_train_clear_destination(simulation,
-                    result->entity_id);break;
+                {FactoryLocomotive*l=factory_locomotive_store_find_mutable(
+                    &simulation->locomotives,result->entity_id);
+                result->result=l!=NULL&&l->schedule_enabled
+                    ?FACTORY_RESULT_INVALID_STATE
+                    :factory_train_clear_destination(simulation,
+                        result->entity_id);}break;
             case FACTORY_COMMAND_REPLAN_TRAIN_ROUTE:
                 result->entity_id=result->command.data.replan_train_route.train_id;
                 result->result=factory_train_set_destination(simulation,
-                    result->entity_id,0U,true);break;
+                    result->entity_id,0U,true);
+                {
+                    FactoryLocomotive *locomotive=
+                        factory_locomotive_store_find_mutable(
+                            &simulation->locomotives,result->entity_id);
+                    if(locomotive!=NULL&&locomotive->schedule_enabled){
+                        locomotive->schedule_status=
+                            result->result==FACTORY_RESULT_OK
+                            ?(locomotive->route_status==FACTORY_TRAIN_ROUTE_ARRIVED
+                                ?FACTORY_TRAIN_SCHEDULE_WAITING
+                                :FACTORY_TRAIN_SCHEDULE_TRAVELING)
+                            :FACTORY_TRAIN_SCHEDULE_ROUTE_UNAVAILABLE;
+                        locomotive->arrived_this_tick=
+                            result->result==FACTORY_RESULT_OK
+                            &&locomotive->route_status==FACTORY_TRAIN_ROUTE_ARRIVED;
+                    }
+                }
+                break;
             case FACTORY_COMMAND_SELECT_RESEARCH:
                 result->result=factory_research_select(simulation,
                     result->command.data.select_research.technology_id);
@@ -3321,6 +3433,7 @@ FactoryResult factory_simulation_tick(FactorySimulation *simulation)
     factory_train_reservations_update(simulation);
     factory_locomotives_update(simulation);
     factory_rail_stations_update_freight(simulation);
+    factory_train_schedules_update(simulation);
     factory_fluid_network_transfer(simulation);
     factory_burner_store_begin_tick(&simulation->burners, simulation);
     factory_fluid_machines_update(simulation);

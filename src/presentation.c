@@ -681,7 +681,11 @@ static FactoryResult populate_entity(
             inspection.reserved_block_id,inspection.reservation_status,
             inspection.blocking_train_id,inspection.reserved_block_count,
             inspection.chain_required_block_count,inspection.blocking_block_id,
-            inspection.chain_status};
+            inspection.chain_status,inspection.schedule_enabled,
+            inspection.schedule_count,inspection.current_stop_index,
+            inspection.current_scheduled_station_id,inspection.wait_condition,
+            inspection.wait_value,inspection.wait_progress,
+            inspection.schedule_status};
     } else if(cargo_wagon!=NULL){FactoryCargoWagonInspection inspection;
         if(!factory_simulation_get_cargo_wagon(simulation,id,&inspection))
             return FACTORY_RESULT_INTERNAL_STATE_MISMATCH;

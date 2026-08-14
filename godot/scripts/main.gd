@@ -44,6 +44,10 @@ func _ready() -> void:
 	inspector.train_destination_requested.connect(_on_train_destination_requested)
 	inspector.rail_station_freight_mode_requested.connect(_on_rail_station_freight_mode_requested)
 	inspector.rail_station_freight_item_requested.connect(_on_rail_station_freight_item_requested)
+	inspector.train_schedule_add_requested.connect(_on_train_schedule_add_requested)
+	inspector.train_schedule_remove_requested.connect(_on_train_schedule_remove_requested)
+	inspector.train_schedule_clear_requested.connect(_on_train_schedule_clear_requested)
+	inspector.train_schedule_enabled_requested.connect(_on_train_schedule_enabled_requested)
 	_reset_demo()
 	build_toolbar.configure(simulation)
 	inspector.configure_catalogs(
@@ -133,6 +137,10 @@ func _synchronize() -> bool:
 		if int(entity.id) == selected_id:
 			selected_state = entity
 			break
+	if int(selected_state.get("type",0)) == 27:
+		inspector.configure_train_schedule(
+			simulation.get_train_schedule(selected_id),
+			bool(selected_state.get("schedule_enabled",false)))
 	var waiting := int(selected_state.get("reservation_status",0)) == 2
 	canvas.set_selected_train_blocks(
 		int(selected_state.get("current_block_id",0)),
@@ -275,6 +283,36 @@ func _on_rail_station_freight_item_requested(entity_id: int,item_type: int) -> v
 		status_label.text = "Status: %s" % simulation.result_name(queued)
 		return
 	_execute_queued_command("Station freight item updated")
+
+func _on_train_schedule_add_requested(entity_id: int,station_id: int,
+		wait_condition: int,wait_value: int) -> void:
+	var queued: int = simulation.queue_train_schedule_add_stop(
+		entity_id,station_id,wait_condition,wait_value)
+	if queued != 0:
+		status_label.text = "Status: %s" % simulation.result_name(queued)
+		return
+	_execute_queued_command("Train schedule stop added")
+
+func _on_train_schedule_remove_requested(entity_id: int,index: int) -> void:
+	var queued: int = simulation.queue_train_schedule_remove_stop(entity_id,index)
+	if queued != 0:
+		status_label.text = "Status: %s" % simulation.result_name(queued)
+		return
+	_execute_queued_command("Train schedule stop removed")
+
+func _on_train_schedule_clear_requested(entity_id: int) -> void:
+	var queued: int = simulation.queue_train_schedule_clear(entity_id)
+	if queued != 0:
+		status_label.text = "Status: %s" % simulation.result_name(queued)
+		return
+	_execute_queued_command("Train schedule cleared")
+
+func _on_train_schedule_enabled_requested(entity_id: int,enabled: bool) -> void:
+	var queued: int = simulation.queue_train_schedule_set_enabled(entity_id,enabled)
+	if queued != 0:
+		status_label.text = "Status: %s" % simulation.result_name(queued)
+		return
+	_execute_queued_command("Train schedule updated")
 
 func _execute_queued_command(success_message: String) -> void:
 	if not _advance(1): return

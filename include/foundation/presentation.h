@@ -344,6 +344,14 @@ typedef struct {
     uint32_t chain_required_block_count;
     FactoryRailBlockId blocking_block_id;
     FactoryTrainChainStatus chain_status;
+    bool schedule_enabled;
+    uint32_t schedule_count;
+    uint32_t current_stop_index;
+    FactoryEntityId current_scheduled_station_id;
+    FactoryTrainWaitCondition wait_condition;
+    uint32_t wait_value;
+    uint32_t wait_progress;
+    FactoryTrainScheduleStatus schedule_status;
 } FactoryPresentationLocomotive;
 
 typedef struct {

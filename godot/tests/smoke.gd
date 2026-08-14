@@ -54,6 +54,11 @@ func _initialize() -> void:
 		and simulation.has_method("queue_set_rail_switch_branch")
 		and simulation.has_method("queue_set_rail_station_freight_mode")
 		and simulation.has_method("queue_set_rail_station_freight_item")
+		and simulation.has_method("queue_train_schedule_add_stop")
+		and simulation.has_method("queue_train_schedule_remove_stop")
+		and simulation.has_method("queue_train_schedule_clear")
+		and simulation.has_method("queue_train_schedule_set_enabled")
+		and simulation.has_method("get_train_schedule")
 		and simulation.has_method("queue_place_locomotive")
 		and simulation.has_method("queue_place_cargo_wagon")
 		and simulation.has_method("queue_couple_rear_wagon")
@@ -150,12 +155,18 @@ func _initialize() -> void:
 		and int(locomotive.rail_network_id) == 54
 		and int(locomotive.train_id) == 65
 		and int(locomotive.vehicle_count) == 3
-		and int(locomotive.destination_station_id) == 0
-		and int(locomotive.route_status) == 0
+		and int(locomotive.destination_station_id) == 62
+		and int(locomotive.route_status) == 1
+		and bool(locomotive.schedule_enabled)
+		and int(locomotive.schedule_count) == 1
+		and int(locomotive.current_scheduled_station_id) == 62
+		and int(locomotive.wait_condition) == 1
+		and int(locomotive.wait_value) == 120
+		and simulation.get_train_schedule(65).size() == 1
 		and int(locomotive.current_block_id) != 0
-		and int(locomotive.reserved_block_id) == 0
-		and int(locomotive.reservation_status) == 0
-		and simulation.get_train_route(65).is_empty(),
+		and int(locomotive.reserved_block_id) != 0
+		and int(locomotive.reservation_status) == 1
+		and not simulation.get_train_route(65).is_empty(),
 		"locomotive presentation: %s" % locomotive
 	):
 		return

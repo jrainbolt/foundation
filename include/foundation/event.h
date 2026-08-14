@@ -63,7 +63,9 @@ typedef enum {
     FACTORY_EVENT_TRAIN_ARRIVED,
     FACTORY_EVENT_TRAIN_BLOCK_RESERVED,
     FACTORY_EVENT_TRAIN_BLOCK_RELEASED,
-    FACTORY_EVENT_RAIL_FREIGHT_TRANSFERRED
+    FACTORY_EVENT_RAIL_FREIGHT_TRANSFERRED,
+    FACTORY_EVENT_TRAIN_WAIT_COMPLETED,
+    FACTORY_EVENT_TRAIN_SCHEDULE_ADVANCED
 } FactoryEventType;
 
 /*
@@ -133,6 +135,11 @@ typedef enum {
  * rail freight transferred: entity_id is the station, related_entity_id is
  * the wagon, item_type/quantity identify the committed transfer,
  * related_quantity is the train ID, and third_quantity is the freight mode.
+ * train wait completed: entity_id is the train, related_entity_id is the
+ * station, quantity is the wait condition, and related_quantity is its value.
+ * train schedule advanced: entity_id is the train, related_entity_id is the
+ * newly selected station, quantity is the previous stop index, and
+ * related_quantity is the new stop index.
  *
  * tick is the simulation tick at the start of the step that emitted the
  * event. Item-transfer quantity is currently one. Successful requests for an

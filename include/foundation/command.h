@@ -69,7 +69,11 @@ typedef enum {
     FACTORY_COMMAND_PLACE_RAIL_SIGNAL,
     FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL,
     FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_MODE,
-    FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM
+    FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM,
+    FACTORY_COMMAND_TRAIN_SCHEDULE_ADD_STOP,
+    FACTORY_COMMAND_TRAIN_SCHEDULE_REMOVE_STOP,
+    FACTORY_COMMAND_TRAIN_SCHEDULE_CLEAR,
+    FACTORY_COMMAND_TRAIN_SCHEDULE_SET_ENABLED
 } FactoryCommandType;
 
 typedef struct {
@@ -202,6 +206,14 @@ typedef struct {
             set_rail_station_freight_mode;
         struct { FactoryEntityId station_entity_id; FactoryItemType item; }
             set_rail_station_freight_item;
+        struct { FactoryEntityId train_id; FactoryEntityId station_entity_id;
+            uint32_t wait_condition; uint32_t wait_value; }
+            train_schedule_add_stop;
+        struct { FactoryEntityId train_id; uint32_t index; }
+            train_schedule_remove_stop;
+        struct { FactoryEntityId train_id; } train_schedule_clear;
+        struct { FactoryEntityId train_id; bool enabled; }
+            train_schedule_set_enabled;
     } data;
 } FactoryCommand;
 

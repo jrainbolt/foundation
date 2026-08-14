@@ -243,6 +243,17 @@ void FoundationSimulation::_bind_methods()
         &FoundationSimulation::queue_replan_train_route);
     ClassDB::bind_method(D_METHOD("get_train_route","train_id"),
         &FoundationSimulation::get_train_route);
+    ClassDB::bind_method(D_METHOD("queue_train_schedule_add_stop","train_id",
+        "station_id","wait_condition","wait_value"),
+        &FoundationSimulation::queue_train_schedule_add_stop);
+    ClassDB::bind_method(D_METHOD("queue_train_schedule_remove_stop","train_id",
+        "index"),&FoundationSimulation::queue_train_schedule_remove_stop);
+    ClassDB::bind_method(D_METHOD("queue_train_schedule_clear","train_id"),
+        &FoundationSimulation::queue_train_schedule_clear);
+    ClassDB::bind_method(D_METHOD("queue_train_schedule_set_enabled","train_id",
+        "enabled"),&FoundationSimulation::queue_train_schedule_set_enabled);
+    ClassDB::bind_method(D_METHOD("get_train_schedule","train_id"),
+        &FoundationSimulation::get_train_schedule);
     ClassDB::bind_method(D_METHOD("get_command_results"),
         &FoundationSimulation::get_command_results);
     ClassDB::bind_method(D_METHOD("get_build_catalog"),
@@ -661,8 +672,17 @@ FactoryResult FoundationSimulation::build_demo()
     couple2.data.couple_rear_wagon={65U,67U};
     result=submit(couple1);if(result!=FACTORY_RESULT_OK)return result;
     result=submit(couple2);if(result!=FACTORY_RESULT_OK)return result;
+    FactoryCommand schedule_stop={};
+    schedule_stop.type=FACTORY_COMMAND_TRAIN_SCHEDULE_ADD_STOP;
+    schedule_stop.data.train_schedule_add_stop={
+        65U,62U,FACTORY_TRAIN_WAIT_TIME,120U};
+    result=submit(schedule_stop);if(result!=FACTORY_RESULT_OK)return result;
+    FactoryCommand schedule_enable={};
+    schedule_enable.type=FACTORY_COMMAND_TRAIN_SCHEDULE_SET_ENABLED;
+    schedule_enable.data.train_schedule_set_enabled={65U,true};
+    result=submit(schedule_enable);if(result!=FACTORY_RESULT_OK)return result;
     result=factory_simulation_tick(simulation_);if(result!=FACTORY_RESULT_OK)return result;
-    for(size_t i=0U;i<7U;++i){const FactoryCommandResult*r=
+    for(size_t i=0U;i<9U;++i){const FactoryCommandResult*r=
         factory_simulation_get_command_result(simulation_,i);
         if(r==nullptr||r->result!=FACTORY_RESULT_OK)
             return r==nullptr?FACTORY_RESULT_INTERNAL_STATE_MISMATCH:r->result;}
@@ -862,6 +882,71 @@ int64_t FoundationSimulation::queue_set_train_destination(
     command.data.set_train_destination={(FactoryEntityId)train_id,
         (FactoryEntityId)station_id};
     return factory_simulation_submit_command(simulation_,&command);
+}
+
+int64_t FoundationSimulation::queue_train_schedule_add_stop(int64_t train_id,
+    int64_t station_id,int64_t wait_condition,int64_t wait_value)
+{
+    if(simulation_==nullptr||train_id<=0||train_id>UINT32_MAX
+        ||station_id<=0||station_id>UINT32_MAX
+        ||wait_condition<FACTORY_TRAIN_WAIT_NONE
+        ||wait_condition>FACTORY_TRAIN_WAIT_CARGO_FULL||wait_value<0
+        ||wait_value>UINT32_MAX)return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};
+    command.type=FACTORY_COMMAND_TRAIN_SCHEDULE_ADD_STOP;
+    command.data.train_schedule_add_stop={(FactoryEntityId)train_id,
+        (FactoryEntityId)station_id,(uint32_t)wait_condition,
+        (uint32_t)wait_value};
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
+int64_t FoundationSimulation::queue_train_schedule_remove_stop(
+    int64_t train_id,int64_t index)
+{
+    if(simulation_==nullptr||train_id<=0||train_id>UINT32_MAX
+        ||index<0||index>=FACTORY_TRAIN_SCHEDULE_MAX_STOPS)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};
+    command.type=FACTORY_COMMAND_TRAIN_SCHEDULE_REMOVE_STOP;
+    command.data.train_schedule_remove_stop={(FactoryEntityId)train_id,
+        (uint32_t)index};
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
+int64_t FoundationSimulation::queue_train_schedule_clear(int64_t train_id)
+{
+    if(simulation_==nullptr||train_id<=0||train_id>UINT32_MAX)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};command.type=FACTORY_COMMAND_TRAIN_SCHEDULE_CLEAR;
+    command.data.train_schedule_clear={(FactoryEntityId)train_id};
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
+int64_t FoundationSimulation::queue_train_schedule_set_enabled(
+    int64_t train_id,bool enabled)
+{
+    if(simulation_==nullptr||train_id<=0||train_id>UINT32_MAX)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};
+    command.type=FACTORY_COMMAND_TRAIN_SCHEDULE_SET_ENABLED;
+    command.data.train_schedule_set_enabled={(FactoryEntityId)train_id,enabled};
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
+Array FoundationSimulation::get_train_schedule(int64_t train_id) const
+{
+    Array result;
+    if(simulation_==nullptr||train_id<=0||train_id>UINT32_MAX)return result;
+    for(size_t index=0U;index<FACTORY_TRAIN_SCHEDULE_MAX_STOPS;++index){
+        FactoryTrainScheduleStop stop;
+        if(!factory_simulation_get_train_schedule_stop(simulation_,
+                (FactoryTrainId)train_id,index,&stop))break;
+        Dictionary value;value["index"]=(int64_t)index;
+        value["station_id"]=(int64_t)stop.station_entity_id;
+        value["wait_condition"]=(int64_t)stop.wait_condition;
+        value["wait_value"]=(int64_t)stop.wait_value;result.append(value);
+    }
+    return result;
 }
 
 int64_t FoundationSimulation::queue_clear_train_destination(int64_t train_id)
@@ -1626,6 +1711,16 @@ bool FoundationSimulation::entity_to_dictionary(
         value["chain_required_block_count"]=(int64_t)entity.data.locomotive.chain_required_block_count;
         value["blocking_block_id"]=(int64_t)entity.data.locomotive.blocking_block_id;
         value["chain_status"]=(int64_t)entity.data.locomotive.chain_status;
+        value["schedule_enabled"]=entity.data.locomotive.schedule_enabled;
+        value["schedule_count"]=(int64_t)entity.data.locomotive.schedule_count;
+        value["current_stop_index"]=(int64_t)
+            entity.data.locomotive.current_stop_index;
+        value["current_scheduled_station_id"]=(int64_t)
+            entity.data.locomotive.current_scheduled_station_id;
+        value["wait_condition"]=(int64_t)entity.data.locomotive.wait_condition;
+        value["wait_value"]=(int64_t)entity.data.locomotive.wait_value;
+        value["wait_progress"]=(int64_t)entity.data.locomotive.wait_progress;
+        value["schedule_status"]=(int64_t)entity.data.locomotive.schedule_status;
         {
             Array reserved_blocks;
             const size_t count=factory_simulation_get_train_reserved_block_count(
