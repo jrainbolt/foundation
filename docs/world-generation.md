@@ -30,7 +30,9 @@ irregular patch cells are Ground, patches cannot overlap, and every deposit has
 a positive finite quantity. Starter quantity defaults to 500 units plus bounded
 per-cell variation.
 
-Additional bounded-attempt remote patches alternate Iron and Copper. Their
+Additional bounded-attempt remote patches rotate through Iron, Copper, and
+Coal. Coal patch shape uses a distinct stateless generation channel and Coal is
+never placed in the protected starter core. Their
 base quantity is 900 units plus `Manhattan distance / (start radius + 1)` times
 the configured distance bonus, with checked saturation at `UINT32_MAX`.
 Patches are generation concepts only: runtime ownership remains one finite
@@ -41,7 +43,7 @@ quantity per deposit tile. No patch list or PRNG state is retained.
 The public FNV-1a checksum helper hashes seed, dimensions, and every authoritative
 tile field using explicit little-endian bytes. It is intended for deterministic
 regression diagnostics, not simulation decisions. Generator version 1 is
-distinct from snapshot version 19. Snapshots store the resulting terrain and
+distinct from snapshot version 30. Snapshots store the resulting terrain and
 deposits and never rerun generation, so changing future generation algorithms
 does not change saved worlds.
 

@@ -104,7 +104,9 @@ static FactoryPresentationMachineStatus refinery_status(
         return FACTORY_PRESENTATION_MACHINE_STATUS_WORKING;
     if (recipe == NULL) return FACTORY_PRESENTATION_MACHINE_STATUS_IDLE;
     if (refinery->input_item != recipe->input_item
-        || refinery->input_amount != recipe->input_amount)
+        || refinery->input_amount != recipe->input_amount
+        || refinery->secondary_input_item != recipe->secondary_input_item
+        || refinery->secondary_input_amount != recipe->secondary_input_amount)
         return FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_INPUT;
     return FACTORY_PRESENTATION_MACHINE_STATUS_WORKING;
 }
@@ -262,7 +264,8 @@ static FactoryResult populate_entity(
         out->status = refinery_status(refinery, recipe, out->powered);
         out->data.refinery = (FactoryPresentationRefinery){
             refinery->recipe_id, refinery->input_item,
-            refinery->input_amount, refinery->output_item,
+            refinery->input_amount, refinery->secondary_input_item,
+            refinery->secondary_input_amount, refinery->output_item,
             refinery->output_amount, refinery->processing_progress,
             recipe == NULL ? 0U : recipe->processing_ticks,
             refinery->processing
@@ -301,6 +304,10 @@ static FactoryResult populate_entity(
         out->data.storage.item_quantities[8] = storage->basic_science_amount;
         out->data.storage.item_quantities[9] =
             storage->construction_material_amount;
+        out->data.storage.item_quantities[10] = storage->coal_amount;
+        out->data.storage.item_quantities[11] = storage->steel_amount;
+        out->data.storage.item_quantities[12] = storage->advanced_component_amount;
+        out->data.storage.item_quantities[13] = storage->advanced_science_amount;
         out->data.storage.total_capacity = storage->total_capacity;
         out->data.storage.configured_output_item =
             storage->configured_output_item;
@@ -573,7 +580,8 @@ static FactoryResult populate_entity(
                     ?FACTORY_PRESENTATION_MACHINE_STATUS_BLOCKED_INPUT
                     :FACTORY_PRESENTATION_MACHINE_STATUS_IDLE;
         out->data.research_lab=(FactoryPresentationResearchLab){
-            lab.science_quantity,lab.science_capacity,lab.power_network_id,
+            lab.science_item,lab.science_quantity,lab.science_capacity,
+            lab.power_network_id,
             lab.connected,lab.activity,lab.science_consumed_last_tick,
             lab.work_contributed_last_tick};
     } else if(rail!=NULL){

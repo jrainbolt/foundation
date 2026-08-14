@@ -252,7 +252,7 @@ func _draw_direction() -> void:
 func _draw_resource_badge() -> void:
 	var resource_type := int(state.get("resource_type", 0))
 	if resource_type == 0: return
-	var color := Color("#a85f42") if resource_type == 1 else Color("#c58145")
+	var color := Color("#a85f42") if resource_type == 1 else (Color("#30343b") if resource_type == 3 else Color("#c58145"))
 	if int(state.get("resource_remaining", 1)) == 0: color = Color("#56606a")
 	draw_circle(Vector2(10, 10), 6.0, color)
 	draw_circle(Vector2(10, 10), 6.0, Color.WHITE, false, 1.0)

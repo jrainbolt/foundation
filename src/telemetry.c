@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define ITEM_COUNT ((size_t)FACTORY_ITEM_CONSTRUCTION_MATERIAL + 1U)
+#define ITEM_COUNT ((size_t)FACTORY_ITEM_ADVANCED_SCIENCE + 1U)
 #define TELEMETRY_MAX_WINDOW 1200U
 
 typedef struct {
@@ -48,7 +48,7 @@ struct FactoryTelemetry {
 };
 
 static bool item_valid(FactoryItemType item)
-{return item>FACTORY_ITEM_NONE&&item<=FACTORY_ITEM_CONSTRUCTION_MATERIAL;}
+{return item>FACTORY_ITEM_NONE&&item<=FACTORY_ITEM_ADVANCED_SCIENCE;}
 
 void factory_telemetry_default_config(FactoryTelemetryConfig *out)
 {if(out!=NULL)*out=(FactoryTelemetryConfig){60U,600U,FACTORY_TELEMETRY_DEFAULT_MAX_ENTITIES};}

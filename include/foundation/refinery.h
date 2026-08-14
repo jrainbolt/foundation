@@ -16,6 +16,8 @@ typedef struct {
     FactoryRecipeId recipe_id;
     FactoryItemType input_item;
     uint32_t input_amount;
+    FactoryItemType secondary_input_item;
+    uint32_t secondary_input_amount;
     FactoryItemType output_item;
     uint32_t output_amount;
     uint32_t processing_progress;

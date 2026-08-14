@@ -24,6 +24,10 @@ typedef struct {
     uint32_t biomass_pellet_amount;
     uint32_t basic_science_amount;
     uint32_t construction_material_amount;
+    uint32_t coal_amount;
+    uint32_t steel_amount;
+    uint32_t advanced_component_amount;
+    uint32_t advanced_science_amount;
     uint32_t total_capacity;
     FactoryItemType configured_output_item;
     FactoryItemType output_item;

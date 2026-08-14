@@ -114,7 +114,7 @@ bool factory_world_validate(const FactoryWorld *world)
     count=(size_t)world->width*(size_t)world->height;
     for(index=0U;index<count;++index){const FactoryTile *tile=&world->tiles[index];
         if(factory_content_terrain_definition_get(tile->terrain)==NULL
-            ||tile->resource>FACTORY_RESOURCE_COPPER
+            ||tile->resource>FACTORY_RESOURCE_COAL
             ||(tile->resource==FACTORY_RESOURCE_NONE&&tile->resource_amount!=0U)
             ||(tile->resource!=FACTORY_RESOURCE_NONE
                 &&!factory_content_terrain_allows_resource(
@@ -210,7 +210,8 @@ FactoryResult factory_world_add_resource(
 
     if (world == NULL
         || (resource != FACTORY_RESOURCE_IRON
-            && resource != FACTORY_RESOURCE_COPPER)
+            && resource != FACTORY_RESOURCE_COPPER
+            && resource != FACTORY_RESOURCE_COAL)
         || amount == 0U) {
         return FACTORY_RESULT_INVALID_ARGUMENT;
     }
@@ -314,6 +315,8 @@ const char *factory_resource_name(FactoryResourceType resource)
             return "iron";
         case FACTORY_RESOURCE_COPPER:
             return "copper";
+        case FACTORY_RESOURCE_COAL:
+            return "coal";
         default:
             return "invalid resource";
     }

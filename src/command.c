@@ -53,7 +53,7 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
             return command->data.set_storage_output.item
                 >= FACTORY_ITEM_NONE
                 && command->data.set_storage_output.item
-                    <= FACTORY_ITEM_CONSTRUCTION_MATERIAL;
+                    <= FACTORY_ITEM_ADVANCED_SCIENCE;
         case FACTORY_COMMAND_PLACE_POWER_POLE:
         case FACTORY_COMMAND_PLACE_POWER_GENERATOR:
         case FACTORY_COMMAND_PLACE_FLUID_TANK:
@@ -91,7 +91,7 @@ bool factory_command_is_well_formed(const FactoryCommand *command)
             return command->data.set_rail_station_freight_item.station_entity_id!=0U
                 &&command->data.set_rail_station_freight_item.item>=FACTORY_ITEM_NONE
                 &&command->data.set_rail_station_freight_item.item
-                    <=FACTORY_ITEM_CONSTRUCTION_MATERIAL;
+                    <=FACTORY_ITEM_ADVANCED_SCIENCE;
         case FACTORY_COMMAND_PLACE_RAIL_SWITCH:
             return factory_rail_switch_geometry_is_valid(
                 (FactoryRailSwitchGeometry)

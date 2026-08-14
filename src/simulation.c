@@ -279,6 +279,8 @@ static FactoryResult place_extractor(
         produced_item = FACTORY_ITEM_IRON_ORE;
     } else if (tile->resource == FACTORY_RESOURCE_COPPER) {
         produced_item = FACTORY_ITEM_COPPER_ORE;
+    } else if (tile->resource == FACTORY_RESOURCE_COAL) {
+        produced_item = FACTORY_ITEM_COAL;
     } else {
         return FACTORY_RESULT_UNSUPPORTED_RESOURCE;
     }
@@ -968,7 +970,7 @@ static FactoryResult set_station_freight(FactorySimulation*s,
             return FACTORY_RESULT_INVALID_ARGUMENT;
         station->freight_mode=(FactoryRailStationFreightMode)mode;
     }else{FactoryItemType item=c->data.set_rail_station_freight_item.item;
-        if(item<FACTORY_ITEM_NONE||item>FACTORY_ITEM_CONSTRUCTION_MATERIAL)
+        if(item<FACTORY_ITEM_NONE||item>FACTORY_ITEM_ADVANCED_SCIENCE)
             return FACTORY_RESULT_INVALID_ARGUMENT;
         if(station->freight_quantity!=0U&&item!=station->configured_item)
             return FACTORY_RESULT_INVALID_STATE;
@@ -2038,7 +2040,7 @@ static FactoryResult set_storage_output(
     FactoryStorage *storage;
 
     if (item < FACTORY_ITEM_NONE
-        || item > FACTORY_ITEM_CONSTRUCTION_MATERIAL) {
+        || item > FACTORY_ITEM_ADVANCED_SCIENCE) {
         return FACTORY_RESULT_INVALID_ARGUMENT;
     }
     if (!factory_entity_is_valid(simulation->entities, id)) {

@@ -43,7 +43,8 @@ bool factory_technology_definitions_validate(
         if (d->id==FACTORY_TECHNOLOGY_NONE || d->id>63U
             || d->prerequisite_count>FACTORY_TECHNOLOGY_MAX_PREREQUISITES
             || d->science_item<=FACTORY_ITEM_NONE
-            || d->science_item>FACTORY_ITEM_BASIC_SCIENCE
+            || (d->science_item!=FACTORY_ITEM_BASIC_SCIENCE
+                &&d->science_item!=FACTORY_ITEM_ADVANCED_SCIENCE)
             || d->science_quantity_per_unit==0U
             || d->required_science_units==0U || d->work_ticks_per_unit==0U
             || d->unlock_flags==0U || (d->unlock_flags&~FACTORY_UNLOCK_ALL)!=0U

@@ -8,6 +8,7 @@
 #define CHANNEL_WATER UINT64_C(0x7761746572)
 #define CHANNEL_ROCK UINT64_C(0x726f636b)
 #define CHANNEL_PATCH UINT64_C(0x7061746368)
+#define CHANNEL_COAL UINT64_C(0x636f616c)
 
 static uint64_t splitmix64(uint64_t value)
 {
@@ -138,14 +139,16 @@ static void place_remote_patches(FactoryWorld *world,
         int32_t x=(int32_t)(h%world->width);
         int32_t y=(int32_t)((h>>32U)%world->height);
         uint32_t distance=(uint32_t)(abs(x-sx)+abs(y-sy));
-        FactoryResourceType type=(placed&1U)==0U?FACTORY_RESOURCE_IRON:FACTORY_RESOURCE_COPPER;
+        FactoryResourceType type=(placed%3U)==0U?FACTORY_RESOURCE_IRON:
+            ((placed%3U)==1U?FACTORY_RESOURCE_COPPER:FACTORY_RESOURCE_COAL);
         uint64_t quantity=(uint64_t)c->remote_base_quantity
             +(uint64_t)(distance/(c->starting_area_radius+1U))*c->remote_distance_bonus;
         if(distance<=c->starter_distance+c->remote_patch_radius
             ||!center_fits(world,x,y,c->remote_patch_radius))continue;
         if(quantity>UINT32_MAX)quantity=UINT32_MAX;
         if(place_patch(world,x,y,c->remote_patch_radius,type,(uint32_t)quantity,
-            CHANNEL_PATCH|(UINT64_C(0x100)+(uint64_t)placed))>=3U)++placed;
+            (type==FACTORY_RESOURCE_COAL?CHANNEL_COAL:CHANNEL_PATCH)
+                |(UINT64_C(0x100)+(uint64_t)placed))>=3U)++placed;
     }
 }
 

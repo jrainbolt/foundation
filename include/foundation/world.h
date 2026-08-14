@@ -34,7 +34,8 @@ typedef struct {
 typedef enum {
     FACTORY_RESOURCE_NONE = 0,
     FACTORY_RESOURCE_IRON,
-    FACTORY_RESOURCE_COPPER
+    FACTORY_RESOURCE_COPPER,
+    FACTORY_RESOURCE_COAL
 } FactoryResourceType;
 
 typedef uint32_t FactoryResourceQuantity;

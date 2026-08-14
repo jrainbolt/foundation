@@ -61,6 +61,10 @@ void factory_storage_store_add(
     storage->biomass_pellet_amount = 0U;
     storage->basic_science_amount = 0U;
     storage->construction_material_amount = 0U;
+    storage->coal_amount = 0U;
+    storage->steel_amount = 0U;
+    storage->advanced_component_amount = 0U;
+    storage->advanced_science_amount = 0U;
     storage->total_capacity = FACTORY_STORAGE_CAPACITY;
     storage->configured_output_item = FACTORY_ITEM_NONE;
     storage->output_item = FACTORY_ITEM_NONE;
@@ -162,6 +166,22 @@ bool factory_storage_get_item_amount(
         *out_amount = storage->construction_material_amount;
         return true;
     }
+    if (item == FACTORY_ITEM_COAL) {
+        *out_amount = storage->coal_amount;
+        return true;
+    }
+    if (item == FACTORY_ITEM_STEEL) {
+        *out_amount = storage->steel_amount;
+        return true;
+    }
+    if (item == FACTORY_ITEM_ADVANCED_COMPONENT) {
+        *out_amount = storage->advanced_component_amount;
+        return true;
+    }
+    if (item == FACTORY_ITEM_ADVANCED_SCIENCE) {
+        *out_amount = storage->advanced_science_amount;
+        return true;
+    }
     return false;
 }
 
@@ -178,7 +198,11 @@ uint32_t factory_storage_get_total_amount(const FactoryStorage *storage)
             + storage->copper_wire_amount
             + storage->biomass_pellet_amount
             + storage->basic_science_amount
-            + storage->construction_material_amount;
+            + storage->construction_material_amount
+            + storage->coal_amount
+            + storage->steel_amount
+            + storage->advanced_component_amount
+            + storage->advanced_science_amount;
 }
 
 static uint32_t *item_amount(
@@ -207,6 +231,14 @@ static uint32_t *item_amount(
             return &storage->basic_science_amount;
         case FACTORY_ITEM_CONSTRUCTION_MATERIAL:
             return &storage->construction_material_amount;
+        case FACTORY_ITEM_COAL:
+            return &storage->coal_amount;
+        case FACTORY_ITEM_STEEL:
+            return &storage->steel_amount;
+        case FACTORY_ITEM_ADVANCED_COMPONENT:
+            return &storage->advanced_component_amount;
+        case FACTORY_ITEM_ADVANCED_SCIENCE:
+            return &storage->advanced_science_amount;
         default:
             return NULL;
     }

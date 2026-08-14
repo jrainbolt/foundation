@@ -10,7 +10,7 @@
 #include "foundation/rail.h"
 
 #define FACTORY_PRESENTATION_DIRECTION_NONE (-1)
-#define FACTORY_PRESENTATION_STORAGE_ITEM_COUNT 10U
+#define FACTORY_PRESENTATION_STORAGE_ITEM_COUNT 14U
 
 typedef enum {
     FACTORY_PRESENTATION_MACHINE_STATUS_NONE = 0,
@@ -51,6 +51,8 @@ typedef struct {
     FactoryRecipeId recipe_id;
     FactoryItemType input_item;
     uint32_t input_quantity;
+    FactoryItemType secondary_input_item;
+    uint32_t secondary_input_quantity;
     FactoryItemType output_item;
     uint32_t output_quantity;
     uint32_t progress;
@@ -252,6 +254,7 @@ typedef struct {
 } FactoryPresentationSteamCondenser;
 
 typedef struct {
+    FactoryItemType science_item;
     uint32_t science_quantity;
     uint32_t science_capacity;
     FactoryPowerNetworkId power_network_id;

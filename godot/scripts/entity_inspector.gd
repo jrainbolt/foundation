@@ -174,7 +174,7 @@ func show_entity(state: Dictionary) -> void:
 		if state.has("progress"): field(lines, "Progress", "%d / %d ticks" % [int(state.progress), int(state.get("duration", 0))])
 	for key in ["processing", "generation_active", "conversion_active", "fuel_active"]:
 		if state.has(key): field(lines, key.capitalize(), Format.yes_no(bool(state[key])))
-	var inventory_keys := ["item", "quantity", "output_item", "output_quantity", "resource_remaining", "science_quantity", "science_capacity", "material_quantity", "supply_radius", "fluid_quantity", "fluid_capacity", "stored_water", "water_capacity", "stored_steam", "steam_capacity", "stored_exhaust", "exhaust_capacity", "stored_energy", "capacity", "stored_heat", "heat_capacity", "fuel_ticks", "energy_available", "cargo_item", "cargo_quantity", "cargo_capacity"]
+	var inventory_keys := ["item", "quantity", "output_item", "output_quantity", "resource_remaining", "science_item_name", "science_quantity", "science_capacity", "material_quantity", "supply_radius", "fluid_quantity", "fluid_capacity", "stored_water", "water_capacity", "stored_steam", "steam_capacity", "stored_exhaust", "exhaust_capacity", "stored_energy", "capacity", "stored_heat", "heat_capacity", "fuel_ticks", "energy_available", "cargo_item", "cargo_quantity", "cargo_capacity"]
 	var has_inventory := false
 	for key in inventory_keys:
 		if state.has(key): has_inventory = true

@@ -101,7 +101,7 @@ func run_test() -> void:
 	controller.select_entity(32)
 	if not require_value(inspector.details.text.contains("Fluid Quantity"), "fluid inspector data"): return
 	controller.select_entity(13)
-	if not require_value(inspector.configuration_selector.visible and inspector.configuration_selector.item_count == 4, "assembler recipe selector"): return
+	if not require_value(inspector.configuration_selector.visible and inspector.configuration_selector.item_count == 6, "assembler recipe selector"): return
 	var assembler_before: Dictionary = canvas.entity_nodes[13].state
 	if not require_value(simulation.queue_set_assembler_recipe(13,2) == 0, "assembler configuration queue"): return
 	if not require_value(int(canvas.entity_nodes[13].state.recipe) == int(assembler_before.recipe), "assembler configuration mutated before tick"): return
@@ -118,7 +118,7 @@ func run_test() -> void:
 			break
 	if not require_value(int(canvas.entity_nodes[13].state.recipe) == 1 and main.status_label.text.contains("updated"), "inspector command workflow"): return
 	controller.select_entity(19)
-	if not require_value(inspector.configuration_selector.visible and inspector.configuration_selector.item_count == 11, "storage output selector"): return
+	if not require_value(inspector.configuration_selector.visible and inspector.configuration_selector.item_count == 15, "storage output selector"): return
 	var storage_before: Dictionary = canvas.entity_nodes[19].state
 	if not require_value(simulation.queue_set_storage_output(19,9) == 0, "storage configuration queue"): return
 	if not require_value(int(canvas.entity_nodes[19].state.configured_output) == int(storage_before.configured_output), "storage configuration mutated before tick"): return

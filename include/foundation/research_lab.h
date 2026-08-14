@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "foundation/entity.h"
+#include "foundation/item.h"
 #include "foundation/power.h"
 #include <foundation/world.h>
 
@@ -24,6 +25,7 @@ typedef struct {
     FactoryEntityId entity_id;
     int32_t x;
     int32_t y;
+    FactoryItemType science_item;
     uint32_t science_quantity;
     uint32_t science_capacity;
     FactoryPowerNetworkId power_network_id;

@@ -10,7 +10,8 @@
 typedef enum {
     FACTORY_RECIPE_NONE = 0,
     FACTORY_RECIPE_IRON_PLATE,
-    FACTORY_RECIPE_COPPER_PLATE
+    FACTORY_RECIPE_COPPER_PLATE,
+    FACTORY_RECIPE_STEEL
 } FactoryRecipeId;
 
 typedef struct {
@@ -19,6 +20,8 @@ typedef struct {
     FactoryItemType output_item;
     uint32_t output_amount;
     uint32_t processing_ticks;
+    FactoryItemType secondary_input_item;
+    uint32_t secondary_input_amount;
 } FactoryRecipe;
 
 /* Returns immutable static recipe data, or NULL for an invalid ID. */

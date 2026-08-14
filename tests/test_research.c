@@ -34,14 +34,14 @@ static void test_definitions(void)
             FACTORY_UNLOCK_AUTOMATION},
         {2U,{1U,0U},1U,FACTORY_ITEM_BASIC_SCIENCE,1U,1U,1U,
             FACTORY_UNLOCK_FLUID_HANDLING}};
-    CHECK(factory_technology_definition_count()==2U);
+    CHECK(factory_technology_definition_count()==3U);
     CHECK(root!=NULL && root->prerequisite_count==0U
         && root->science_quantity_per_unit==2U
         && root->required_science_units==2U && root->work_ticks_per_unit==3U);
     CHECK(dependent!=NULL && dependent->id==FACTORY_TECHNOLOGY_FLUID_HANDLING
         && dependent->prerequisites[0]==FACTORY_TECHNOLOGY_BASIC_AUTOMATION);
     CHECK(factory_technology_definition_get(99U)==NULL);
-    CHECK(factory_technology_definition_at(2U)==NULL);
+    CHECK(factory_technology_definition_at(3U)==NULL);
     CHECK(!factory_technology_definitions_validate(cyclic,2U));
 }
 

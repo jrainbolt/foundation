@@ -25,6 +25,14 @@ const char *factory_item_name(FactoryItemType item)
             return "basic science";
         case FACTORY_ITEM_CONSTRUCTION_MATERIAL:
             return "construction material";
+        case FACTORY_ITEM_COAL:
+            return "coal";
+        case FACTORY_ITEM_STEEL:
+            return "steel";
+        case FACTORY_ITEM_ADVANCED_COMPONENT:
+            return "advanced component";
+        case FACTORY_ITEM_ADVANCED_SCIENCE:
+            return "advanced science";
         default:
             return "invalid item";
     }
@@ -38,6 +46,10 @@ uint32_t factory_item_iron_units(FactoryItemType item)
         case FACTORY_ITEM_ELECTRONIC_COMPONENT:
             return 2U;
         case FACTORY_ITEM_IRON_GEAR:
+            return 4U;
+        case FACTORY_ITEM_STEEL:
+        case FACTORY_ITEM_ADVANCED_COMPONENT:
+        case FACTORY_ITEM_ADVANCED_SCIENCE:
             return 4U;
         default:
             return 0U;
@@ -53,6 +65,9 @@ uint32_t factory_item_copper_units(FactoryItemType item)
             return 2U;
         case FACTORY_ITEM_COPPER_WIRE:
             return 1U;
+        case FACTORY_ITEM_ADVANCED_COMPONENT:
+        case FACTORY_ITEM_ADVANCED_SCIENCE:
+            return 2U;
         default:
             return 0U;
     }

@@ -98,14 +98,14 @@ static void test_generation(void)
     FactoryWorld *a=factory_world_create_with_seed(64U,48U,UINT64_C(42));
     FactoryWorld *b=factory_world_create_with_seed(64U,48U,UINT64_C(42));
     FactoryWorld *different=factory_world_create_with_seed(64U,48U,UINT64_C(43));
-    uint32_t terrain_counts[4]={0},iron=0U,copper=0U,remote=0U;
+    uint32_t terrain_counts[4]={0},iron=0U,copper=0U,coal=0U,remote=0U;
     factory_world_generation_default_config(&config);
     CHECK(factory_world_generate(a,&config)==FACTORY_RESULT_OK);
     CHECK(factory_world_generate(b,&config)==FACTORY_RESULT_OK);
     CHECK(factory_world_generate(different,&config)==FACTORY_RESULT_OK);
     CHECK(factory_world_generation_checksum(a)==factory_world_generation_checksum(b));
     CHECK(factory_world_generation_checksum(a)!=factory_world_generation_checksum(different));
-    CHECK(factory_world_generation_checksum(a)==UINT64_C(17182821196558947513));
+    CHECK(factory_world_generation_checksum(a)==UINT64_C(13709290720089151708));
     CHECK(factory_world_get_start_x(a)==32&&factory_world_get_start_y(a)==24);
     for(uint32_t y=0U;y<48U;++y)for(uint32_t x=0U;x<64U;++x){
         const FactoryTile *ta=factory_world_get_tile(a,(int32_t)x,(int32_t)y);
@@ -115,6 +115,10 @@ static void test_generation(void)
         ++terrain_counts[ta->terrain];
         if(ta->resource==FACTORY_RESOURCE_IRON)++iron;
         if(ta->resource==FACTORY_RESOURCE_COPPER)++copper;
+        if(ta->resource==FACTORY_RESOURCE_COAL){
+            ++coal;
+            CHECK(abs((int32_t)x-32)>5||abs((int32_t)y-24)>5);
+        }
         if(ta->resource!=FACTORY_RESOURCE_NONE
             &&(abs((int32_t)x-32)>11||abs((int32_t)y-24)>11)){
             ++remote;CHECK(ta->resource_amount>=900U);
@@ -123,7 +127,7 @@ static void test_generation(void)
     CHECK(terrain_counts[FACTORY_TERRAIN_GROUND]>terrain_counts[FACTORY_TERRAIN_WATER]);
     CHECK(terrain_counts[FACTORY_TERRAIN_GROUND]>terrain_counts[FACTORY_TERRAIN_ROCK]);
     CHECK(terrain_counts[FACTORY_TERRAIN_WATER]>0U&&terrain_counts[FACTORY_TERRAIN_ROCK]>0U);
-    CHECK(iron>=3U&&copper>=3U);
+    CHECK(iron>=3U&&copper>=3U&&coal>=3U);
     CHECK(remote>=3U);
     for(int32_t dy=-5;dy<=5;++dy)for(int32_t dx=-5;dx<=5;++dx)
         if(dx*dx+dy*dy<=25)CHECK(factory_world_get_terrain(a,32+dx,24+dy)==FACTORY_TERRAIN_GROUND);

@@ -69,8 +69,8 @@ func _initialize() -> void:
 		and simulation.has_method("get_train_route")
 		and simulation.has_method("get_command_results")
 		and simulation.get_build_catalog().size() == 30
-		and simulation.get_assembler_recipe_catalog().size() == 4
-		and simulation.get_item_catalog().size() == 11
+		and simulation.get_assembler_recipe_catalog().size() == 6
+		and simulation.get_item_catalog().size() == 15
 		and simulation.get_construction_units() >= 0,
 		"construction command bridge"
 	):

@@ -1116,7 +1116,7 @@ bool factory_simulation_get_cargo_wagon(const FactorySimulation*s,
 FactoryResult factory_simulation_cargo_wagon_insert(FactorySimulation*s,
     FactoryEntityId id,FactoryItemType item,uint32_t quantity)
 {FactoryCargoWagon*w;if(s==NULL||item<=FACTORY_ITEM_NONE
-    ||item>FACTORY_ITEM_CONSTRUCTION_MATERIAL||quantity==0U)
+    ||item>FACTORY_ITEM_ADVANCED_SCIENCE||quantity==0U)
     return FACTORY_RESULT_INVALID_ARGUMENT;
  w=factory_cargo_wagon_store_find_mutable(&s->cargo_wagons,id);
  if(w==NULL)return factory_entity_is_valid(s->entities,id)
@@ -1129,7 +1129,7 @@ FactoryResult factory_simulation_cargo_wagon_insert(FactorySimulation*s,
 FactoryResult factory_simulation_cargo_wagon_remove(FactorySimulation*s,
     FactoryEntityId id,FactoryItemType item,uint32_t quantity)
 {FactoryCargoWagon*w;if(s==NULL||item<=FACTORY_ITEM_NONE
-    ||item>FACTORY_ITEM_CONSTRUCTION_MATERIAL||quantity==0U)
+    ||item>FACTORY_ITEM_ADVANCED_SCIENCE||quantity==0U)
     return FACTORY_RESULT_INVALID_ARGUMENT;
  w=factory_cargo_wagon_store_find_mutable(&s->cargo_wagons,id);
  if(w==NULL)return factory_entity_is_valid(s->entities,id)

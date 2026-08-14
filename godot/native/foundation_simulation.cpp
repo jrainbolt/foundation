@@ -977,7 +977,7 @@ int64_t FoundationSimulation::queue_set_storage_output(
 {
     if (simulation_==nullptr || entity_id<=0 || entity_id>UINT32_MAX
         || item_type<FACTORY_ITEM_NONE
-        || item_type>FACTORY_ITEM_CONSTRUCTION_MATERIAL)
+        || item_type>FACTORY_ITEM_ADVANCED_SCIENCE)
         return FACTORY_RESULT_INVALID_ARGUMENT;
     FactoryCommand command={};
     command.type=FACTORY_COMMAND_SET_STORAGE_OUTPUT;
@@ -1018,7 +1018,7 @@ int64_t FoundationSimulation::queue_set_rail_station_freight_item(
     int64_t entity_id,int64_t item)
 {
     if(simulation_==nullptr||entity_id<=0||entity_id>UINT32_MAX
-        ||item<FACTORY_ITEM_NONE||item>FACTORY_ITEM_CONSTRUCTION_MATERIAL)
+        ||item<FACTORY_ITEM_NONE||item>FACTORY_ITEM_ADVANCED_SCIENCE)
         return FACTORY_RESULT_INVALID_ARGUMENT;
     FactoryCommand command={};
     command.type=FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_ITEM;
@@ -1242,7 +1242,7 @@ Array FoundationSimulation::get_item_catalog() const
 {
     Array values;
     for(int item=FACTORY_ITEM_NONE;
-        item<=FACTORY_ITEM_CONSTRUCTION_MATERIAL;++item){
+        item<=FACTORY_ITEM_ADVANCED_SCIENCE;++item){
         Dictionary value;
         value["item_type"]=(int64_t)item;
         value["name"]=item==FACTORY_ITEM_NONE
@@ -1787,6 +1787,10 @@ bool FoundationSimulation::entity_to_dictionary(
             (int64_t)entity.data.steam_condenser.activity;
         break;
     case FACTORY_ENTITY_TYPE_RESEARCH_LAB:
+        value["science_item"] =
+            (int64_t)entity.data.research_lab.science_item;
+        value["science_item_name"] = String(factory_item_name(
+            entity.data.research_lab.science_item));
         value["science_quantity"] =
             (int64_t)entity.data.research_lab.science_quantity;
         value["science_capacity"] =

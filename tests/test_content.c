@@ -84,9 +84,9 @@ static void test_invalid_views(void)
 {
     const FactoryContentView *base=factory_content_get();
     FactoryContentView view=*base;
-    FactoryEntityDefinition entities[21];
-    FactoryRefineryRecipeDefinition refinery[2];
-    FactoryTechnologyDefinition technologies[2];
+    FactoryEntityDefinition entities[FACTORY_ENTITY_TYPE_RAIL_CHAIN_SIGNAL];
+    FactoryRefineryRecipeDefinition refinery[3];
+    FactoryTechnologyDefinition technologies[FACTORY_TECHNOLOGY_COUNT];
     FactorySteamGenerationRecipe steam[1];
     (void)memcpy(entities,base->entities,sizeof(entities));
     entities[1].entity_type=entities[0].entity_type;

@@ -9,6 +9,7 @@ typedef struct {
     FactoryEntityId entity_id;
     int32_t x;
     int32_t y;
+    FactoryItemType science_item;
     uint32_t science_quantity;
     FactoryResearchLabActivity activity;
     uint32_t science_consumed_last_tick;

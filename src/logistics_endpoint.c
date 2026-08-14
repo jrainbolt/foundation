@@ -6,7 +6,7 @@
 static bool item_is_valid(FactoryItemType item)
 {
     return item > FACTORY_ITEM_NONE
-        && item <= FACTORY_ITEM_CONSTRUCTION_MATERIAL;
+        && item <= FACTORY_ITEM_ADVANCED_SCIENCE;
 }
 
 bool factory_logistics_endpoint_equal(
@@ -215,7 +215,11 @@ FactoryLogisticsResult factory_logistics_endpoint_can_accept(
     if(research_lab!=NULL){
         if(endpoint.slot!=FACTORY_LOGISTICS_SLOT_RESEARCH_LAB_INPUT)
             return FACTORY_LOGISTICS_RESULT_INVALID_SLOT;
-        if(item!=FACTORY_ITEM_BASIC_SCIENCE)
+        if(item!=FACTORY_ITEM_BASIC_SCIENCE
+            &&item!=FACTORY_ITEM_ADVANCED_SCIENCE)
+            return FACTORY_LOGISTICS_RESULT_INCOMPATIBLE_ITEM;
+        if(research_lab->science_quantity!=0U
+            &&research_lab->science_item!=item)
             return FACTORY_LOGISTICS_RESULT_INCOMPATIBLE_ITEM;
         return research_lab->science_quantity<FACTORY_RESEARCH_LAB_SCIENCE_CAPACITY
             ?FACTORY_LOGISTICS_RESULT_OK:FACTORY_LOGISTICS_RESULT_BLOCKED;
@@ -258,11 +262,16 @@ FactoryLogisticsResult factory_logistics_endpoint_can_accept(
             return FACTORY_LOGISTICS_RESULT_INVALID_SLOT;
         }
         recipe = factory_recipe_get(refinery->recipe_id);
-        if (recipe == NULL || recipe->input_item != item) {
+        if (recipe == NULL || (recipe->input_item != item
+                && recipe->secondary_input_item != item)) {
             return FACTORY_LOGISTICS_RESULT_INCOMPATIBLE_ITEM;
         }
-        return refinery->input_item == FACTORY_ITEM_NONE
-            && refinery->input_amount == 0U
+        if (recipe->input_item == item) {
+            return refinery->input_amount < recipe->input_amount
+                ? FACTORY_LOGISTICS_RESULT_OK
+                : FACTORY_LOGISTICS_RESULT_BLOCKED;
+        }
+        return refinery->secondary_input_amount < recipe->secondary_input_amount
             ? FACTORY_LOGISTICS_RESULT_OK
             : FACTORY_LOGISTICS_RESULT_BLOCKED;
     }
@@ -468,6 +477,7 @@ static void insert_unchecked(
         ++depot->material_quantity;
     } else if(research_lab!=NULL
         && endpoint.slot==FACTORY_LOGISTICS_SLOT_RESEARCH_LAB_INPUT){
+        research_lab->science_item=item;
         ++research_lab->science_quantity;
     } else if (burner != NULL
         && endpoint.slot == FACTORY_LOGISTICS_SLOT_BURNER_INPUT) {
@@ -478,8 +488,14 @@ static void insert_unchecked(
     } else if (splitter != NULL) {
         splitter->item = item;
     } else if (refinery != NULL) {
-        refinery->input_item = item;
-        refinery->input_amount = 1U;
+        const FactoryRecipe *recipe=factory_recipe_get(refinery->recipe_id);
+        if(recipe!=NULL&&item==recipe->input_item){
+            refinery->input_item=item;
+            ++refinery->input_amount;
+        }else{
+            refinery->secondary_input_item=item;
+            ++refinery->secondary_input_amount;
+        }
     } else if (assembler != NULL) {
         size_t slot = endpoint.slot
                 == FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_0
@@ -507,8 +523,16 @@ static void insert_unchecked(
         ++storage->biomass_pellet_amount;
     } else if (item == FACTORY_ITEM_BASIC_SCIENCE) {
         ++storage->basic_science_amount;
-    } else {
+    } else if (item == FACTORY_ITEM_CONSTRUCTION_MATERIAL) {
         ++storage->construction_material_amount;
+    } else if (item == FACTORY_ITEM_COAL) {
+        ++storage->coal_amount;
+    } else if (item == FACTORY_ITEM_STEEL) {
+        ++storage->steel_amount;
+    } else if (item == FACTORY_ITEM_ADVANCED_COMPONENT) {
+        ++storage->advanced_component_amount;
+    } else {
+        ++storage->advanced_science_amount;
     }
 }
 

@@ -60,6 +60,8 @@ void factory_refinery_store_add(
     refinery->recipe_id = FACTORY_RECIPE_NONE;
     refinery->input_item = FACTORY_ITEM_NONE;
     refinery->input_amount = 0U;
+    refinery->secondary_input_item = FACTORY_ITEM_NONE;
+    refinery->secondary_input_amount = 0U;
     refinery->output_item = FACTORY_ITEM_NONE;
     refinery->output_amount = 0U;
     refinery->processing_progress = 0U;
@@ -131,9 +133,13 @@ void factory_refinery_store_update(
             && !refinery->processing
             && refinery->output_item == FACTORY_ITEM_NONE
             && refinery->input_item == recipe->input_item
-            && refinery->input_amount == recipe->input_amount) {
+            && refinery->input_amount == recipe->input_amount
+            && refinery->secondary_input_item == recipe->secondary_input_item
+            && refinery->secondary_input_amount == recipe->secondary_input_amount) {
             refinery->input_item = FACTORY_ITEM_NONE;
             refinery->input_amount = 0U;
+            refinery->secondary_input_item = FACTORY_ITEM_NONE;
+            refinery->secondary_input_amount = 0U;
             refinery->processing = true;
             refinery->processing_progress = 0U;
         }

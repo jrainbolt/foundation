@@ -3,7 +3,8 @@
 #define RESOURCE_BIT(resource) (UINT32_C(1) << (uint32_t)(resource))
 static const FactoryTerrainDefinition terrains[] = {
     {FACTORY_TERRAIN_GROUND,true,
-        RESOURCE_BIT(FACTORY_RESOURCE_IRON)|RESOURCE_BIT(FACTORY_RESOURCE_COPPER)},
+        RESOURCE_BIT(FACTORY_RESOURCE_IRON)|RESOURCE_BIT(FACTORY_RESOURCE_COPPER)
+            |RESOURCE_BIT(FACTORY_RESOURCE_COAL)},
     {FACTORY_TERRAIN_WATER,false,0U},
     {FACTORY_TERRAIN_ROCK,false,0U}
 };
@@ -43,9 +44,13 @@ static const FactoryEntityDefinition entities[] = {
 
 static const FactoryRefineryRecipeDefinition refinery_recipes[] = {
     {FACTORY_RECIPE_IRON_PLATE,{FACTORY_ITEM_IRON_ORE,1U,
-        FACTORY_ITEM_IRON_PLATE,1U,FACTORY_IRON_PLATE_PROCESSING_TICKS}},
+        FACTORY_ITEM_IRON_PLATE,1U,FACTORY_IRON_PLATE_PROCESSING_TICKS,
+        FACTORY_ITEM_NONE,0U}},
     {FACTORY_RECIPE_COPPER_PLATE,{FACTORY_ITEM_COPPER_ORE,1U,
-        FACTORY_ITEM_COPPER_PLATE,1U,FACTORY_IRON_PLATE_PROCESSING_TICKS}}
+        FACTORY_ITEM_COPPER_PLATE,1U,FACTORY_IRON_PLATE_PROCESSING_TICKS,
+        FACTORY_ITEM_NONE,0U}},
+    {FACTORY_RECIPE_STEEL,{FACTORY_ITEM_IRON_PLATE,2U,
+        FACTORY_ITEM_STEEL,1U,20U,FACTORY_ITEM_COAL,1U}}
 };
 
 static const FactoryAssemblerRecipe assembler_recipes[] = {
@@ -59,7 +64,14 @@ static const FactoryAssemblerRecipe assembler_recipes[] = {
     {FACTORY_ASSEMBLER_RECIPE_COPPER_WIRE,
         {FACTORY_ITEM_COPPER_PLATE,FACTORY_ITEM_NONE},{1U,0U},1U,
         FACTORY_ITEM_COPPER_WIRE,2U,FACTORY_ASSEMBLER_ELECTRONIC_COMPONENT_TICKS,
-        FACTORY_UNLOCK_AUTOMATION}
+        FACTORY_UNLOCK_AUTOMATION},
+    {FACTORY_ASSEMBLER_RECIPE_ADVANCED_COMPONENT,
+        {FACTORY_ITEM_STEEL,FACTORY_ITEM_COPPER_WIRE},{1U,2U},2U,
+        FACTORY_ITEM_ADVANCED_COMPONENT,1U,20U,FACTORY_UNLOCK_AUTOMATION},
+    {FACTORY_ASSEMBLER_RECIPE_ADVANCED_SCIENCE,
+        {FACTORY_ITEM_ADVANCED_COMPONENT,FACTORY_ITEM_ELECTRONIC_COMPONENT},
+        {1U,1U},2U,FACTORY_ITEM_ADVANCED_SCIENCE,1U,25U,
+        FACTORY_UNLOCK_FLUID_HANDLING}
 };
 
 static const FactoryTechnologyDefinition technologies[] = {
@@ -67,7 +79,11 @@ static const FactoryTechnologyDefinition technologies[] = {
         FACTORY_ITEM_BASIC_SCIENCE,2U,2U,3U,FACTORY_UNLOCK_AUTOMATION},
     {FACTORY_TECHNOLOGY_FLUID_HANDLING,
         {FACTORY_TECHNOLOGY_BASIC_AUTOMATION,0U},1U,
-        FACTORY_ITEM_BASIC_SCIENCE,1U,2U,2U,FACTORY_UNLOCK_FLUID_HANDLING}
+        FACTORY_ITEM_BASIC_SCIENCE,1U,2U,2U,FACTORY_UNLOCK_FLUID_HANDLING},
+    {FACTORY_TECHNOLOGY_ADVANCED_MANUFACTURING,
+        {FACTORY_TECHNOLOGY_FLUID_HANDLING,0U},1U,
+        FACTORY_ITEM_ADVANCED_SCIENCE,2U,3U,3U,
+        FACTORY_UNLOCK_ADVANCED_MANUFACTURING}
 };
 
 static const FactoryFuelDefinition fuels[] = {{
@@ -147,11 +163,11 @@ bool factory_simulation_is_assembler_recipe_unlocked(const FactorySimulation*s,F
 bool factory_content_terrain_allows_resource(FactoryTerrainType terrain,
     FactoryResourceType resource)
 {const FactoryTerrainDefinition*d=factory_content_terrain_definition_get(terrain);
-return d!=NULL&&resource>FACTORY_RESOURCE_NONE&&resource<=FACTORY_RESOURCE_COPPER
+return d!=NULL&&resource>FACTORY_RESOURCE_NONE&&resource<=FACTORY_RESOURCE_COAL
     &&(d->allowed_resource_mask&(UINT32_C(1)<<(uint32_t)resource))!=0U;}
 
 static bool item_valid(FactoryItemType item)
-{ return item>FACTORY_ITEM_NONE && item<=FACTORY_ITEM_CONSTRUCTION_MATERIAL; }
+{ return item>FACTORY_ITEM_NONE && item<=FACTORY_ITEM_ADVANCED_SCIENCE; }
 static bool fluid_exists(const FactoryContentView *v,FactoryFluidType id)
 { for(size_t i=0U;i<v->fluid_count;++i)if(v->fluids[i].fluid_type==id)return true;return false; }
 
@@ -174,7 +190,9 @@ bool factory_content_validate_view(const FactoryContentView *v)
         return false;
     for(size_t i=0U;i<v->terrain_count;++i){const FactoryTerrainDefinition*d=&v->terrains[i];
         if(d->terrain_type<FACTORY_TERRAIN_GROUND||d->terrain_type>FACTORY_TERRAIN_ROCK
-            ||(d->allowed_resource_mask&~(RESOURCE_BIT(FACTORY_RESOURCE_IRON)|RESOURCE_BIT(FACTORY_RESOURCE_COPPER)))!=0U)return false;
+            ||(d->allowed_resource_mask&~(RESOURCE_BIT(FACTORY_RESOURCE_IRON)
+                |RESOURCE_BIT(FACTORY_RESOURCE_COPPER)
+                |RESOURCE_BIT(FACTORY_RESOURCE_COAL)))!=0U)return false;
         for(size_t j=i+1U;j<v->terrain_count;++j)
             if(d->terrain_type==v->terrains[j].terrain_type)return false;}
     for(size_t i=0U;i<v->entity_count;++i){const FactoryEntityDefinition*d=&v->entities[i];
@@ -192,7 +210,12 @@ bool factory_content_validate_view(const FactoryContentView *v)
     for(size_t i=0U;i<v->refinery_recipe_count;++i){const FactoryRefineryRecipeDefinition*d=&v->refinery_recipes[i];
         if(d->recipe_id==FACTORY_RECIPE_NONE||!item_valid(d->recipe.input_item)
             ||!item_valid(d->recipe.output_item)||d->recipe.input_amount==0U
-            ||d->recipe.output_amount==0U||d->recipe.processing_ticks==0U)return false;
+            ||d->recipe.output_amount==0U||d->recipe.processing_ticks==0U
+            ||((d->recipe.secondary_input_item==FACTORY_ITEM_NONE)
+                !=(d->recipe.secondary_input_amount==0U))
+            ||(d->recipe.secondary_input_item!=FACTORY_ITEM_NONE
+                &&(!item_valid(d->recipe.secondary_input_item)
+                    ||d->recipe.secondary_input_item==d->recipe.input_item)))return false;
         for(size_t j=i+1U;j<v->refinery_recipe_count;++j)if(d->recipe_id==v->refinery_recipes[j].recipe_id)return false;}
     for(size_t i=0U;i<v->assembler_recipe_count;++i){const FactoryAssemblerRecipe*d=&v->assembler_recipes[i];
         if(d->recipe_id==FACTORY_ASSEMBLER_RECIPE_NONE||d->input_count==0U

@@ -432,4 +432,10 @@ target_include_directories(factory_train_schedule_tests PRIVATE
 target_link_libraries(factory_train_schedule_tests PRIVATE factory_engine
     foundation_project_options)
 add_test(NAME factory_train_schedule_tests COMMAND factory_train_schedule_tests)
+add_executable(factory_advanced_science_tests tests/test_advanced_science.c)
+target_include_directories(factory_advanced_science_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+target_link_libraries(factory_advanced_science_tests PRIVATE factory_engine
+    foundation_project_options)
+add_test(NAME factory_advanced_science_tests COMMAND factory_advanced_science_tests)
 endif()
