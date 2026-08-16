@@ -852,7 +852,7 @@ static FactoryResult validate_simulation(
             : value->facing == FACTORY_DIRECTION_NORTH ? -1 : 0;
         if (!direction_valid((uint32_t)value->facing)
             || value->state > FACTORY_INSERTER_STATE_DROPPING
-            || value->progress >= FACTORY_INSERTER_ACTION_TICKS
+            || value->progress > FACTORY_INSERTER_ACTION_TICKS
             || (!holding
                 && (value->held_amount != 0U
                     || value->held_item != FACTORY_ITEM_NONE))

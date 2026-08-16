@@ -30,18 +30,6 @@ static void ticks_observe(FactorySimulation *s,FactoryTelemetry *telemetry,
     }
 }
 
-static FactoryEntityId place_and_get(FactorySimulation *s,FactoryCommand command)
-{
-    submit(s,command);
-    ticks(s,1U);
-    const FactoryCommandResult *result=factory_simulation_get_command_result(s,0U);
-    if(result==NULL||result->result!=FACTORY_RESULT_OK)
-        fprintf(stderr,"placement command %u failed: %d\n",
-            (unsigned)command.type,result!=NULL?(int)result->result:-1);
-    CHECK(result!=NULL&&result->result==FACTORY_RESULT_OK);
-    return result!=NULL?result->entity_id:0U;
-}
-
 static bool snapshots_equal(const FactorySimulation *a,
     const FactorySimulation *b)
 {
@@ -66,6 +54,87 @@ static bool snapshots_equal(const FactorySimulation *a,
     factory_snapshot_buffer_destroy(&first);
     factory_snapshot_buffer_destroy(&second);
     return equal;
+}
+
+typedef struct {
+    FactorySimulation *a;
+    FactorySimulation *b;
+} SimulationPair;
+
+static bool events_equal(const FactorySimulation *a,
+    const FactorySimulation *b)
+{
+    const size_t count=factory_simulation_get_event_count(a);
+    if(count!=factory_simulation_get_event_count(b))return false;
+    for(size_t i=0U;i<count;++i){
+        const FactoryEvent *x=factory_simulation_get_event(a,i);
+        const FactoryEvent *y=factory_simulation_get_event(b,i);
+        if(x==NULL||y==NULL||x->type!=y->type||x->tick!=y->tick
+            ||x->entity_id!=y->entity_id
+            ||x->related_entity_id!=y->related_entity_id
+            ||x->entity_type!=y->entity_type||x->item_type!=y->item_type
+            ||x->fluid_type!=y->fluid_type
+            ||x->related_fluid_type!=y->related_fluid_type
+            ||x->nuclear_fuel_id!=y->nuclear_fuel_id
+            ||x->technology_id!=y->technology_id
+            ||x->resource_type!=y->resource_type||x->quantity!=y->quantity
+            ||x->related_quantity!=y->related_quantity
+            ||x->third_quantity!=y->third_quantity||x->x!=y->x
+            ||x->y!=y->y)return false;
+    }
+    return true;
+}
+
+static void pair_tick(SimulationPair pair)
+{
+    CHECK(factory_simulation_tick(pair.a)==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_tick(pair.b)==FACTORY_RESULT_OK);
+    CHECK(factory_simulation_get_tick(pair.a)
+        ==factory_simulation_get_tick(pair.b));
+    CHECK(events_equal(pair.a,pair.b));
+    CHECK(snapshots_equal(pair.a,pair.b));
+}
+
+static void pair_submit(SimulationPair pair,FactoryCommand command)
+{
+    submit(pair.a,command);
+    submit(pair.b,command);
+}
+
+static FactoryEntityId pair_place(SimulationPair pair,FactoryCommand command)
+{
+    pair_submit(pair,command);
+    pair_tick(pair);
+    const FactoryCommandResult *a=factory_simulation_get_command_result(
+        pair.a,0U);
+    const FactoryCommandResult *b=factory_simulation_get_command_result(
+        pair.b,0U);
+    CHECK(a!=NULL&&b!=NULL&&a->result==FACTORY_RESULT_OK
+        &&b->result==FACTORY_RESULT_OK&&a->entity_id==b->entity_id);
+    return a!=NULL?a->entity_id:0U;
+}
+
+static void pair_insert(SimulationPair pair,FactoryLogisticsEndpoint endpoint,
+    FactoryItemType item)
+{
+    CHECK(factory_logistics_endpoint_insert(pair.a,endpoint,item)
+        ==FACTORY_LOGISTICS_RESULT_OK);
+    CHECK(factory_logistics_endpoint_insert(pair.b,endpoint,item)
+        ==FACTORY_LOGISTICS_RESULT_OK);
+    CHECK(events_equal(pair.a,pair.b));
+    CHECK(snapshots_equal(pair.a,pair.b));
+}
+
+static void pair_transfer(SimulationPair pair,
+    FactoryLogisticsEndpoint source,FactoryLogisticsEndpoint destination,
+    FactoryItemType item)
+{
+    CHECK(factory_logistics_endpoint_transfer(pair.a,source,destination,item)
+        ==FACTORY_LOGISTICS_RESULT_OK);
+    CHECK(factory_logistics_endpoint_transfer(pair.b,source,destination,item)
+        ==FACTORY_LOGISTICS_RESULT_OK);
+    CHECK(events_equal(pair.a,pair.b));
+    CHECK(snapshots_equal(pair.a,pair.b));
 }
 
 static void test_catalog_and_physical_chain(void)
@@ -346,12 +415,14 @@ static void test_generated_coal_autonomous_freight_to_steel(void)
 {
     FactoryWorldGenerationConfig generation;
     FactoryWorld *world=factory_world_create_with_seed(64U,48U,UINT64_C(6));
+    FactoryWorld *world_b=factory_world_create_with_seed(64U,48U,UINT64_C(6));
     int32_t coal_x=0,coal_y=0;
     uint32_t best=UINT32_MAX,initial_coal=0U;
     factory_world_generation_default_config(&generation);
     generation.water_threshold=0U;
     generation.rock_threshold=0U;
     CHECK(factory_world_generate(world,&generation)==FACTORY_RESULT_OK);
+    CHECK(factory_world_generate(world_b,&generation)==FACTORY_RESULT_OK);
     const int32_t start_x=factory_world_get_start_x(world);
     const int32_t start_y=factory_world_get_start_y(world);
     for(int32_t y=8;y<38;++y)for(int32_t x=8;x<56;++x){
@@ -370,8 +441,10 @@ static void test_generated_coal_autonomous_freight_to_steel(void)
 
     FactorySimulation *s=factory_simulation_create_with_construction_units(
         world,FACTORY_CONSTRUCTION_COST_CONSTRUCTION_DEPOT+500U);
-    s->fixture_initial_generator_fuel=FACTORY_TEST_GENERATOR_FUEL_QUANTITY;
-    FactoryEntityId depot=place_and_get(s,(FactoryCommand){
+    FactorySimulation *s_b=factory_simulation_create_with_construction_units(
+        world_b,FACTORY_CONSTRUCTION_COST_CONSTRUCTION_DEPOT+500U);
+    const SimulationPair pair={s,s_b};
+    FactoryEntityId depot=pair_place(pair,(FactoryCommand){
         FACTORY_COMMAND_PLACE_CONSTRUCTION_DEPOT,
         {.place_construction_depot={coal_x+2,coal_y+5}}});
     CHECK(s->construction_depots.items[0].entity_id==depot
@@ -390,67 +463,73 @@ static void test_generated_coal_autonomous_freight_to_steel(void)
         FACTORY_RAIL_HORIZONTAL,FACTORY_RAIL_HORIZONTAL,
         FACTORY_RAIL_CURVE_NW};
     for(int32_t index=0;index<7;++index){
-        top[index]=place_and_get(s,(FactoryCommand){FACTORY_COMMAND_PLACE_RAIL,
+        top[index]=pair_place(pair,(FactoryCommand){FACTORY_COMMAND_PLACE_RAIL,
             {.place_rail={ox+index+2,oy+3,top_geometry[index]}}});
-        (void)place_and_get(s,(FactoryCommand){FACTORY_COMMAND_PLACE_RAIL,
+        (void)pair_place(pair,(FactoryCommand){FACTORY_COMMAND_PLACE_RAIL,
             {.place_rail={ox+index+2,oy+7,bottom_geometry[index]}}});
     }
     for(int32_t index=0;index<3;++index){
-        (void)place_and_get(s,(FactoryCommand){FACTORY_COMMAND_PLACE_RAIL,
+        (void)pair_place(pair,(FactoryCommand){FACTORY_COMMAND_PLACE_RAIL,
             {.place_rail={ox+2,oy+index+4,FACTORY_RAIL_VERTICAL}}});
-        (void)place_and_get(s,(FactoryCommand){FACTORY_COMMAND_PLACE_RAIL,
+        (void)pair_place(pair,(FactoryCommand){FACTORY_COMMAND_PLACE_RAIL,
             {.place_rail={ox+8,oy+index+4,FACTORY_RAIL_VERTICAL}}});
     }
-    FactoryEntityId load_station=place_and_get(s,(FactoryCommand){
+    FactoryEntityId load_station=pair_place(pair,(FactoryCommand){
         FACTORY_COMMAND_PLACE_RAIL_STATION,
         {.place_rail_station={coal_x,coal_y+3,FACTORY_DIRECTION_SOUTH}}});
-    FactoryEntityId unload_station=place_and_get(s,(FactoryCommand){
+    FactoryEntityId unload_station=pair_place(pair,(FactoryCommand){
         FACTORY_COMMAND_PLACE_RAIL_STATION,
         {.place_rail_station={coal_x+2,coal_y+9,FACTORY_DIRECTION_NORTH}}});
-    FactoryEntityId extractor=place_and_get(s,(FactoryCommand){
+    FactoryEntityId extractor=pair_place(pair,(FactoryCommand){
         FACTORY_COMMAND_PLACE_EXTRACTOR,
         {.place_extractor={coal_x,coal_y,FACTORY_DIRECTION_SOUTH}}});
     CHECK(factory_simulation_get_command_result(s,0U)->construction_depot_id
         ==depot);
-    FactoryEntityId coal_belt=place_and_get(s,(FactoryCommand){
+    FactoryEntityId coal_belt=pair_place(pair,(FactoryCommand){
         FACTORY_COMMAND_PLACE_BELT,
         {.place_belt={coal_x,coal_y+1,FACTORY_DIRECTION_SOUTH}}});
-    FactoryEntityId load_inserter=place_and_get(s,(FactoryCommand){
+    FactoryEntityId load_inserter=pair_place(pair,(FactoryCommand){
         FACTORY_COMMAND_PLACE_INSERTER,
         {.place_inserter={coal_x,coal_y+2,FACTORY_DIRECTION_SOUTH}}});
-    (void)place_and_get(s,(FactoryCommand){FACTORY_COMMAND_PLACE_POWER_POLE,
+    (void)pair_place(pair,(FactoryCommand){FACTORY_COMMAND_PLACE_POWER_POLE,
         {.place_power_pole={coal_x-1,coal_y+2}}});
-    s->fixture_initial_generator_fuel=FACTORY_TEST_GENERATOR_FUEL_QUANTITY;
-    (void)place_and_get(s,(FactoryCommand){FACTORY_COMMAND_PLACE_POWER_GENERATOR,
+    FactoryEntityId mine_generator=pair_place(pair,(FactoryCommand){
+        FACTORY_COMMAND_PLACE_POWER_GENERATOR,
         {.place_power_generator={coal_x-1,coal_y+1}}});
-    FactoryEntityId unload_inserter=place_and_get(s,(FactoryCommand){
+    for(uint32_t i=0U;i<10U;++i)pair_insert(pair,
+        (FactoryLogisticsEndpoint){mine_generator,
+            FACTORY_LOGISTICS_SLOT_BURNER_INPUT},FACTORY_ITEM_BIOMASS_PELLET);
+    FactoryEntityId unload_inserter=pair_place(pair,(FactoryCommand){
         FACTORY_COMMAND_PLACE_INSERTER,
         {.place_inserter={coal_x+2,coal_y+10,FACTORY_DIRECTION_SOUTH}}});
-    FactoryEntityId refinery=place_and_get(s,(FactoryCommand){
+    FactoryEntityId refinery=pair_place(pair,(FactoryCommand){
         FACTORY_COMMAND_PLACE_REFINERY,
         {.place_refinery={coal_x+2,coal_y+11,FACTORY_DIRECTION_NORTH,
             FACTORY_DIRECTION_EAST}}});
-    FactoryEntityId output_inserter=place_and_get(s,(FactoryCommand){
+    FactoryEntityId output_inserter=pair_place(pair,(FactoryCommand){
         FACTORY_COMMAND_PLACE_INSERTER,
         {.place_inserter={coal_x+3,coal_y+11,FACTORY_DIRECTION_EAST}}});
-    FactoryEntityId steel_storage=place_and_get(s,(FactoryCommand){
+    FactoryEntityId steel_storage=pair_place(pair,(FactoryCommand){
         FACTORY_COMMAND_PLACE_STORAGE,
         {.place_storage={coal_x+4,coal_y+11}}});
-    (void)place_and_get(s,(FactoryCommand){FACTORY_COMMAND_PLACE_POWER_POLE,
+    (void)pair_place(pair,(FactoryCommand){FACTORY_COMMAND_PLACE_POWER_POLE,
         {.place_power_pole={coal_x+2,coal_y+12}}});
-    s->fixture_initial_generator_fuel=FACTORY_TEST_GENERATOR_FUEL_QUANTITY;
-    (void)place_and_get(s,(FactoryCommand){FACTORY_COMMAND_PLACE_POWER_GENERATOR,
+    FactoryEntityId refinery_generator=pair_place(pair,(FactoryCommand){
+        FACTORY_COMMAND_PLACE_POWER_GENERATOR,
         {.place_power_generator={coal_x+1,coal_y+12}}});
-    FactoryEntityId signal=place_and_get(s,(FactoryCommand){
+    for(uint32_t i=0U;i<10U;++i)pair_insert(pair,
+        (FactoryLogisticsEndpoint){refinery_generator,
+            FACTORY_LOGISTICS_SLOT_BURNER_INPUT},FACTORY_ITEM_BIOMASS_PELLET);
+    FactoryEntityId signal=pair_place(pair,(FactoryCommand){
         FACTORY_COMMAND_PLACE_RAIL_SIGNAL,
         {.place_rail_signal={ox+5,oy+4,FACTORY_DIRECTION_EAST}}});
     FactoryRailSignalInspection signal_state;
     CHECK(factory_simulation_get_rail_signal(s,signal,&signal_state)
         &&signal_state.connected);
-    FactoryEntityId wagon=place_and_get(s,(FactoryCommand){
+    FactoryEntityId wagon=pair_place(pair,(FactoryCommand){
         FACTORY_COMMAND_PLACE_CARGO_WAGON,
         {.place_cargo_wagon={top[1],FACTORY_DIRECTION_EAST}}});
-    FactoryEntityId train=place_and_get(s,(FactoryCommand){
+    FactoryEntityId train=pair_place(pair,(FactoryCommand){
         FACTORY_COMMAND_PLACE_LOCOMOTIVE,
         {.place_locomotive={top[2],FACTORY_DIRECTION_EAST}}});
 
@@ -478,23 +557,34 @@ static void test_generated_coal_autonomous_freight_to_steel(void)
         {FACTORY_COMMAND_TRAIN_SCHEDULE_SET_ENABLED,
             {.train_schedule_set_enabled={train,true}}}
     };
-    for(size_t i=0U;i<sizeof(setup)/sizeof(setup[0]);++i)submit(s,setup[i]);
-    ticks(s,1U);
+    for(size_t i=0U;i<sizeof(setup)/sizeof(setup[0]);++i)
+        pair_submit(pair,setup[i]);
+    pair_tick(pair);
     for(size_t i=0U;i<sizeof(setup)/sizeof(setup[0]);++i)
         CHECK(factory_simulation_get_command_result(s,i)->result
-            ==FACTORY_RESULT_OK);
+            ==FACTORY_RESULT_OK
+            &&factory_simulation_get_command_result(s_b,i)->result
+                ==FACTORY_RESULT_OK);
 
     FactoryTelemetryConfig telemetry_config={32U,1200U,128U};
     FactoryTelemetry *telemetry=factory_telemetry_create(&telemetry_config);
     FactorySimulation *loaded=NULL;
     bool saw_partial_load=false,saw_loaded_travel=false,saw_unload=false;
     uint32_t steel_cycles=0U;
-    for(uint32_t iteration=0U;iteration<5200U&&steel_cycles<3U;++iteration){
+    for(uint32_t iteration=0U;iteration<6200U&&steel_cycles<6U;++iteration){
         FactoryRefinery current;
         CHECK(factory_simulation_get_refinery(s,refinery,&current));
         if(!current.processing&&current.output_item==FACTORY_ITEM_NONE
             &&current.input_amount==0U){
             CHECK(factory_logistics_endpoint_insert(s,
+                (FactoryLogisticsEndpoint){refinery,
+                    FACTORY_LOGISTICS_SLOT_INPUT},FACTORY_ITEM_IRON_PLATE)
+                ==FACTORY_LOGISTICS_RESULT_OK);
+            CHECK(factory_logistics_endpoint_insert(s_b,
+                (FactoryLogisticsEndpoint){refinery,
+                    FACTORY_LOGISTICS_SLOT_INPUT},FACTORY_ITEM_IRON_PLATE)
+                ==FACTORY_LOGISTICS_RESULT_OK);
+            CHECK(factory_logistics_endpoint_insert(s_b,
                 (FactoryLogisticsEndpoint){refinery,
                     FACTORY_LOGISTICS_SLOT_INPUT},FACTORY_ITEM_IRON_PLATE)
                 ==FACTORY_LOGISTICS_RESULT_OK);
@@ -513,7 +603,7 @@ static void test_generated_coal_autonomous_freight_to_steel(void)
                     FACTORY_ITEM_IRON_PLATE)==FACTORY_LOGISTICS_RESULT_OK);
             }
         }
-        CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);
+        pair_tick(pair);
         CHECK(factory_telemetry_observe_step(telemetry,s)
             ==FACTORY_TELEMETRY_RESULT_OK);
         if(loaded!=NULL){
@@ -550,6 +640,10 @@ static void test_generated_coal_autonomous_freight_to_steel(void)
             coal_belt,load_inserter,load_station,wagon,unload_station,
             unload_inserter,refinery,output_inserter,steel_storage)
             ==initial_coal);
+        CHECK(coal_and_steel_accounting(s_b,coal_x,coal_y,extractor,
+            coal_belt,load_inserter,load_station,wagon,unload_station,
+            unload_inserter,refinery,output_inserter,steel_storage)
+            ==initial_coal);
         if(loaded==NULL&&saw_loaded_travel){
             FactorySnapshotBuffer checkpoint={0};
             CHECK(factory_simulation_create_snapshot(s,&checkpoint)
@@ -560,10 +654,10 @@ static void test_generated_coal_autonomous_freight_to_steel(void)
         }
     }
     CHECK(saw_partial_load&&saw_loaded_travel&&saw_unload);
-    CHECK(loaded!=NULL&&steel_cycles>=3U);
+    CHECK(loaded!=NULL&&steel_cycles>=6U);
     CHECK(loaded!=NULL&&snapshots_equal(s,loaded));
     if(!(saw_partial_load&&saw_loaded_travel&&saw_unload
-        &&loaded!=NULL&&steel_cycles>=3U)){
+        &&loaded!=NULL&&steel_cycles>=6U)){
         FactoryExtractor debug_extractor;
         FactoryCargoWagonInspection debug_wagon;
         FactoryRailStationInspection debug_load,debug_unload;
@@ -589,6 +683,150 @@ static void test_generated_coal_autonomous_freight_to_steel(void)
     }
     CHECK(factory_simulation_get_locomotive(s,train,
         &(FactoryLocomotiveInspection){0}));
+
+    /* Complete the same distributed production and research chain in both
+     * independently generated simulations.  All fixture material enters via
+     * normal logistics endpoints; research state is never mutated directly. */
+    FactoryEntityId wire_assembler=pair_place(pair,(FactoryCommand){
+        FACTORY_COMMAND_PLACE_ASSEMBLER,
+        {.place_assembler={coal_x-1,coal_y+5,FACTORY_DIRECTION_EAST}}});
+    FactoryEntityId electronic_assembler=pair_place(pair,(FactoryCommand){
+        FACTORY_COMMAND_PLACE_ASSEMBLER,
+        {.place_assembler={coal_x-1,coal_y+6,FACTORY_DIRECTION_EAST}}});
+    FactoryEntityId science_assembler=pair_place(pair,(FactoryCommand){
+        FACTORY_COMMAND_PLACE_ASSEMBLER,
+        {.place_assembler={coal_x,coal_y+6,FACTORY_DIRECTION_EAST}}});
+    FactoryEntityId science_inserter=pair_place(pair,(FactoryCommand){
+        FACTORY_COMMAND_PLACE_INSERTER,
+        {.place_inserter={coal_x+1,coal_y+6,FACTORY_DIRECTION_EAST}}});
+    FactoryEntityId lab=pair_place(pair,(FactoryCommand){
+        FACTORY_COMMAND_PLACE_RESEARCH_LAB,
+        {.place_research_lab={coal_x+2,coal_y+6}}});
+    FactoryEntityId component_assembler=pair_place(pair,(FactoryCommand){
+        FACTORY_COMMAND_PLACE_ASSEMBLER,
+        {.place_assembler={coal_x+3,coal_y+6,FACTORY_DIRECTION_WEST}}});
+    (void)pair_place(pair,(FactoryCommand){FACTORY_COMMAND_PLACE_POWER_POLE,
+        {.place_power_pole={coal_x+1,coal_y+7}}});
+    FactoryEntityId production_generator=pair_place(pair,(FactoryCommand){
+        FACTORY_COMMAND_PLACE_POWER_GENERATOR,
+        {.place_power_generator={coal_x,coal_y+7}}});
+    for(uint32_t i=0U;i<20U;++i)pair_insert(pair,
+        (FactoryLogisticsEndpoint){production_generator,
+            FACTORY_LOGISTICS_SLOT_BURNER_INPUT},FACTORY_ITEM_BIOMASS_PELLET);
+
+    for(uint32_t i=0U;i<4U;++i)pair_insert(pair,
+        (FactoryLogisticsEndpoint){lab,
+            FACTORY_LOGISTICS_SLOT_RESEARCH_LAB_INPUT},
+        FACTORY_ITEM_BASIC_SCIENCE);
+    pair_submit(pair,(FactoryCommand){FACTORY_COMMAND_SELECT_RESEARCH,
+        {.select_research={FACTORY_TECHNOLOGY_BASIC_AUTOMATION}}});
+    do pair_tick(pair); while(!factory_simulation_is_technology_completed(
+        s,FACTORY_TECHNOLOGY_BASIC_AUTOMATION));
+    CHECK(factory_simulation_is_technology_completed(s_b,
+        FACTORY_TECHNOLOGY_BASIC_AUTOMATION));
+    for(uint32_t i=0U;i<2U;++i)pair_insert(pair,
+        (FactoryLogisticsEndpoint){lab,
+            FACTORY_LOGISTICS_SLOT_RESEARCH_LAB_INPUT},
+        FACTORY_ITEM_BASIC_SCIENCE);
+    pair_submit(pair,(FactoryCommand){FACTORY_COMMAND_SELECT_RESEARCH,
+        {.select_research={FACTORY_TECHNOLOGY_FLUID_HANDLING}}});
+    do pair_tick(pair); while(!factory_simulation_is_technology_completed(
+        s,FACTORY_TECHNOLOGY_FLUID_HANDLING));
+    CHECK(factory_simulation_is_technology_completed(s_b,
+        FACTORY_TECHNOLOGY_FLUID_HANDLING));
+
+    const FactoryCommand production_setup[]={
+        {FACTORY_COMMAND_SET_STORAGE_OUTPUT,
+            {.set_storage_output={steel_storage,FACTORY_ITEM_STEEL}}},
+        {FACTORY_COMMAND_SET_ASSEMBLER_RECIPE,
+            {.set_assembler_recipe={wire_assembler,
+                FACTORY_ASSEMBLER_RECIPE_COPPER_WIRE}}},
+        {FACTORY_COMMAND_SET_ASSEMBLER_RECIPE,
+            {.set_assembler_recipe={electronic_assembler,
+                FACTORY_ASSEMBLER_RECIPE_ELECTRONIC_COMPONENT}}},
+        {FACTORY_COMMAND_SET_ASSEMBLER_RECIPE,
+            {.set_assembler_recipe={component_assembler,
+                FACTORY_ASSEMBLER_RECIPE_ADVANCED_COMPONENT}}},
+        {FACTORY_COMMAND_SET_ASSEMBLER_RECIPE,
+            {.set_assembler_recipe={science_assembler,
+                FACTORY_ASSEMBLER_RECIPE_ADVANCED_SCIENCE}}}
+    };
+    for(size_t i=0U;i<sizeof(production_setup)/sizeof(production_setup[0]);++i)
+        pair_submit(pair,production_setup[i]);
+    pair_tick(pair);
+    for(size_t i=0U;i<sizeof(production_setup)/sizeof(production_setup[0]);++i)
+        CHECK(factory_simulation_get_command_result(s,i)->result
+                ==FACTORY_RESULT_OK
+            &&factory_simulation_get_command_result(s_b,i)->result
+                ==FACTORY_RESULT_OK);
+
+    for(uint32_t cycle=0U;cycle<6U;++cycle){
+        pair_insert(pair,(FactoryLogisticsEndpoint){wire_assembler,
+            FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_0},
+            FACTORY_ITEM_COPPER_PLATE);
+        pair_insert(pair,(FactoryLogisticsEndpoint){electronic_assembler,
+            FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_0},FACTORY_ITEM_IRON_PLATE);
+        pair_insert(pair,(FactoryLogisticsEndpoint){electronic_assembler,
+            FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_1},
+            FACTORY_ITEM_COPPER_PLATE);
+        for(uint32_t tick=0U;tick<20U;++tick)pair_tick(pair);
+        pair_transfer(pair,(FactoryLogisticsEndpoint){steel_storage,
+                FACTORY_LOGISTICS_SLOT_STORAGE_OUTPUT},
+            (FactoryLogisticsEndpoint){component_assembler,
+                FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_0},FACTORY_ITEM_STEEL);
+        for(uint32_t item=0U;item<2U;++item)pair_transfer(pair,
+            (FactoryLogisticsEndpoint){wire_assembler,
+                FACTORY_LOGISTICS_SLOT_OUTPUT},
+            (FactoryLogisticsEndpoint){component_assembler,
+                FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_1},
+            FACTORY_ITEM_COPPER_WIRE);
+        for(uint32_t tick=0U;tick<20U;++tick)pair_tick(pair);
+        pair_transfer(pair,(FactoryLogisticsEndpoint){component_assembler,
+                FACTORY_LOGISTICS_SLOT_OUTPUT},
+            (FactoryLogisticsEndpoint){science_assembler,
+                FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_0},
+            FACTORY_ITEM_ADVANCED_COMPONENT);
+        pair_transfer(pair,(FactoryLogisticsEndpoint){electronic_assembler,
+                FACTORY_LOGISTICS_SLOT_OUTPUT},
+            (FactoryLogisticsEndpoint){science_assembler,
+                FACTORY_LOGISTICS_SLOT_ASSEMBLER_INPUT_1},
+            FACTORY_ITEM_ELECTRONIC_COMPONENT);
+        for(uint32_t tick=0U;tick<30U;++tick)pair_tick(pair);
+    }
+    FactoryResearchLabInspection lab_a,lab_b;
+    CHECK(factory_simulation_get_research_lab(s,lab,&lab_a)
+            ==FACTORY_RESULT_OK
+        &&factory_simulation_get_research_lab(s_b,lab,&lab_b)
+            ==FACTORY_RESULT_OK
+        &&lab_a.science_item==FACTORY_ITEM_ADVANCED_SCIENCE
+        &&lab_a.science_quantity==6U
+        &&lab_a.science_item==lab_b.science_item
+        &&lab_a.science_quantity==lab_b.science_quantity);
+    pair_submit(pair,(FactoryCommand){FACTORY_COMMAND_SELECT_RESEARCH,
+        {.select_research={FACTORY_TECHNOLOGY_ADVANCED_MANUFACTURING}}});
+    uint64_t completion_tick_a=0U,completion_tick_b=0U;
+    for(uint32_t tick=0U;tick<32U&&completion_tick_a==0U;++tick){
+        pair_tick(pair);
+        if(factory_simulation_is_technology_completed(s,
+            FACTORY_TECHNOLOGY_ADVANCED_MANUFACTURING))
+            completion_tick_a=factory_simulation_get_tick(s);
+        if(factory_simulation_is_technology_completed(s_b,
+            FACTORY_TECHNOLOGY_ADVANCED_MANUFACTURING))
+            completion_tick_b=factory_simulation_get_tick(s_b);
+    }
+    CHECK(completion_tick_a!=0U&&completion_tick_a==completion_tick_b);
+    CHECK(factory_simulation_has_unlock(s,
+            FACTORY_UNLOCK_ADVANCED_MANUFACTURING)
+        &&factory_simulation_has_unlock(s_b,
+            FACTORY_UNLOCK_ADVANCED_MANUFACTURING));
+    CHECK(factory_simulation_is_entity_unlocked(s,
+            FACTORY_ENTITY_TYPE_RAIL_CHAIN_SIGNAL)
+        &&factory_simulation_is_entity_unlocked(s_b,
+            FACTORY_ENTITY_TYPE_RAIL_CHAIN_SIGNAL));
+    CHECK(snapshots_equal(s,s_b));
+    printf("independent distributed Advanced Manufacturing completion tick: %llu\n",
+        (unsigned long long)completion_tick_a);
+    (void)science_inserter;
     {
         FactoryTelemetryItemMetrics coal_metrics,steel_metrics;
         CHECK(factory_telemetry_get_item_metrics(telemetry,FACTORY_ITEM_COAL,
@@ -597,10 +835,11 @@ static void test_generated_coal_autonomous_freight_to_steel(void)
             FACTORY_TELEMETRY_WINDOW_LONG,&steel_metrics));
         CHECK(coal_metrics.extracted_quantity>0U);
         CHECK(coal_metrics.transferred_quantity>=100U);
-        CHECK(steel_metrics.produced_quantity>=3U);
+        CHECK(steel_metrics.produced_quantity>=6U);
     }
     factory_simulation_destroy(loaded);
     factory_telemetry_destroy(telemetry);
+    factory_simulation_destroy(s_b);factory_world_destroy(world_b);
     factory_simulation_destroy(s);factory_world_destroy(world);
 }
 
