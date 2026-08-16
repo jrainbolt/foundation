@@ -259,9 +259,10 @@ static void test_bootstrap_preflight_failure_is_transactional(void)
 static void test_generated_remote_outpost(void)
 {
     FactoryWorldGenerationConfig config;
-    FactoryWorld *w=factory_world_create_with_seed(64U,48U,UINT64_C(42));
+    FactoryWorld *w=factory_world_create_with_seed(64U,48U,UINT64_C(6));
     int32_t sx,sy,rx=0,ry=0,route_x,depot_x;
     uint32_t best=UINT32_MAX,initial_cost=0U,transported=30U;
+    FactoryResourceQuantity starting_quantity=0U;
     FactoryCommand commands[FACTORY_COMMAND_QUEUE_CAPACITY];size_t count=0U;
     factory_world_generation_default_config(&config);
     config.water_threshold=0U;config.rock_threshold=0U;
@@ -270,8 +271,9 @@ static void test_generated_remote_outpost(void)
     for(int32_t y=3;y<45;++y)for(int32_t x=7;x<57;++x){
         const FactoryTile *tile=factory_world_get_tile(w,x,y);
         uint32_t distance=distance_u32(sx,sy,x,y);
-        if(tile->resource!=FACTORY_RESOURCE_NONE&&distance>11U&&distance<best){
-            best=distance;rx=x;ry=y;
+        if(tile->resource==FACTORY_RESOURCE_COAL
+            &&distance>11U&&distance<best){
+            best=distance;rx=x;ry=y;starting_quantity=tile->resource_amount;
         }
     }
     CHECK(best!=UINT32_MAX);
@@ -402,8 +404,8 @@ static void test_generated_remote_outpost(void)
     CHECK(initial_cost+transported==initial_cost
         +s->construction_depots.items[0].material_quantity
         +FACTORY_CONSTRUCTION_COST_EXTRACTOR);
-    printf("remote outpost: patch=(%d,%d) start=(%d,%d) distance=%u material=%u belts=%zu supply_ticks=%zu production=%llu storage_inflow=%u\n",
-        rx,ry,sx,sy,best,transported,count-11U,supply_ticks,
+    printf("remote Coal outpost: patch=(%d,%d) start=(%d,%d) distance=%u initial_quantity=%u material=%u belts=%zu supply_ticks=%zu production=%llu storage_inflow=%u\n",
+        rx,ry,sx,sy,best,starting_quantity,transported,count-11U,supply_ticks,
         (unsigned long long)extractor_metrics.completed_cycles,
         factory_storage_get_total_amount(&s->storages.items[1]));
     factory_telemetry_destroy(telemetry);

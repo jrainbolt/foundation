@@ -41,11 +41,21 @@ static void test_lookup_and_compatibility(void)
     }
     CHECK(factory_content_entity_definition_at(view->entity_count)==NULL);
     CHECK(factory_content_entity_definition_get(FACTORY_ENTITY_TYPE_NONE)==NULL);
+    CHECK(factory_content_entity_unlock_requirement(
+        FACTORY_ENTITY_TYPE_RAIL_CHAIN_SIGNAL)
+        ==FACTORY_UNLOCK_ADVANCED_MANUFACTURING);
     for(size_t i=0U;i<view->refinery_recipe_count;++i) {
         const FactoryRefineryRecipeDefinition *d=
             factory_content_refinery_recipe_at(i);
         CHECK(factory_content_refinery_recipe_get(d->recipe_id)==d);
         CHECK(factory_recipe_get(d->recipe_id)==&d->recipe);
+    }
+    {
+        const FactoryRefineryRecipeDefinition *steel=
+            factory_content_refinery_recipe_get(FACTORY_RECIPE_STEEL);
+        CHECK(steel!=NULL
+            &&steel->recipe.secondary_input_item==FACTORY_ITEM_COAL
+            &&steel->recipe.secondary_input_amount==1U);
     }
     for(size_t i=0U;i<view->assembler_recipe_count;++i) {
         FactoryAssemblerRecipe copied={0};
@@ -97,6 +107,11 @@ static void test_invalid_views(void)
     CHECK(!factory_content_validate_view(&view));
     view=*base; (void)memcpy(refinery,base->refinery_recipes,sizeof(refinery));
     refinery[1].recipe_id=refinery[0].recipe_id; view.refinery_recipes=refinery;
+    CHECK(!factory_content_validate_view(&view));
+    view=*base; (void)memcpy(refinery,base->refinery_recipes,sizeof(refinery));
+    refinery[2].recipe.secondary_input_item=FACTORY_ITEM_COAL;
+    refinery[2].recipe.secondary_input_amount=0U;
+    view.refinery_recipes=refinery;
     CHECK(!factory_content_validate_view(&view));
     view=*base; (void)memcpy(technologies,base->technologies,sizeof(technologies));
     technologies[1].unlock_flags=technologies[0].unlock_flags;

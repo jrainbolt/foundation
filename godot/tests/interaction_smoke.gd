@@ -65,7 +65,7 @@ func run_test() -> void:
 	if not require_value(toolbar.buttons.has(27) and not toolbar.buttons[27].disabled, "locomotive toolbar entry"): return
 	if not require_value(toolbar.buttons.has(28) and not toolbar.buttons[28].disabled, "cargo wagon toolbar entry"): return
 	if not require_value(toolbar.buttons.has(29) and not toolbar.buttons[29].disabled, "rail signal toolbar entry"): return
-	if not require_value(toolbar.buttons.has(30) and not toolbar.buttons[30].disabled, "chain signal toolbar entry"): return
+	if not require_value(toolbar.buttons.has(30) and toolbar.buttons[30].disabled, "locked chain signal toolbar entry"): return
 	if not require_value(controller.select_entity(59), "demo rail switch selection"): return
 	if not require_value(inspector.configuration_label.text == "Rail switch branch"
 		and inspector.configuration_selector.item_count == 2,

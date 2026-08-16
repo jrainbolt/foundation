@@ -27,3 +27,24 @@ each requiring two Advanced Science and three powered work ticks. Definitions
 remain outside snapshots. Typed lab inventory, new storage counts, and the
 second refinery input are authoritative, so snapshot version 30 serializes
 them canonically.
+
+Completing Advanced Manufacturing unlocks Rail Chain Signals. The gate is
+owned solely by the immutable entity definition and uses the generic content
+unlock query and construction validation path. Basic rail, stations,
+locomotives, cargo wagons, ordinary signals, depots, and every recipe required
+to make Advanced Science remain available beforehand, so progression has no
+circular dependency.
+
+Completion coverage uses generated seed 6 for a compact remote Coal outpost.
+The test discovers the Coal tile through public world inspection, constructs
+the Extractor and its rail corridor from a supplied Construction Depot, and
+runs a scheduled Cargo Wagon between LOAD/CARGO_FULL and UNLOAD/CARGO_EMPTY
+stops without manual destinations. Coal is accounted for every tick across
+the deposit, Extractor, belt, inserters, station buffers, wagon, refinery
+secondary input, in-process Steel, and stored Steel. A loaded-train checkpoint
+is loaded and continued to identical canonical bytes.
+
+The seed-42 procedural regression remains intentional: adding Coal changed the
+old checksum `17182821196558947513` to `13709290720089151708`. Same-seed
+generation remains exactly equal, different seeds differ, and Coal remains
+outside the protected starter core.

@@ -1,5 +1,6 @@
 #include <foundation/foundation.h>
 #include <foundation/snapshot.h>
+#include "../src/simulation_internal.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -11,10 +12,21 @@ static FactoryEntityId result_id(FactorySimulation*s)
 static FactoryEntityId place(FactorySimulation*s,FactoryCommand c)
 {CHECK(factory_simulation_submit_command(s,&c)==FACTORY_RESULT_OK);
  CHECK(factory_simulation_tick(s)==FACTORY_RESULT_OK);return result_id(s);}
+static void unlock_chain_signal_fixture(FactorySimulation *s)
+{
+ s->research.completed_bits|=
+    (UINT64_C(1)<<FACTORY_TECHNOLOGY_BASIC_AUTOMATION)
+    |(UINT64_C(1)<<FACTORY_TECHNOLOGY_FLUID_HANDLING)
+    |(UINT64_C(1)<<FACTORY_TECHNOLOGY_ADVANCED_MANUFACTURING);
+ s->research.progress[0].completed_units=2U;
+ s->research.progress[1].completed_units=2U;
+ s->research.progress[2].completed_units=3U;
+}
 
 static void chain_lock_and_snapshot(void)
 {FactoryWorld*w=factory_world_create(14,7);FactorySimulation*s=
  factory_simulation_create_with_construction_units(w,2000U);FactoryEntityId r[8];
+ unlock_chain_signal_fixture(s);
  for(int x=1;x<=8;++x){FactoryCommand c={FACTORY_COMMAND_PLACE_RAIL,
     {.place_rail={x,2,FACTORY_RAIL_HORIZONTAL}}};r[x-1]=place(s,c);}
  FactoryCommand chain={FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL,
@@ -55,6 +67,7 @@ static void chain_lock_and_snapshot(void)
 static void occupied_exit_rejects_atomic_request(void)
 {FactoryWorld*w=factory_world_create(14,7);FactorySimulation*s=
  factory_simulation_create_with_construction_units(w,2000U);FactoryEntityId r[8];
+ unlock_chain_signal_fixture(s);
  for(int x=1;x<=8;++x){FactoryCommand c={FACTORY_COMMAND_PLACE_RAIL,
     {.place_rail={x,2,FACTORY_RAIL_HORIZONTAL}}};r[x-1]=place(s,c);}
  FactoryCommand chain={FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL,

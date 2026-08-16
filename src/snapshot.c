@@ -220,7 +220,7 @@ static bool snapshot_command_valid(const FactoryCommand *command)
         return command->data.set_refinery_recipe.recipe_id
             >= FACTORY_RECIPE_NONE
             && command->data.set_refinery_recipe.recipe_id
-                <= FACTORY_RECIPE_COPPER_PLATE;
+                <= FACTORY_RECIPE_STEEL;
     }
     if (command->type==FACTORY_COMMAND_SELECT_RESEARCH)
         return factory_technology_definition_get(

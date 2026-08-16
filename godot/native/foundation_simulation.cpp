@@ -649,7 +649,10 @@ FactoryResult FoundationSimulation::build_demo()
                 :rail_result->result;
     }
     const FactoryCommand signal_demo[] = {
-        place(FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL,2,-1,
+        /* Advanced Manufacturing gates Chain Signals. Keep the stock demo on
+         * its normally researched Fluid Handling state and expose the locked
+         * Chain Signal through the content catalog instead of bypassing it. */
+        place(FACTORY_COMMAND_PLACE_RAIL_SIGNAL,2,-1,
             FACTORY_DIRECTION_EAST),
         place(FACTORY_COMMAND_PLACE_RAIL_SIGNAL,3,-1,
             FACTORY_DIRECTION_EAST)

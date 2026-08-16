@@ -106,7 +106,7 @@ func _initialize() -> void:
 		12, 11, 13, 11, 14, 15, 8, 16, 7, 17,
 		18, 18, 18, 19, 11, 10, 11, 20,
 		11, 21,
-		24, 24, 24, 24, 24, 26, 24, 24, 25, 30, 29, 27, 28, 28,
+		24, 24, 24, 24, 24, 26, 24, 24, 25, 29, 29, 27, 28, 28,
 		24, 24, 24, 24, 24, 24, 24, 24, 24,
 		24, 24, 24, 24, 24, 24, 24, 24, 24,
 		24, 24, 24, 24, 24, 24,
@@ -129,7 +129,7 @@ func _initialize() -> void:
 	var first_signal: Dictionary = entities[62]
 	var second_signal: Dictionary = entities[63]
 	if not _require(
-		int(first_signal.type) == 30
+		int(first_signal.type) == 29
 		and int(first_signal.attached_rail_id) == 57
 		and int(first_signal.signal_orientation) == 1
 		and int(first_signal.downstream_block_id) != 0
