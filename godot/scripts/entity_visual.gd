@@ -42,10 +42,26 @@ var state: Dictionary = {}
 var selected := false
 var hovered := false
 var title_font := SystemFont.new()
+var cosmetic_time := 0.0
+var movement_from := Vector2.ZERO
+var movement_target := Vector2.ZERO
+var movement_elapsed := 1.0
+var visual_step_elapsed := 0.0
+const VEHICLE_LERP_SECONDS := 0.30
 
 func _init() -> void:
 	title_font.font_names = PackedStringArray(["Helvetica", "Arial", "Sans"])
 	title_font.font_weight = 700
+	set_process(true)
+
+func _process(delta: float) -> void:
+	cosmetic_time = fmod(cosmetic_time + delta,1000.0)
+	visual_step_elapsed = minf(1.0,visual_step_elapsed + delta * 12.0)
+	if movement_elapsed < VEHICLE_LERP_SECONDS:
+		movement_elapsed = minf(VEHICLE_LERP_SECONDS,movement_elapsed + delta)
+		var ratio := smoothstep(0.0,1.0,movement_elapsed / VEHICLE_LERP_SECONDS)
+		position = movement_from.lerp(movement_target,ratio)
+	queue_redraw()
 
 func set_selected(value: bool) -> void:
 	selected = value
@@ -56,8 +72,19 @@ func set_hovered(value: bool) -> void:
 	queue_redraw()
 
 func apply(next_state: Dictionary) -> void:
+	var entity_type := int(next_state.get("type",0))
+	var next_position := Vector2(float(next_state.x) * CELL,float(next_state.y) * CELL)
+	if not state.is_empty() and entity_type in [27,28] and next_position != movement_target:
+		movement_from = position
+		movement_target = next_position
+		movement_elapsed = 0.0
+	else:
+		movement_from = next_position
+		movement_target = next_position
+		position = next_position
+		movement_elapsed = VEHICLE_LERP_SECONDS
 	state = next_state.duplicate(true)
-	position = Vector2(float(state.x) * CELL, float(state.y) * CELL)
+	visual_step_elapsed = 0.0
 	queue_redraw()
 
 func _draw() -> void:
@@ -92,6 +119,14 @@ func _draw() -> void:
 		draw_circle(Vector2(38,42),5.0,Color("#dce8f2"))
 		_draw_selection()
 		return
+	if entity_type == 2:
+		_draw_belt(color)
+		_draw_selection()
+		return
+	if entity_type == 7:
+		_draw_inserter(color)
+		_draw_selection()
+		return
 	if not bool(state.get("powered", true)) and entity_type in [1, 3, 4, 7, 21, 22]:
 		color = color.darkened(0.42)
 	draw_rect(TILE_RECT, Color("#111820"), true)
@@ -99,7 +134,7 @@ func _draw() -> void:
 	draw_rect(TILE_RECT, color.lightened(0.28), false, 1.5)
 	_draw_connections(entity_type)
 	draw_string(title_font, Vector2(7, 18), TITLES.get(entity_type, "ENTITY"), HORIZONTAL_ALIGNMENT_CENTER, 62, 10, Color("#e8edf2"))
-	_draw_centered(ABBREVIATIONS.get(entity_type, "?"), 44.0, 18, Color.WHITE)
+	_draw_machine_silhouette(entity_type,color)
 	var status := _important_status(entity_type)
 	if not status.is_empty():
 		_draw_centered(status, 64.0, 10, Color("#d6e0e8"))
@@ -107,6 +142,124 @@ func _draw() -> void:
 	_draw_resource_badge()
 	_draw_process_bar()
 	_draw_selection()
+
+func _draw_belt(color: Color) -> void:
+	var direction := int(state.get("direction",1))
+	var vectors := [Vector2.UP,Vector2.RIGHT,Vector2.DOWN,Vector2.LEFT]
+	var axis: Vector2 = vectors[direction]
+	var side := axis.rotated(PI/2.0)
+	var center := Vector2(38,38)
+	draw_rect(TILE_RECT,Color("#10161b"),true)
+	draw_line(center-axis*38.0,center+axis*38.0,Color("#242b31"),32.0)
+	for offset in [-12.0,12.0]:
+		draw_line(center-axis*38.0+side*offset,center+axis*38.0+side*offset,color.lightened(0.25),3.0)
+	for tread in range(-2,3):
+		var p := center + axis*(float(tread)*15.0-4.0)
+		draw_line(p-side*11.0,p+side*11.0,Color("#9e7f37",0.75),2.0)
+	var item := int(state.get("item",0))
+	if item != 0:
+		var duration := maxi(1,int(state.get("duration",1)))
+		var ratio := clampf((float(state.get("progress",0))+visual_step_elapsed)/float(duration),0.0,1.0)
+		var token := center + axis*((ratio-0.5)*48.0)
+		_draw_item_token(token,item,6.0)
+	draw_line(center-axis*7.0,center+axis*10.0,Color("#f1ce65"),3.0)
+	draw_colored_polygon(PackedVector2Array([center+axis*15.0,center+axis*7.0+side*5.0,center+axis*7.0-side*5.0]),Color("#f1ce65"))
+
+func _draw_inserter(color: Color) -> void:
+	draw_rect(TILE_RECT,Color("#10161b"),true)
+	draw_circle(Vector2(38,38),24.0,color.darkened(0.18))
+	draw_circle(Vector2(38,38),9.0,Color("#c8b7d1"))
+	var direction := int(state.get("direction",1))
+	var axis: Vector2 = [Vector2.UP,Vector2.RIGHT,Vector2.DOWN,Vector2.LEFT][direction]
+	var inserter_state := int(state.get("inserter_state",0))
+	var progress := clampf(maxf(float(state.get("progress",0)),visual_step_elapsed),0.0,1.0)
+	var phase := 0.0
+	if inserter_state == 1: phase = -1.0 + progress
+	elif inserter_state == 2: phase = 0.0
+	elif inserter_state == 3: phase = progress
+	else: phase = -1.0
+	var head := Vector2(38,38) + axis * phase * 24.0
+	draw_line(Vector2(38,38),head,Color("#e2c457"),7.0)
+	draw_circle(head,7.0,Color("#f5da72"))
+	if int(state.get("item",0)) != 0:
+		_draw_item_token(head,int(state.item),4.5)
+	_draw_centered("WAIT" if inserter_state == 0 else "MOVE",68.0,9,Color("#d8e0e7"))
+
+func _draw_machine_silhouette(entity_type: int,color: Color) -> void:
+	var center := Vector2(38,39)
+	var active := _is_visually_active(entity_type)
+	var pulse := 0.5 + 0.5*sin(cosmetic_time*7.0)
+	match entity_type:
+		1:
+			draw_circle(center,17.0,Color("#182029"))
+			for arm in range(4):
+				var angle := float(arm)*PI/2.0+(cosmetic_time*2.2 if active else 0.0)
+				draw_line(center+Vector2(cos(angle),sin(angle))*6.0,center+Vector2(cos(angle),sin(angle))*20.0,color.lightened(0.38),5.0)
+			draw_circle(center,6.0,Color("#d9e2e7"))
+		3:
+			draw_rect(Rect2(20,25,36,30),Color("#1a2026"),true)
+			draw_circle(center,13.0,Color("#ff9b4a",0.35+0.45*pulse if active else 0.18))
+			draw_line(Vector2(24,24),Vector2(24,16),Color("#aeb7bd"),5.0)
+		4:
+			draw_circle(center,18.0,Color("#19222a"))
+			var angle := cosmetic_time*2.8 if active else 0.0
+			for tooth in range(6):
+				var a := angle+float(tooth)*TAU/6.0
+				draw_circle(center+Vector2(cos(a),sin(a))*14.0,4.0,color.lightened(0.4))
+			draw_circle(center,7.0,Color("#d6e0e5"))
+		5:
+			draw_rect(Rect2(18,24,40,33),Color("#1b2732"),true)
+			draw_line(Vector2(18,34),Vector2(58,34),color.lightened(0.35),4.0)
+			draw_line(Vector2(38,24),Vector2(38,57),color.lightened(0.25),3.0)
+		9,14,20:
+			draw_circle(center,19.0,Color("#192127"))
+			draw_arc(center,14.0,0.0,TAU,24,color.lightened(0.4),5.0)
+			var needle := cosmetic_time*3.0 if active else -PI/2.0
+			draw_line(center,center+Vector2(cos(needle),sin(needle))*13.0,Color("#f8df72"),4.0)
+		10:
+			draw_rect(Rect2(21,20,34,39),Color("#16252c"),true)
+			draw_arc(Vector2(38,21),17.0,PI,TAU,18,color.lightened(0.42),3.0)
+			draw_rect(Rect2(24,43,28,12),Color("#4fd5ee",0.55),true)
+		12:
+			draw_circle(center,18.0,Color("#14303a"))
+			draw_colored_polygon(PackedVector2Array([Vector2(38,20),Vector2(55,49),Vector2(21,49)]),Color("#5bd6ec",0.62))
+		13,19,21:
+			draw_rect(Rect2(19,24,38,31),Color("#192229"),true)
+			draw_circle(center,12.0,color.lightened(0.22))
+			if active:
+				for bubble in range(3): draw_circle(Vector2(27+bubble*11,23-fmod(cosmetic_time*15.0+bubble*7.0,11.0)),2.5,Color("#d9f7ff",0.75))
+		16:
+			draw_rect(Rect2(21,20,34,39),Color("#172027"),true)
+			draw_colored_polygon(PackedVector2Array([Vector2(40,23),Vector2(29,41),Vector2(38,41),Vector2(34,55),Vector2(49,35),Vector2(40,35)]),Color("#f6dc62"))
+		17:
+			draw_circle(center,19.0,Color("#17271f"))
+			draw_circle(center,12.0,Color("#72e59b",0.30+0.5*pulse if active else 0.24))
+		22:
+			draw_rect(Rect2(20,22,36,36),Color("#172333"),true)
+			draw_circle(center,14.0,Color("#75b9ff",0.30+0.45*pulse if active else 0.22))
+			draw_line(Vector2(28,51),Vector2(48,27),Color("#dff3ff"),3.0)
+			draw_line(Vector2(28,27),Vector2(48,51),Color("#dff3ff"),3.0)
+		23:
+			draw_rect(Rect2(17,27,42,29),Color("#202a23"),true)
+			for crate in range(3): draw_rect(Rect2(20+crate*12,31,10,18),color.lightened(0.2+crate*0.06),true)
+		_:
+			_draw_centered(ABBREVIATIONS.get(entity_type,"?"),46.0,16,Color.WHITE)
+
+func _is_visually_active(entity_type: int) -> bool:
+	if not bool(state.get("powered",true)): return false
+	if entity_type in [1,3,4]: return int(state.get("duration",0)) > 0 and int(state.get("progress",0)) > 0
+	if entity_type == 22: return int(state.get("lab_activity",0)) == 1
+	if entity_type in [9,14,15,20]: return int(state.get("generated_last_tick",0)) > 0
+	if entity_type == 13: return bool(state.get("conversion_active",false))
+	if entity_type == 19: return int(state.get("heat_exchanger_activity",0)) == 1
+	if entity_type == 21: return int(state.get("condenser_activity",0)) == 1
+	return false
+
+func _draw_item_token(at: Vector2,item: int,radius: float) -> void:
+	var colors := [Color("#dce5ea"),Color("#aeb8bf"),Color("#c77b42"),Color("#e68a48"),Color("#72cce3"),Color("#a7d9e6"),Color("#dfb94e"),Color("#88c56c"),Color("#c86654"),Color("#835f43"),Color("#31353a"),Color("#8ea4b4"),Color("#9d72c7"),Color("#7cceeb")]
+	var token_color: Color = colors[clampi(item-1,0,colors.size()-1)]
+	draw_circle(at,radius+2.0,Color("#111820"))
+	draw_circle(at,radius,token_color)
 
 func _draw_signal() -> void:
 	var aspect := int(state.get("signal_aspect",1))

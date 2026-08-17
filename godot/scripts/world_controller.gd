@@ -166,7 +166,7 @@ func _draw() -> void:
 		var color := Color("#62d98b",0.42) if preview_is_advisably_valid() else (Color("#d7a95b",0.42) if coverage == 1 else Color("#ef6262",0.42))
 		draw_rect(preview,color,true)
 		draw_rect(preview,color.lightened(0.35),false,3.0)
-		draw_string(ThemeDB.fallback_font,preview.position+Vector2(5,18),"BUILD %d" % build_entity_type,HORIZONTAL_ALIGNMENT_LEFT,-1,11)
+		draw_string(ThemeDB.fallback_font,preview.position+Vector2(5,18),"GHOST %d" % build_entity_type,HORIZONTAL_ALIGNMENT_LEFT,-1,10,Color.WHITE)
 		var center := preview.get_center()
 		var vectors := [Vector2.UP,Vector2.RIGHT,Vector2.DOWN,Vector2.LEFT]
 		if build_entity_type == 24:
@@ -182,7 +182,26 @@ func _draw() -> void:
 				if mask & (1 << index):
 					draw_line(center,center+vectors[index]*36.0,Color.WHITE,5.0)
 		else:
-			draw_line(center,center+vectors[build_direction]*20.0,Color.WHITE,3.0)
+			_draw_preview_silhouette(center,build_entity_type,color.lightened(0.42))
+			draw_line(center,center+vectors[build_direction]*25.0,Color.WHITE,3.0)
+			draw_colored_polygon(PackedVector2Array([
+				center+vectors[build_direction]*30.0,
+				center+vectors[build_direction]*21.0+vectors[build_direction].rotated(PI/2.0)*5.0,
+				center+vectors[build_direction]*21.0-vectors[build_direction].rotated(PI/2.0)*5.0]),Color.WHITE)
 	elif mode == InteractionMode.DEMOLISH:
 		draw_line(grid_to_world(hovered_grid)+Vector2(12,12),grid_to_world(hovered_grid)+Vector2(52,52),Color("#ff6868"),5.0)
 		draw_line(grid_to_world(hovered_grid)+Vector2(52,12),grid_to_world(hovered_grid)+Vector2(12,52),Color("#ff6868"),5.0)
+
+func _draw_preview_silhouette(center: Vector2,entity_type: int,color: Color) -> void:
+	match entity_type:
+		1,4,9,14,20,22:
+			draw_circle(center,20.0,Color("#111820",0.68))
+			draw_circle(center,13.0,color,false,4.0)
+		3,5,10,13,19,21,23:
+			draw_rect(Rect2(center-Vector2(20,17),Vector2(40,34)),Color("#111820",0.65),true)
+			draw_rect(Rect2(center-Vector2(16,13),Vector2(32,26)),color,false,4.0)
+		7:
+			draw_circle(center,9.0,color)
+			draw_line(center,center+Vector2(22,0),color,7.0)
+		_:
+			draw_rect(Rect2(center-Vector2(18,18),Vector2(36,36)),color,false,4.0)

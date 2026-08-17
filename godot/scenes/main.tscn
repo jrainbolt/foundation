@@ -79,6 +79,14 @@ text = "Tick: 0"
 unique_name_in_owner = true
 text = "Status: ready"
 
+[node name="SidebarBackdrop" type="ColorRect" parent="Interface"]
+offset_left = 792.0
+offset_top = 10.0
+offset_right = 1090.0
+offset_bottom = 710.0
+color = Color(0.045, 0.061, 0.073, 0.94)
+mouse_filter = 2
+
 [node name="Sidebar" type="VBoxContainer" parent="Interface"]
 anchors_preset = 1
 anchor_left = 1.0

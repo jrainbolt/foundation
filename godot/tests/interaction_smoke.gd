@@ -77,6 +77,7 @@ func run_test() -> void:
 	if not require_value(controller.mode == 1 and toolbar.buttons[5].button_pressed, "toolbar selected state"): return
 	controller.enter_select_mode()
 	var tick_before := int(simulation.get_tick())
+	var decoration_before := int(canvas.decoration_signature(Vector2i(24,16)))
 	if not require_value(camera.position == Vector2(1862,1254) and is_equal_approx(camera.zoom.x,0.55), "generated camera center"): return
 	var camera_before := camera.position
 	camera.move_by(Vector2(25, -10))
@@ -86,6 +87,13 @@ func run_test() -> void:
 	if not require_value(is_equal_approx(camera.zoom.x, camera.minimum_zoom) and int(simulation.get_tick()) == tick_before, "minimum zoom or camera advanced simulation"): return
 	if not require_value(controller.world_to_grid(Vector2(-1, -1)) == Vector2i(-1, -1), "negative grid conversion"): return
 	if not require_value(controller.grid_to_world(Vector2i(2, 3)) == Vector2(152, 228), "grid world conversion"): return
+	if not require_value(decoration_before == int(canvas.decoration_signature(Vector2i(24,16)))
+		and decoration_before != int(canvas.decoration_signature(Vector2i(25,16))),
+		"stable coordinate-derived terrain decoration"): return
+	var belt_visual: FoundationEntityVisual = canvas.entity_nodes[2]
+	if not require_value(int(belt_visual.state.get("type",0)) == 2
+		and belt_visual.movement_target == Vector2(float(belt_visual.state.x)*76.0,float(belt_visual.state.y)*76.0),
+		"authoritative visual target or belt presentation"): return
 	var first_state: Dictionary = canvas.entity_nodes[1].state
 	if not require_value(canvas.entity_nodes[1].TITLES.has(int(first_state.type)) and not canvas.entity_nodes[1]._important_status(int(first_state.type)).is_empty(), "entity label hierarchy"): return
 	var first_grid := Vector2i(int(first_state.x), int(first_state.y))
@@ -161,6 +169,7 @@ func run_test() -> void:
 	main._reset_demo()
 	if not require_value(controller.selected_entity_id == 0 and inspector.entity_id == 0, "reset selection policy"): return
 	if not require_value(canvas.entity_nodes.size() == 104, "reset visual parity"): return
+	if not require_value(decoration_before == int(canvas.decoration_signature(Vector2i(24,16))), "reset cosmetic stability"): return
 	main.queue_free()
 	await process_frame
 	print("Foundation interaction smoke test passed")

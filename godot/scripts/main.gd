@@ -15,6 +15,7 @@ const STEPS_PER_SECOND := 12.0
 @onready var construction_label: Label = %ConstructionLabel
 @onready var build_panel: PanelContainer = $Interface/BuildPanel
 @onready var sidebar: VBoxContainer = $Interface/Sidebar
+@onready var sidebar_backdrop: ColorRect = $Interface/SidebarBackdrop
 @onready var top_toolbar: PanelContainer = $Interface/Toolbar
 const Format := preload("res://scripts/presentation_format.gd")
 
@@ -66,6 +67,8 @@ func _position_interface() -> void:
 	var sidebar_width := clampf(viewport_size.x * 0.27, 288.0, 420.0)
 	sidebar.position = Vector2(viewport_size.x - sidebar_width - 10.0, 10.0)
 	sidebar.size = Vector2(sidebar_width, viewport_size.y - 20.0)
+	sidebar_backdrop.position = sidebar.position - Vector2(8.0,0.0)
+	sidebar_backdrop.size = sidebar.size + Vector2(8.0,0.0)
 	top_toolbar.position = Vector2(12.0, 10.0)
 	top_toolbar.size = Vector2(viewport_size.x - sidebar_width - 34.0, 44.0)
 	build_panel.position = Vector2(12.0, viewport_size.y - 122.0)
