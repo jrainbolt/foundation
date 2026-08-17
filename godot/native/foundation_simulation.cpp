@@ -215,6 +215,9 @@ void FoundationSimulation::_bind_methods()
         D_METHOD("queue_set_assembler_recipe","entity_id","recipe_id"),
         &FoundationSimulation::queue_set_assembler_recipe);
     ClassDB::bind_method(
+        D_METHOD("queue_set_refinery_recipe","entity_id","recipe_id"),
+        &FoundationSimulation::queue_set_refinery_recipe);
+    ClassDB::bind_method(
         D_METHOD("queue_set_storage_output","entity_id","item_type"),
         &FoundationSimulation::queue_set_storage_output);
     ClassDB::bind_method(D_METHOD("queue_select_research","technology_id"),
@@ -264,6 +267,8 @@ void FoundationSimulation::_bind_methods()
         &FoundationSimulation::get_technology_catalog);
     ClassDB::bind_method(D_METHOD("get_assembler_recipe_catalog"),
         &FoundationSimulation::get_assembler_recipe_catalog);
+    ClassDB::bind_method(D_METHOD("get_refinery_recipe_catalog"),
+        &FoundationSimulation::get_refinery_recipe_catalog);
     ClassDB::bind_method(D_METHOD("get_item_catalog"),
         &FoundationSimulation::get_item_catalog);
     ClassDB::bind_method(D_METHOD("get_construction_units"),
@@ -948,8 +953,11 @@ int64_t FoundationSimulation::queue_place_entity(
         command_type=FACTORY_COMMAND_PLACE_RAIL_CHAIN_SIGNAL;break;
     default:return FACTORY_RESULT_INVALID_ARGUMENT;
     }
+    FactoryDirection first=(FactoryDirection)direction;
+    FactoryDirection second=entity_type==FACTORY_ENTITY_TYPE_REFINERY
+        ?(FactoryDirection)((direction+2)%4):first;
     FactoryCommand command=place(command_type,(int32_t)x,(int32_t)y,
-        (FactoryDirection)direction,(FactoryDirection)direction);
+        first,second);
     return factory_simulation_submit_command(simulation_,&command);
 }
 
@@ -976,6 +984,19 @@ int64_t FoundationSimulation::queue_set_assembler_recipe(
         (FactoryEntityId)entity_id;
     command.data.set_assembler_recipe.recipe_id=
         (FactoryAssemblerRecipeId)recipe_id;
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
+int64_t FoundationSimulation::queue_set_refinery_recipe(
+    int64_t entity_id,int64_t recipe_id)
+{
+    if (simulation_==nullptr || entity_id<=0 || entity_id>UINT32_MAX
+        || recipe_id<FACTORY_RECIPE_NONE || recipe_id>FACTORY_RECIPE_STEEL)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};
+    command.type=FACTORY_COMMAND_SET_REFINERY_RECIPE;
+    command.data.set_refinery_recipe.refinery_entity=(FactoryEntityId)entity_id;
+    command.data.set_refinery_recipe.recipe_id=(FactoryRecipeId)recipe_id;
     return factory_simulation_submit_command(simulation_,&command);
 }
 
@@ -1254,6 +1275,35 @@ Array FoundationSimulation::get_assembler_recipe_catalog() const
         value["unlocked"]=simulation_!=nullptr
             && factory_simulation_is_assembler_recipe_unlocked(
                 simulation_,recipe->recipe_id);
+        values.append(value);
+    }
+    return values;
+}
+
+Array FoundationSimulation::get_refinery_recipe_catalog() const
+{
+    Array values;
+    Dictionary none;
+    none["recipe_id"]=(int64_t)FACTORY_RECIPE_NONE;
+    none["name"]="None";
+    none["unlocked"]=true;
+    values.append(none);
+    for (size_t i=0U;i<factory_content_refinery_recipe_count();++i) {
+        const FactoryRefineryRecipeDefinition *definition=
+            factory_content_refinery_recipe_at(i);
+        if (definition==nullptr) continue;
+        Dictionary value;
+        value["recipe_id"]=(int64_t)definition->recipe_id;
+        value["name"]=String(factory_item_name(definition->recipe.output_item));
+        value["input_item"]=(int64_t)definition->recipe.input_item;
+        value["input_amount"]=(int64_t)definition->recipe.input_amount;
+        value["output_item"]=(int64_t)definition->recipe.output_item;
+        value["output_amount"]=(int64_t)definition->recipe.output_amount;
+        value["secondary_input_item"]=
+            (int64_t)definition->recipe.secondary_input_item;
+        value["secondary_input_amount"]=
+            (int64_t)definition->recipe.secondary_input_amount;
+        value["unlocked"]=true;
         values.append(value);
     }
     return values;

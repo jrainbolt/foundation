@@ -1,6 +1,6 @@
 # Assembler recipes
 
-Assemblers use one of three immutable recipes from the authoritative table in
+Assemblers use one of six immutable recipes from the authoritative table in
 the unified immutable content layer.
 
 | Identifier | Input slot 0 | Input slot 1 | Output | Ticks |
@@ -8,6 +8,13 @@ the unified immutable content layer.
 | `ELECTRONIC_COMPONENT` | 1 iron plate | 1 copper plate | 1 electronic component | 15 |
 | `IRON_GEAR` | 2 iron plates | unused | 1 iron gear | 15 |
 | `COPPER_WIRE` | 1 copper plate | unused | 2 copper wire | 15 |
+| `ADVANCED_COMPONENT` | 1 steel | 2 copper wire | 1 advanced component | 20 |
+| `ADVANCED_SCIENCE` | 1 advanced component | 1 electronic component | 1 advanced science | 25 |
+| `BASIC_SCIENCE` | 1 iron gear | 1 electronic component | 1 basic science | 15 |
+
+`BASIC_SCIENCE` has no unlock requirement. Both of its inputs are made by
+start-unlocked assembler recipes from iron and copper plates, so it can supply
+the Research Lab before Basic Automation without Coal or a circular unlock.
 
 New assemblers select `NONE`. They accept no input and do no work until a
 `FACTORY_COMMAND_SET_ASSEMBLER_RECIPE` command is applied. Commands run FIFO

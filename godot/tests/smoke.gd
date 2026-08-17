@@ -50,6 +50,7 @@ func _initialize() -> void:
 		simulation.has_method("queue_place_entity")
 		and simulation.has_method("queue_demolish_entity")
 		and simulation.has_method("queue_set_assembler_recipe")
+		and simulation.has_method("queue_set_refinery_recipe")
 		and simulation.has_method("queue_set_storage_output")
 		and simulation.has_method("queue_set_rail_switch_branch")
 		and simulation.has_method("queue_set_rail_station_freight_mode")
@@ -69,10 +70,22 @@ func _initialize() -> void:
 		and simulation.has_method("get_train_route")
 		and simulation.has_method("get_command_results")
 		and simulation.get_build_catalog().size() == 30
-		and simulation.get_assembler_recipe_catalog().size() == 6
+		and simulation.get_assembler_recipe_catalog().size() == 7
+		and simulation.get_refinery_recipe_catalog().size() == 4
 		and simulation.get_item_catalog().size() == 15
 		and simulation.get_construction_units() >= 0,
 		"construction command bridge"
+	):
+		return
+	var basic_science_recipe: Dictionary = {}
+	for definition: Dictionary in simulation.get_assembler_recipe_catalog():
+		if int(definition.recipe_id) == 6:
+			basic_science_recipe = definition
+	if not _require(
+		not basic_science_recipe.is_empty()
+		and bool(basic_science_recipe.unlocked)
+		and int(basic_science_recipe.output_item) == 9,
+		"Basic Science catalog entry: %s" % basic_science_recipe
 	):
 		return
 	if not _require(simulation.get_tick() == 61, "unexpected reset tick"):

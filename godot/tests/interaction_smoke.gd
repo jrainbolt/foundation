@@ -109,7 +109,7 @@ func run_test() -> void:
 	controller.select_entity(32)
 	if not require_value(inspector.details.text.contains("Fluid Quantity"), "fluid inspector data"): return
 	controller.select_entity(13)
-	if not require_value(inspector.configuration_selector.visible and inspector.configuration_selector.item_count == 6, "assembler recipe selector"): return
+	if not require_value(inspector.configuration_selector.visible and inspector.configuration_selector.item_count == 7, "assembler recipe selector"): return
 	var assembler_before: Dictionary = canvas.entity_nodes[13].state
 	if not require_value(simulation.queue_set_assembler_recipe(13,2) == 0, "assembler configuration queue"): return
 	if not require_value(int(canvas.entity_nodes[13].state.recipe) == int(assembler_before.recipe), "assembler configuration mutated before tick"): return
@@ -135,6 +135,18 @@ func run_test() -> void:
 	if not require_value(int(configuration_results[0].result) == 0 and int(configuration_results[0].new_storage_output) == 9 and int(canvas.entity_nodes[19].state.configured_output) == 9, "storage command and presentation"): return
 	configuration_events = simulation.get_events()
 	if not require_value(not configuration_events.is_empty() and int(configuration_events[0].type) == 40 and int(configuration_events[0].item_type) == 9, "storage configuration event"): return
+	controller.select_entity(65)
+	if not require_value(inspector.consist_panel.visible
+		and inspector.decouple_rear.disabled == false,
+		"locomotive rear-decouple control"): return
+	inspector._on_decouple_rear_pressed()
+	if not require_value(int(canvas.entity_nodes[65].state.vehicle_count) == 2,
+		"rear decouple presentation refresh"): return
+	if not require_value(inspector.couple_rear.disabled == false,
+		"eligible rear-wagon coupling control"): return
+	inspector._on_couple_rear_pressed()
+	if not require_value(int(canvas.entity_nodes[65].state.vehicle_count) == 3,
+		"rear coupling presentation refresh"): return
 	var selected: int = int(controller.selected_entity_id)
 	var selection_tick_before := int(simulation.get_tick())
 	if not require_value(main._advance(1), "simulation step"): return
@@ -142,7 +154,9 @@ func run_test() -> void:
 	if not require_value(inspector.entity_id == selected and int(simulation.get_tick()) == selection_tick_before + 1, "inspector refresh"): return
 	controller.select_entity(1)
 	var entity_count: int = simulation.get_entities().size()
-	if not require_value(simulation.queue_place_entity(5,12,0,0) == 0, "placement queue submission"): return
+	var refinery_queued := int(simulation.queue_place_entity(3,12,0,0))
+	if not require_value(refinery_queued == 0,
+		"placement queue submission: %s" % simulation.result_name(refinery_queued)): return
 	if not require_value(simulation.get_entities().size() == entity_count, "placement mutated before tick"): return
 	if not require_value(simulation.step() == 0, "placement execution tick"): return
 	var command_results: Array = simulation.get_command_results()
@@ -154,6 +168,13 @@ func run_test() -> void:
 	command_results = simulation.get_command_results()
 	if not require_value(int(command_results[0].result) != 0 and simulation.get_entities().size() == entity_count + 1, "occupied placement rejection"): return
 	if not require_value(main._synchronize() and controller.select_entity(placed_id), "select constructed entity"): return
+	if not require_value(inspector.configuration_selector.visible
+		and inspector.configuration_selector.item_count == 4,
+		"refinery recipe selector"): return
+	inspector._on_configuration_selected(3)
+	if not require_value(int(canvas.entity_nodes[placed_id].state.recipe) == 3
+		and main.status_label.text.contains("updated"),
+		"command-driven Steel recipe selection"): return
 	if not require_value(simulation.queue_demolish_entity(placed_id) == 0, "demolition queue submission"): return
 	if not require_value(simulation.get_entities().size() == entity_count + 1, "demolition mutated before tick"): return
 	if not require_value(simulation.step() == 0 and main._synchronize(), "demolition execution and synchronization"): return

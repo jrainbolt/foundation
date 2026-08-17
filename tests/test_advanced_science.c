@@ -837,6 +837,9 @@ static void test_generated_coal_autonomous_freight_to_steel(void)
         CHECK(coal_metrics.transferred_quantity>=100U);
         CHECK(steel_metrics.produced_quantity>=6U);
     }
+    printf("legacy freight harness construction: spent=%u remaining=%u\n",
+        500U-s->construction_depots.items[0].material_quantity,
+        s->construction_depots.items[0].material_quantity);
     factory_simulation_destroy(loaded);
     factory_telemetry_destroy(telemetry);
     factory_simulation_destroy(s_b);factory_world_destroy(world_b);

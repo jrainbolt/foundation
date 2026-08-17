@@ -2,8 +2,10 @@
 
 Construction material is `FACTORY_ITEM_CONSTRUCTION_MATERIAL` and uses the
 ordinary Storage, Belt, Inserter, and logistics-endpoint ownership path. A
-Construction Depot accepts only that item, stores at most 500 units, has no
-output, and requires no power.
+Construction Depot accepts only that item, stores at most 500 units, and
+requires no power. Its authoritative inventory is both its logistics input and
+output: generic logistics may remove one Construction Material from the depot
+output or insert one at the depot input. There is no separate output buffer.
 
 The simulation's former global construction inventory is a finite bootstrap
 reserve only until the first depot commits. The first depot's cost is paid
@@ -18,7 +20,9 @@ must have every cell covered. Among covering depots that can independently pay
 the complete immutable content cost, the lowest stable entity ID supplies the
 placement. Costs are never split. Terrain, occupancy, and unlock checks occur
 before source selection, and deduction occurs only after entity placement
-commits.
+commits. FIFO construction commands are processed before inserters and other
+tick logistics, so commands spend from the balance visible in their command
+phase.
 
 Demolition refunds the complete cost to the lowest-ID covering depot with
 capacity. Refunds are not split. Without an eligible destination demolition
@@ -34,8 +38,9 @@ snapshot must contain a zero reserve. Coverage overlays and telemetry remain
 derived and transient.
 
 This establishes physical remote-outpost supply without train-specific state.
-Future rail logistics can transport the same ordinary construction item to
-distant depots.
+Inserters, Belts, Storage, and Rail Stations/Cargo Wagons transport the same
+ordinary item. Material becomes construction supply only after it physically
+enters a Construction Depot; material held elsewhere cannot fund placement.
 
 Static rails and Rail Stations use this physical supply path. Each tile is an
 independent transaction: a rail costs 2 units and a station costs 30, selected

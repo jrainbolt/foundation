@@ -2,6 +2,7 @@ class_name FoundationEntityInspector
 extends PanelContainer
 
 signal assembler_recipe_requested(entity_id: int,recipe_id: int)
+signal refinery_recipe_requested(entity_id: int,recipe_id: int)
 signal storage_output_requested(entity_id: int,item_type: int)
 signal rail_switch_branch_requested(entity_id: int,branch: int)
 signal train_destination_requested(entity_id: int,station_id: int)
@@ -11,6 +12,8 @@ signal train_schedule_add_requested(entity_id: int,station_id: int,wait_conditio
 signal train_schedule_remove_requested(entity_id: int,index: int)
 signal train_schedule_clear_requested(entity_id: int)
 signal train_schedule_enabled_requested(entity_id: int,enabled: bool)
+signal couple_rear_wagon_requested(locomotive_id: int,wagon_id: int)
+signal decouple_rear_wagon_requested(locomotive_id: int)
 
 const Format := preload("res://scripts/presentation_format.gd")
 @onready var title_label: Label = %InspectorTitle
@@ -19,6 +22,9 @@ const Format := preload("res://scripts/presentation_format.gd")
 @onready var configuration_selector: OptionButton = %ConfigurationSelector
 @onready var secondary_configuration_label: Label = %SecondaryConfigurationLabel
 @onready var secondary_configuration_selector: OptionButton = %SecondaryConfigurationSelector
+@onready var consist_panel: HBoxContainer = %ConsistPanel
+@onready var couple_rear: Button = %CoupleRear
+@onready var decouple_rear: Button = %DecoupleRear
 @onready var schedule_panel: VBoxContainer = %SchedulePanel
 @onready var schedule_enabled: CheckButton = %ScheduleEnabled
 @onready var schedule_stop_selector: OptionButton = %ScheduleStopSelector
@@ -30,9 +36,11 @@ const Format := preload("res://scripts/presentation_format.gd")
 @onready var schedule_clear: Button = %ScheduleClear
 var entity_id := 0
 var recipe_catalog: Array = []
+var refinery_recipe_catalog: Array = []
 var item_catalog: Array = []
 var station_catalog: Array = []
 var configuring := false
+var rear_wagon_candidate := 0
 
 func _ready() -> void:
 	configuration_selector.item_selected.connect(_on_configuration_selected)
@@ -42,12 +50,30 @@ func _ready() -> void:
 	schedule_add.pressed.connect(_on_schedule_add_pressed)
 	schedule_remove.pressed.connect(_on_schedule_remove_pressed)
 	schedule_clear.pressed.connect(_on_schedule_clear_pressed)
+	couple_rear.pressed.connect(_on_couple_rear_pressed)
+	decouple_rear.pressed.connect(_on_decouple_rear_pressed)
 	for wait_name in ["None", "Time", "Cargo empty", "Cargo full"]:
 		schedule_wait_selector.add_item(wait_name)
 
-func configure_catalogs(recipes: Array,items: Array) -> void:
+func configure_catalogs(recipes: Array,items: Array,refinery_recipes: Array = []) -> void:
 	recipe_catalog = recipes.duplicate(true)
 	item_catalog = items.duplicate(true)
+	refinery_recipe_catalog = refinery_recipes.duplicate(true)
+
+func configure_consist(state: Dictionary,wagons: Array) -> void:
+	rear_wagon_candidate = 0
+	if int(state.get("type",0)) != 27:
+		consist_panel.hide()
+		return
+	for wagon: Dictionary in wagons:
+		if not bool(wagon.get("coupled",false)):
+			rear_wagon_candidate = int(wagon.get("id",0))
+			break
+	var vehicle_count := int(state.get("vehicle_count",1))
+	couple_rear.disabled = rear_wagon_candidate == 0
+	couple_rear.tooltip_text = "Candidate wagon #%d; Foundation validates rear adjacency and rail compatibility." % rear_wagon_candidate if rear_wagon_candidate != 0 else "No uncoupled wagon is available."
+	decouple_rear.disabled = vehicle_count <= 1
+	consist_panel.show()
 
 func configure_stations(stations: Array) -> void:
 	station_catalog = stations.duplicate(true)
@@ -224,6 +250,7 @@ func _hide_configuration() -> void:
 	configuration_selector.hide()
 	secondary_configuration_label.hide()
 	secondary_configuration_selector.hide()
+	consist_panel.hide()
 	schedule_panel.hide()
 
 func _show_configuration(type_id: int,state: Dictionary) -> void:
@@ -232,6 +259,15 @@ func _show_configuration(type_id: int,state: Dictionary) -> void:
 	if type_id == 4:
 		configuration_label.text = "Assembler recipe"
 		for definition: Dictionary in recipe_catalog:
+			var index := configuration_selector.item_count
+			configuration_selector.add_item(str(definition.get("name","Recipe")))
+			configuration_selector.set_item_metadata(index,int(definition.get("recipe_id",0)))
+			configuration_selector.set_item_disabled(index,not bool(definition.get("unlocked",false)))
+			if int(definition.get("recipe_id",0)) == int(state.get("recipe",0)):
+				configuration_selector.select(index)
+	elif type_id == 3:
+		configuration_label.text = "Refinery recipe"
+		for definition: Dictionary in refinery_recipe_catalog:
 			var index := configuration_selector.item_count
 			configuration_selector.add_item(str(definition.get("name","Recipe")))
 			configuration_selector.set_item_metadata(index,int(definition.get("recipe_id",0)))
@@ -295,6 +331,8 @@ func _on_configuration_selected(index: int) -> void:
 	var value := int(configuration_selector.get_item_metadata(index))
 	if configuration_label.text == "Assembler recipe":
 		assembler_recipe_requested.emit(entity_id,value)
+	elif configuration_label.text == "Refinery recipe":
+		refinery_recipe_requested.emit(entity_id,value)
 	elif configuration_label.text == "Rail switch branch":
 		rail_switch_branch_requested.emit(entity_id,value)
 	elif configuration_label.text == "Train destination":
@@ -333,3 +371,10 @@ func _on_schedule_remove_pressed() -> void:
 
 func _on_schedule_clear_pressed() -> void:
 	train_schedule_clear_requested.emit(entity_id)
+
+func _on_couple_rear_pressed() -> void:
+	if rear_wagon_candidate != 0:
+		couple_rear_wagon_requested.emit(entity_id,rear_wagon_candidate)
+
+func _on_decouple_rear_pressed() -> void:
+	decouple_rear_wagon_requested.emit(entity_id)

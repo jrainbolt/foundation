@@ -2991,9 +2991,18 @@ static bool inspect_inserter_source(
     const FactoryAssembler *assembler;
     const FactoryStorage *storage;
     const FactoryRailStation *station;
+    const FactoryConstructionDepot *depot;
 
     if (tile == NULL || tile->occupying_entity == 0U) {
         return false;
+    }
+    depot = factory_construction_depot_store_find(
+        &simulation->construction_depots, tile->occupying_entity);
+    if (depot != NULL) {
+        *out_endpoint = (FactoryLogisticsEndpoint) { depot->entity_id,
+            FACTORY_LOGISTICS_SLOT_OUTPUT };
+        return factory_logistics_endpoint_peek(simulation, *out_endpoint,
+            out_item) == FACTORY_LOGISTICS_RESULT_OK;
     }
     belt = factory_belt_store_find(&simulation->belts, tile->occupying_entity);
     if (belt != NULL) {

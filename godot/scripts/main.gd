@@ -47,7 +47,9 @@ func _ready() -> void:
 	world_controller.placement_requested.connect(_on_placement_requested)
 	world_controller.demolition_requested.connect(_on_demolition_requested)
 	world_controller.interaction_mode_changed.connect(_on_interaction_mode_changed)
+	world_controller.selected_entity_changed.connect(_on_selected_entity_changed)
 	inspector.assembler_recipe_requested.connect(_on_assembler_recipe_requested)
+	inspector.refinery_recipe_requested.connect(_on_refinery_recipe_requested)
 	inspector.storage_output_requested.connect(_on_storage_output_requested)
 	inspector.rail_switch_branch_requested.connect(_on_rail_switch_branch_requested)
 	inspector.train_destination_requested.connect(_on_train_destination_requested)
@@ -57,6 +59,8 @@ func _ready() -> void:
 	inspector.train_schedule_remove_requested.connect(_on_train_schedule_remove_requested)
 	inspector.train_schedule_clear_requested.connect(_on_train_schedule_clear_requested)
 	inspector.train_schedule_enabled_requested.connect(_on_train_schedule_enabled_requested)
+	inspector.couple_rear_wagon_requested.connect(_on_couple_rear_wagon_requested)
+	inspector.decouple_rear_wagon_requested.connect(_on_decouple_rear_wagon_requested)
 	%ResearchButton.pressed.connect(_toggle_research)
 	alert_button.pressed.connect(_toggle_alerts)
 	history_button.pressed.connect(_toggle_history)
@@ -65,7 +69,8 @@ func _ready() -> void:
 	_reset_demo()
 	build_toolbar.configure(simulation)
 	inspector.configure_catalogs(
-		simulation.get_assembler_recipe_catalog(),simulation.get_item_catalog())
+		simulation.get_assembler_recipe_catalog(),simulation.get_item_catalog(),
+		simulation.get_refinery_recipe_catalog())
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED and is_node_ready():
@@ -156,6 +161,11 @@ func _synchronize() -> bool:
 		if int(entity.id) == selected_id:
 			selected_state = entity
 			break
+	var wagons: Array = []
+	for entity: Dictionary in entities:
+		if int(entity.get("type",0)) == 28: wagons.append(entity)
+	wagons.sort_custom(func(a: Dictionary,b: Dictionary) -> bool:
+		return int(a.get("id",0)) < int(b.get("id",0)))
 	selection_summary.text = "Selected: None" if selected_state.is_empty() else \
 		"Selected: %s #%d — %s" % [Format.entity_type(int(selected_state.get("type",0))),
 		selected_id,Format.machine_status(int(selected_state.get("status",0)))]
@@ -169,6 +179,7 @@ func _synchronize() -> bool:
 		selected_state.get("reserved_blocks",[]),
 		int(selected_state.get("next_route_block_id",0)) if waiting else 0)
 	world_controller.refresh_selection()
+	inspector.configure_consist(selected_state,wagons)
 	world_controller.set_hovered_grid(world_controller.hovered_grid)
 	build_toolbar.refresh(simulation)
 	var depot_supply := 0
@@ -344,6 +355,39 @@ func _on_assembler_recipe_requested(entity_id: int,recipe_id: int) -> void:
 		status_label.text = "Status: %s" % simulation.result_name(queued)
 		return
 	_execute_queued_command("Assembler recipe updated")
+
+func _on_refinery_recipe_requested(entity_id: int,recipe_id: int) -> void:
+	var queued: int = simulation.queue_set_refinery_recipe(entity_id,recipe_id)
+	if queued != 0:
+		status_label.text = "Status: %s" % simulation.result_name(queued)
+		return
+	_execute_queued_command("Refinery recipe updated")
+
+func _on_selected_entity_changed(entity_id: int) -> void:
+	var selected_state: Dictionary = {}
+	var wagons: Array = []
+	for entity: Dictionary in simulation.get_entities():
+		if int(entity.get("type",0)) == 28:
+			wagons.append(entity)
+		if int(entity.get("id",0)) == entity_id:
+			selected_state = entity
+	wagons.sort_custom(func(a: Dictionary,b: Dictionary) -> bool:
+		return int(a.get("id",0)) < int(b.get("id",0)))
+	inspector.configure_consist(selected_state,wagons)
+
+func _on_couple_rear_wagon_requested(locomotive_id: int,wagon_id: int) -> void:
+	var queued: int = simulation.queue_couple_rear_wagon(locomotive_id,wagon_id)
+	if queued != 0:
+		status_label.text = "Status: %s" % simulation.result_name(queued)
+		return
+	_execute_queued_command("Rear wagon coupled")
+
+func _on_decouple_rear_wagon_requested(locomotive_id: int) -> void:
+	var queued: int = simulation.queue_decouple_rear_wagon(locomotive_id)
+	if queued != 0:
+		status_label.text = "Status: %s" % simulation.result_name(queued)
+		return
+	_execute_queued_command("Rear wagon decoupled")
 
 func _on_storage_output_requested(entity_id: int,item_type: int) -> void:
 	var queued: int = simulation.queue_set_storage_output(entity_id,item_type)

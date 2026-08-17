@@ -56,7 +56,8 @@ static void configure(FactorySimulation *simulation, FactoryEntityId station,
         FACTORY_RESULT_OK);
 }
 
-static void freight_arrival_transfer_snapshot_and_reconfigure(void)
+static void freight_arrival_transfer_snapshot_and_reconfigure(
+    FactoryItemType freight_item)
 {
     FactoryWorld *world = factory_world_create(12, 5);
     FactorySimulation *simulation =
@@ -64,7 +65,7 @@ static void freight_arrival_transfer_snapshot_and_reconfigure(void)
     FactoryEntityId rails[8];
     for (int32_t x = 1; x <= 8; ++x) rails[x - 1] = place_rail(simulation, x);
     FactoryEntityId station = place_station(simulation, 8);
-    configure(simulation, station, FACTORY_ITEM_IRON_PLATE,
+    configure(simulation, station, freight_item,
         FACTORY_RAIL_STATION_FREIGHT_UNLOAD);
 
     FactoryCommand wagon_command = { FACTORY_COMMAND_PLACE_CARGO_WAGON,
@@ -81,7 +82,7 @@ static void freight_arrival_transfer_snapshot_and_reconfigure(void)
     CHECK(factory_simulation_submit_command(simulation, &couple) == 0);
     CHECK(factory_simulation_tick(simulation) == 0);
     CHECK(factory_simulation_cargo_wagon_insert(simulation, wagon,
-        FACTORY_ITEM_IRON_PLATE, 30U) == FACTORY_RESULT_OK);
+        freight_item, 30U) == FACTORY_RESULT_OK);
     FactoryCommand destination = { FACTORY_COMMAND_SET_TRAIN_DESTINATION,
         { .set_train_destination = { train, station } } };
     CHECK(factory_simulation_submit_command(simulation, &destination) == 0);
@@ -113,7 +114,7 @@ static void freight_arrival_transfer_snapshot_and_reconfigure(void)
     }
     CHECK(event != NULL && event->type == FACTORY_EVENT_RAIL_FREIGHT_TRANSFERRED
         && event->entity_id == station && event->related_entity_id == wagon
-        && event->item_type == FACTORY_ITEM_IRON_PLATE && event->quantity == 10U
+        && event->item_type == freight_item && event->quantity == 10U
         && event->related_quantity == train);
 
     /* Reservation-derived state settles on the tick after arrival. */
@@ -150,16 +151,16 @@ static void freight_arrival_transfer_snapshot_and_reconfigure(void)
         FACTORY_RESULT_INVALID_STATE);
     CHECK(factory_simulation_get_rail_station(simulation, station,
         &station_state) && station_state.configured_item ==
-        FACTORY_ITEM_IRON_PLATE && station_state.freight_quantity == 30U);
+        freight_item && station_state.freight_quantity == 30U);
 
     FactoryLogisticsEndpoint endpoint = { station,
         FACTORY_LOGISTICS_SLOT_RAIL_STATION_FREIGHT };
     FactoryItemType endpoint_item = FACTORY_ITEM_NONE;
     CHECK(factory_logistics_endpoint_peek(simulation, endpoint,
         &endpoint_item) == FACTORY_LOGISTICS_RESULT_OK
-        && endpoint_item == FACTORY_ITEM_IRON_PLATE);
+        && endpoint_item == freight_item);
     CHECK(factory_logistics_endpoint_can_accept(simulation, endpoint,
-        FACTORY_ITEM_IRON_PLATE) == FACTORY_LOGISTICS_RESULT_INVALID_SLOT);
+        freight_item) == FACTORY_LOGISTICS_RESULT_INVALID_SLOT);
     FactoryCommand load_mode = {
         FACTORY_COMMAND_SET_RAIL_STATION_FREIGHT_MODE,
         { .set_rail_station_freight_mode = { station,
@@ -167,7 +168,7 @@ static void freight_arrival_transfer_snapshot_and_reconfigure(void)
     CHECK(factory_simulation_submit_command(simulation, &load_mode) == 0);
     CHECK(factory_simulation_tick(simulation) == 0);
     CHECK(factory_logistics_endpoint_can_accept(simulation, endpoint,
-        FACTORY_ITEM_IRON_PLATE) == FACTORY_LOGISTICS_RESULT_OK);
+        freight_item) == FACTORY_LOGISTICS_RESULT_OK);
     CHECK(factory_logistics_endpoint_peek(simulation, endpoint,
         &endpoint_item) == FACTORY_LOGISTICS_RESULT_INVALID_SLOT);
 
@@ -181,6 +182,8 @@ static void freight_arrival_transfer_snapshot_and_reconfigure(void)
 
 int main(void)
 {
-    freight_arrival_transfer_snapshot_and_reconfigure();
+    freight_arrival_transfer_snapshot_and_reconfigure(FACTORY_ITEM_IRON_PLATE);
+    freight_arrival_transfer_snapshot_and_reconfigure(
+        FACTORY_ITEM_CONSTRUCTION_MATERIAL);
     return failures != 0 ? 1 : 0;
 }

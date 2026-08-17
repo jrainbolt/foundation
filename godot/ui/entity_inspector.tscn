@@ -42,6 +42,21 @@ unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(0, 38)
 
+[node name="ConsistPanel" type="HBoxContainer" parent="Margin/Layout"]
+unique_name_in_owner = true
+visible = false
+theme_override_constants/separation = 6
+
+[node name="CoupleRear" type="Button" parent="Margin/Layout/ConsistPanel"]
+unique_name_in_owner = true
+text = "Couple Rear Wagon"
+size_flags_horizontal = 3
+
+[node name="DecoupleRear" type="Button" parent="Margin/Layout/ConsistPanel"]
+unique_name_in_owner = true
+text = "Decouple Rear Wagon"
+size_flags_horizontal = 3
+
 [node name="SchedulePanel" type="VBoxContainer" parent="Margin/Layout"]
 unique_name_in_owner = true
 visible = false

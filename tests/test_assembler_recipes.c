@@ -94,6 +94,20 @@ static void test_recipe_catalog(void)
         FACTORY_ITEM_NONE, 0U,
         FACTORY_ITEM_COPPER_WIRE, 2U
     );
+    {
+        FactoryAssemblerRecipe basic;
+        CHECK(factory_assembler_recipe_get(
+            FACTORY_ASSEMBLER_RECIPE_BASIC_SCIENCE,&basic));
+        CHECK(basic.input_items[0]==FACTORY_ITEM_IRON_GEAR
+            &&basic.input_amounts[0]==1U
+            &&basic.input_items[1]==FACTORY_ITEM_ELECTRONIC_COMPONENT
+            &&basic.input_amounts[1]==1U&&basic.input_count==2U
+            &&basic.output_item==FACTORY_ITEM_BASIC_SCIENCE
+            &&basic.output_amount==1U
+            &&basic.processing_ticks
+                ==FACTORY_ASSEMBLER_ELECTRONIC_COMPONENT_TICKS
+            &&basic.required_unlock==FACTORY_UNLOCK_NONE);
+    }
     CHECK(!factory_assembler_recipe_get(
         FACTORY_ASSEMBLER_RECIPE_NONE, &recipe
     ));
@@ -364,6 +378,12 @@ int main(void)
         FACTORY_ITEM_COPPER_PLATE, 1U,
         FACTORY_ITEM_NONE,
         FACTORY_ITEM_COPPER_WIRE, 2U
+    );
+    run_recipe(
+        FACTORY_ASSEMBLER_RECIPE_BASIC_SCIENCE,
+        FACTORY_ITEM_IRON_GEAR, 1U,
+        FACTORY_ITEM_ELECTRONIC_COMPONENT,
+        FACTORY_ITEM_BASIC_SCIENCE, 1U
     );
     test_storage_new_items();
     test_configuration_demolition_fifo();

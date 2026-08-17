@@ -47,6 +47,7 @@ public:
         int64_t entity_type,int64_t x,int64_t y,int64_t direction);
     int64_t queue_demolish_entity(int64_t entity_id);
     int64_t queue_set_assembler_recipe(int64_t entity_id,int64_t recipe_id);
+    int64_t queue_set_refinery_recipe(int64_t entity_id,int64_t recipe_id);
     int64_t queue_set_storage_output(int64_t entity_id,int64_t item_type);
     int64_t queue_select_research(int64_t technology_id);
     int64_t queue_set_rail_switch_branch(int64_t entity_id,int64_t branch);
@@ -70,6 +71,7 @@ public:
     Array get_build_catalog() const;
     Array get_technology_catalog() const;
     Array get_assembler_recipe_catalog() const;
+    Array get_refinery_recipe_catalog() const;
     Array get_item_catalog() const;
     int64_t get_construction_units() const;
     int64_t place_fluid_tank(int64_t x, int64_t y);
