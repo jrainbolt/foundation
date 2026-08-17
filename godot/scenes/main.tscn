@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource path="res://scripts/main.gd" type="Script" id="1"]
 [ext_resource path="res://scripts/factory_canvas.gd" type="Script" id="2"]
@@ -7,6 +7,8 @@
 [ext_resource path="res://scripts/world_controller.gd" type="Script" id="5"]
 [ext_resource path="res://ui/entity_inspector.tscn" type="PackedScene" id="6"]
 [ext_resource path="res://scripts/build_toolbar.gd" type="Script" id="7"]
+[ext_resource path="res://scripts/research_panel.gd" type="Script" id="8"]
+[ext_resource path="res://scripts/alert_panel.gd" type="Script" id="9"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -75,6 +77,30 @@ text = "Run"
 unique_name_in_owner = true
 text = "Tick: 0"
 
+[node name="ResearchSummary" type="Label" parent="Interface/Toolbar/Controls"]
+unique_name_in_owner = true
+text = "Research: None"
+
+[node name="GoalLabel" type="Label" parent="Interface/Toolbar/Controls"]
+unique_name_in_owner = true
+text = "Next: inspect the factory"
+
+[node name="SelectionSummary" type="Label" parent="Interface/Toolbar/Controls"]
+unique_name_in_owner = true
+text = "Selected: None"
+
+[node name="ResearchButton" type="Button" parent="Interface/Toolbar/Controls"]
+unique_name_in_owner = true
+text = "Research"
+
+[node name="AlertButton" type="Button" parent="Interface/Toolbar/Controls"]
+unique_name_in_owner = true
+text = "Alerts 0"
+
+[node name="HistoryButton" type="Button" parent="Interface/Toolbar/Controls"]
+unique_name_in_owner = true
+text = "History"
+
 [node name="StatusLabel" type="Label" parent="Interface/Toolbar/Controls"]
 unique_name_in_owner = true
 text = "Status: ready"
@@ -107,6 +133,7 @@ size_flags_vertical = 3
 layout_mode = 2
 text = "Recent simulation events"
 theme_override_font_sizes/font_size = 15
+visible = false
 
 [node name="EventLog" type="RichTextLabel" parent="Interface/Sidebar"]
 unique_name_in_owner = true
@@ -115,6 +142,35 @@ layout_mode = 2
 size_flags_vertical = 3
 bbcode_enabled = true
 scroll_following = true
+visible = false
+
+[node name="ResearchPanel" type="PanelContainer" parent="Interface"]
+unique_name_in_owner = true
+offset_left = 18.0
+offset_top = 62.0
+offset_right = 430.0
+offset_bottom = 350.0
+visible = false
+script = ExtResource("8")
+
+[node name="AlertPanel" type="PanelContainer" parent="Interface"]
+unique_name_in_owner = true
+offset_left = 438.0
+offset_top = 62.0
+offset_right = 738.0
+offset_bottom = 300.0
+visible = false
+script = ExtResource("9")
+
+[node name="NotificationLabel" type="Label" parent="Interface"]
+unique_name_in_owner = true
+offset_left = 360.0
+offset_top = 62.0
+offset_right = 720.0
+offset_bottom = 92.0
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 0.88, 0.35, 1)
+theme_override_font_sizes/font_size = 16
 
 [node name="BuildPanel" type="PanelContainer" parent="Interface"]
 offset_left = 12.0
@@ -141,7 +197,7 @@ theme_override_font_sizes/font_size = 14
 
 [node name="BuildScroll" type="ScrollContainer" parent="Interface/BuildPanel/Layout"]
 layout_mode = 2
-horizontal_scroll_mode = 2
+horizontal_scroll_mode = 0
 vertical_scroll_mode = 0
 
 [node name="BuildToolbar" type="HBoxContainer" parent="Interface/BuildPanel/Layout/BuildScroll"]

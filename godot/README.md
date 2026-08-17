@@ -11,6 +11,27 @@ mode shows its advisory Manhattan coverage: green has known supply, amber is
 covered but empty, and red is uncovered or otherwise invalid. Normal command
 results remain authoritative.
 
+## Frontend state boundary
+
+The gameplay HUD, open/closed panels, selected build category, advisory
+affordability text, active alerts, notifications, event-history rows, camera,
+hover, and selection are transient Godot state. They are rebuilt from copied
+presentation records, immutable content catalogs, inspection APIs, command
+results, and committed events. None of that state is written to Foundation or
+included in snapshots.
+
+Research selection and construction still cross the boundary only as normal
+FIFO commands. Foundation alone validates prerequisites, unlocks, supply,
+terrain, and occupancy. The UI may explain or predict those rules, but its
+prediction is never authoritative. Build categories and progression ordering
+are presentation metadata; costs, prerequisites, science requirements, unlock
+flags, completion, and entity availability come from Foundation definitions.
+
+The compact top HUD shows deterministic time, active research, the next
+incomplete technology, and a grouped alert count. Research and alert panels are
+on-demand overlays. The event history is secondary and collapsed by default;
+only important committed events create transient notifications.
+
 ## Pinned prerequisites
 
 - Godot 4.5 or a later compatible Godot 4.x release
@@ -108,6 +129,7 @@ For a headless integration smoke test after building:
 godot --headless --path . --script tests/smoke.gd
 godot --headless --path . --script tests/main_scene_smoke.gd
 godot --headless --path . --script tests/interaction_smoke.gd
+godot --headless --path . --script tests/hud_smoke.gd
 ```
 
 The first test checks native-class loading, safe uninitialized access,

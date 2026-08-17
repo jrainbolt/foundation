@@ -48,6 +48,7 @@ public:
     int64_t queue_demolish_entity(int64_t entity_id);
     int64_t queue_set_assembler_recipe(int64_t entity_id,int64_t recipe_id);
     int64_t queue_set_storage_output(int64_t entity_id,int64_t item_type);
+    int64_t queue_select_research(int64_t technology_id);
     int64_t queue_set_rail_switch_branch(int64_t entity_id,int64_t branch);
     int64_t queue_set_rail_station_freight_mode(int64_t entity_id,int64_t mode);
     int64_t queue_set_rail_station_freight_item(int64_t entity_id,int64_t item);
@@ -67,6 +68,7 @@ public:
     Array get_train_schedule(int64_t train_id) const;
     Array get_command_results() const;
     Array get_build_catalog() const;
+    Array get_technology_catalog() const;
     Array get_assembler_recipe_catalog() const;
     Array get_item_catalog() const;
     int64_t get_construction_units() const;

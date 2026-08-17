@@ -217,6 +217,8 @@ void FoundationSimulation::_bind_methods()
     ClassDB::bind_method(
         D_METHOD("queue_set_storage_output","entity_id","item_type"),
         &FoundationSimulation::queue_set_storage_output);
+    ClassDB::bind_method(D_METHOD("queue_select_research","technology_id"),
+        &FoundationSimulation::queue_select_research);
     ClassDB::bind_method(
         D_METHOD("queue_set_rail_switch_branch","entity_id","branch"),
         &FoundationSimulation::queue_set_rail_switch_branch);
@@ -258,6 +260,8 @@ void FoundationSimulation::_bind_methods()
         &FoundationSimulation::get_command_results);
     ClassDB::bind_method(D_METHOD("get_build_catalog"),
         &FoundationSimulation::get_build_catalog);
+    ClassDB::bind_method(D_METHOD("get_technology_catalog"),
+        &FoundationSimulation::get_technology_catalog);
     ClassDB::bind_method(D_METHOD("get_assembler_recipe_catalog"),
         &FoundationSimulation::get_assembler_recipe_catalog);
     ClassDB::bind_method(D_METHOD("get_item_catalog"),
@@ -989,6 +993,20 @@ int64_t FoundationSimulation::queue_set_storage_output(
     return factory_simulation_submit_command(simulation_,&command);
 }
 
+int64_t FoundationSimulation::queue_select_research(int64_t technology_id)
+{
+    if (simulation_==nullptr || technology_id<=FACTORY_TECHNOLOGY_NONE
+        || technology_id>UINT32_MAX
+        || factory_technology_definition_get(
+            (FactoryTechnologyId)technology_id)==nullptr)
+        return FACTORY_RESULT_INVALID_ARGUMENT;
+    FactoryCommand command={};
+    command.type=FACTORY_COMMAND_SELECT_RESEARCH;
+    command.data.select_research.technology_id=
+        (FactoryTechnologyId)technology_id;
+    return factory_simulation_submit_command(simulation_,&command);
+}
+
 int64_t FoundationSimulation::queue_set_rail_switch_branch(
     int64_t entity_id,int64_t branch)
 {
@@ -1274,6 +1292,56 @@ Array FoundationSimulation::get_build_catalog() const
             return Array();
         value["unlocked"]=simulation_!=nullptr
             && factory_simulation_is_entity_unlocked(simulation_,d->entity_type);
+        values.append(value);
+    }
+    return values;
+}
+
+Array FoundationSimulation::get_technology_catalog() const
+{
+    Array values;
+    if (simulation_==nullptr) return values;
+    const FactoryTechnologyId active=
+        factory_simulation_get_active_research(simulation_);
+    for (size_t i=0U;i<factory_technology_definition_count();++i) {
+        const FactoryTechnologyDefinition *definition=
+            factory_technology_definition_at(i);
+        if (definition==nullptr) continue;
+        FactoryTechnologyProgressInspection progress={};
+        if (factory_simulation_get_technology_progress(
+                simulation_,definition->id,&progress)!=FACTORY_RESULT_OK)
+            return Array();
+        Dictionary value;
+        value["technology_id"]=(int64_t)definition->id;
+        Array prerequisites;
+        bool prerequisites_met=true;
+        for (uint32_t j=0U;j<definition->prerequisite_count;++j) {
+            prerequisites.append((int64_t)definition->prerequisites[j]);
+            prerequisites_met=prerequisites_met
+                && factory_simulation_is_technology_completed(
+                    simulation_,definition->prerequisites[j]);
+        }
+        value["prerequisites"]=prerequisites;
+        value["science_item"]=(int64_t)definition->science_item;
+        value["science_quantity_per_unit"]=
+            (int64_t)definition->science_quantity_per_unit;
+        value["required_units"]=(int64_t)definition->required_science_units;
+        value["completed_units"]=(int64_t)progress.completed_units;
+        value["work_ticks"]=(int64_t)progress.work_ticks_in_current_unit;
+        value["work_ticks_per_unit"]=(int64_t)definition->work_ticks_per_unit;
+        value["unlock_flags"]=(int64_t)definition->unlock_flags;
+        value["completed"]=progress.completed;
+        value["active"]=active==definition->id;
+        value["available"]=prerequisites_met&&!progress.completed;
+        Array unlocked_entities;
+        for (size_t j=0U;j<factory_content_entity_definition_count();++j) {
+            const FactoryEntityDefinition *entity=
+                factory_content_entity_definition_at(j);
+            if (entity!=nullptr && entity->required_unlock!=FACTORY_UNLOCK_NONE
+                && (entity->required_unlock&definition->unlock_flags)!=0U)
+                unlocked_entities.append((int64_t)entity->entity_type);
+        }
+        value["unlocked_entities"]=unlocked_entities;
         values.append(value);
     }
     return values;

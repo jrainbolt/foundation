@@ -6,6 +6,7 @@ const DIRECTIONS := ["North", "East", "South", "West"]
 const ITEMS := ["None", "Iron Ore", "Iron Plate", "Copper Ore", "Copper Plate", "Electronic Component", "Iron Gear", "Copper Wire", "Biomass Pellet", "Basic Science", "Construction Material", "Coal", "Steel", "Advanced Component", "Advanced Science"]
 const FLUIDS := ["None", "Water", "Steam", "Exhaust Steam"]
 const STATUSES := ["None", "Idle", "Working", "Blocked: input", "Blocked: output", "Unpowered"]
+const TECHNOLOGIES := ["None","Basic Automation","Fluid Handling","Advanced Manufacturing"]
 
 static func entity_type(value: int) -> String:
 	return ENTITY_NAMES[value] if value >= 0 and value < ENTITY_NAMES.size() else "Entity type %d" % value
@@ -21,6 +22,9 @@ static func fluid(value: int) -> String:
 
 static func machine_status(value: int) -> String:
 	return STATUSES[value] if value >= 0 and value < STATUSES.size() else "Status %d" % value
+
+static func technology(value: int) -> String:
+	return TECHNOLOGIES[value] if value >= 0 and value < TECHNOLOGIES.size() else "Technology %d" % value
 
 static func number(value: int) -> String:
 	var source := str(value)

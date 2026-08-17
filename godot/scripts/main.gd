@@ -17,6 +17,14 @@ const STEPS_PER_SECOND := 12.0
 @onready var sidebar: VBoxContainer = $Interface/Sidebar
 @onready var sidebar_backdrop: ColorRect = $Interface/SidebarBackdrop
 @onready var top_toolbar: PanelContainer = $Interface/Toolbar
+@onready var research_summary: Label = %ResearchSummary
+@onready var goal_label: Label = %GoalLabel
+@onready var selection_summary: Label = %SelectionSummary
+@onready var alert_button: Button = %AlertButton
+@onready var history_button: Button = %HistoryButton
+@onready var research_panel: Control = %ResearchPanel
+@onready var alert_panel: Control = %AlertPanel
+@onready var notification_label: Label = %NotificationLabel
 const Format := preload("res://scripts/presentation_format.gd")
 
 var simulation: Object
@@ -49,6 +57,11 @@ func _ready() -> void:
 	inspector.train_schedule_remove_requested.connect(_on_train_schedule_remove_requested)
 	inspector.train_schedule_clear_requested.connect(_on_train_schedule_clear_requested)
 	inspector.train_schedule_enabled_requested.connect(_on_train_schedule_enabled_requested)
+	%ResearchButton.pressed.connect(_toggle_research)
+	alert_button.pressed.connect(_toggle_alerts)
+	history_button.pressed.connect(_toggle_history)
+	research_panel.research_requested.connect(_on_research_requested)
+	alert_panel.entity_requested.connect(_on_alert_entity_requested)
 	_reset_demo()
 	build_toolbar.configure(simulation)
 	inspector.configure_catalogs(
@@ -71,8 +84,8 @@ func _position_interface() -> void:
 	sidebar_backdrop.size = sidebar.size + Vector2(8.0,0.0)
 	top_toolbar.position = Vector2(12.0, 10.0)
 	top_toolbar.size = Vector2(viewport_size.x - sidebar_width - 34.0, 44.0)
-	build_panel.position = Vector2(12.0, viewport_size.y - 122.0)
-	build_panel.size = Vector2(maxf(360.0, viewport_size.x - sidebar_width - 34.0), 112.0)
+	build_panel.position = Vector2(12.0, viewport_size.y - 166.0)
+	build_panel.size = Vector2(maxf(360.0, viewport_size.x - sidebar_width - 34.0), 156.0)
 
 func _physics_process(delta: float) -> void:
 	if not running:
@@ -91,6 +104,9 @@ func _reset_demo() -> void:
 	run_button.text = "Run"
 	cadence_accumulator = 0.0
 	event_lines.clear()
+	notification_label.text = ""
+	research_panel.visible = false
+	alert_panel.visible = false
 	if is_instance_valid(world_controller):
 		world_controller.clear_selection()
 		world_controller.enter_select_mode()
@@ -140,6 +156,9 @@ func _synchronize() -> bool:
 		if int(entity.id) == selected_id:
 			selected_state = entity
 			break
+	selection_summary.text = "Selected: None" if selected_state.is_empty() else \
+		"Selected: %s #%d — %s" % [Format.entity_type(int(selected_state.get("type",0))),
+		selected_id,Format.machine_status(int(selected_state.get("status",0)))]
 	if int(selected_state.get("type",0)) == 27:
 		inspector.configure_train_schedule(
 			simulation.get_train_schedule(selected_id),
@@ -152,12 +171,34 @@ func _synchronize() -> bool:
 	world_controller.refresh_selection()
 	world_controller.set_hovered_grid(world_controller.hovered_grid)
 	build_toolbar.refresh(simulation)
-	construction_label.text = "Construction: %d units" % int(simulation.get_construction_units())
+	var depot_supply := 0
+	var depot_count := 0
+	for entity: Dictionary in entities:
+		if int(entity.get("type",0)) == 23:
+			depot_count += 1
+			depot_supply += int(entity.get("material_quantity",0))
+	construction_label.text = "%s: %s units" % [
+		"Depot supply" if depot_count > 0 else "Bootstrap supply",
+		Format.number(depot_supply if depot_count > 0 else int(simulation.get_construction_units()))]
 	tick_label.text = "Tick: %d  Day: %d  Time: %d" % [
 		tick, day, time_of_day
 	]
+	var research_catalog: Array = simulation.get_technology_catalog()
+	research_panel.refresh(research_catalog)
+	var active_name := "None"
+	var next_name := "Factory complete"
+	for technology: Dictionary in research_catalog:
+		if bool(technology.active): active_name = Format.technology(int(technology.technology_id))
+		if next_name == "Factory complete" and not bool(technology.completed):
+			next_name = Format.technology(int(technology.technology_id))
+	var research: Dictionary = simulation.get_research()
+	research_summary.text = "Research: %s  %d/%d" % [active_name,
+		int(research.get("completed_units",0)),int(research.get("required_units",0))]
+	goal_label.text = "Next: %s" % next_name
+	var alert_groups := _derive_alerts(entities)
+	alert_panel.refresh(alert_groups)
+	alert_button.text = "Alerts %d" % alert_panel.alert_count
 	if world_controller.selected_entity_id == 0:
-		var research: Dictionary = simulation.get_research()
 		var powered_count := 0
 		for entity: Dictionary in entities:
 			if bool(entity.get("powered", false)): powered_count += 1
@@ -184,6 +225,11 @@ func _append_events(events: Array) -> void:
 		var background := "#18202a" if event_lines.size() % 2 == 0 else "#202935"
 		var accent := "#65d3e7" if int(event.type) >= 20 else "#e5c85a"
 		event_lines.append("[bgcolor=%s][color=%s]▎[/color][font_size=12] %s [/font_size][/bgcolor]" % [background, accent, row])
+		match int(event.type):
+			38: notification_label.text = "Technology completed: %s" % Format.technology(int(event.technology_id))
+			41: notification_label.text = "Resource deposit depleted"
+			47: notification_label.text = "Train route invalidated — inspect the train"
+			48: notification_label.text = "Train arrived at station"
 	while event_lines.size() > MAX_EVENT_LINES:
 		event_lines.pop_front()
 
@@ -199,6 +245,54 @@ func _on_step_pressed() -> void:
 func _on_run_pressed() -> void:
 	running = not running
 	run_button.text = "Pause" if running else "Run"
+
+func _toggle_research() -> void:
+	research_panel.visible = not research_panel.visible
+	if research_panel.visible: alert_panel.visible = false
+
+func _toggle_alerts() -> void:
+	alert_panel.visible = not alert_panel.visible
+	if alert_panel.visible: research_panel.visible = false
+
+func _toggle_history() -> void:
+	event_log.visible = not event_log.visible
+	$Interface/Sidebar/LogLabel.visible = event_log.visible
+	history_button.text = "Hide History" if event_log.visible else "History"
+
+func _on_research_requested(technology_id: int) -> void:
+	var queued := int(simulation.queue_select_research(technology_id))
+	if queued != 0:
+		_show_result(queued)
+		return
+	research_panel.visible = false
+	_execute_queued_command("Research selected: %s" % Format.technology(technology_id))
+
+func _on_alert_entity_requested(entity_id: int) -> void:
+	if not world_controller.select_entity(entity_id): return
+	var visual: FoundationEntityVisual = canvas.entity_nodes[entity_id]
+	%Camera2D.center_on_grid(Vector2i(int(visual.state.x),int(visual.state.y)),76.0)
+	alert_panel.visible = false
+
+func _derive_alerts(entities: Array) -> Dictionary:
+	var groups := {"Unpowered":[],"Blocked input":[],"Blocked output":[],
+		"Depleted resource":[],"Train waiting":[],"Invalid route":[],
+		"Disconnected station":[],"Research missing science":[]}
+	for entity: Dictionary in entities:
+		var id := int(entity.get("id",0))
+		match int(entity.get("status",0)):
+			3: groups["Blocked input"].append(id)
+			4: groups["Blocked output"].append(id)
+			5: groups["Unpowered"].append(id)
+		if int(entity.get("type",0)) == 1 and int(entity.get("resource_remaining",1)) == 0:
+			groups["Depleted resource"].append(id)
+		if int(entity.get("type",0)) == 27:
+			if int(entity.get("reservation_status",0)) == 2: groups["Train waiting"].append(id)
+			if int(entity.get("route_status",0)) == 3: groups["Invalid route"].append(id)
+		if int(entity.get("type",0)) == 25 and not bool(entity.get("rail_connected",false)):
+			groups["Disconnected station"].append(id)
+		if int(entity.get("type",0)) == 22 and int(entity.get("activity",0)) == 4:
+			groups["Research missing science"].append(id)
+	return groups
 
 func _on_build_selected(entity_type: int) -> void:
 	world_controller.enter_build_mode(entity_type)
