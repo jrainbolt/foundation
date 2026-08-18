@@ -446,4 +446,12 @@ target_link_libraries(factory_playable_prerequisite_tests PRIVATE
     factory_engine foundation_project_options)
 add_test(NAME factory_playable_prerequisite_tests
     COMMAND factory_playable_prerequisite_tests)
+add_executable(factory_first_factory_completion_tests
+    tests/test_first_factory_completion.c)
+target_include_directories(factory_first_factory_completion_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(factory_first_factory_completion_tests PRIVATE
+    factory_engine foundation_project_options)
+add_test(NAME factory_first_factory_completion_tests
+    COMMAND factory_first_factory_completion_tests)
 endif()
